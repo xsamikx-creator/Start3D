@@ -1,0 +1,23 @@
+{
+  // Start3D on Cloudflare Workers: static site (index.html) + API + Telegram bot.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "start3d",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  },
+  // No database_id: Wrangler creates the "start3d" D1 database on the first deploy.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "start3d" }
+  ],
+  "observability": { "enabled": true },
+  "vars": {
+    "BOT_USERNAME": "start3d_bot",
+    "ADMIN_TG_ID": "",
+    "CARD_TEXT": "4169 •••• •••• 0000 (пример, замените)",
+    "DEPOSIT_PCT": "50"
+  }
+  // Secrets are set in the dashboard, never here: BOT_TOKEN, WEBHOOK_SECRET.
+}
