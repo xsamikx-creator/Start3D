@@ -448,7 +448,9 @@ async function onCallback(env, q, origin) {
 // Registers the webhook once per origin, so no manual /tg/setup call is needed.
 async function ensureWebhook(env, origin) {
   if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET || origin.includes('localhost')) return;
-  if ((await kvGet(env, 'webhook')) === origin) return;
+  // Keyed by origin + bot id, so swapping BOT_TOKEN for a new bot re-registers the webhook.
+  const key = `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`;
+  if ((await kvGet(env, 'webhook')) === key) return;
   const r = await tg(env, 'setWebhook', { url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
   if (!r.ok) return console.error('setWebhook failed', r.description);
   await tg(env, 'setMyCommands', { commands: [
@@ -457,7 +459,7 @@ async function ensureWebhook(env, origin) {
   ] });
   const me = await tg(env, 'getMe', {});
   if (me.ok) await kvSet(env, 'bot_username', me.result.username);
-  await kvSet(env, 'webhook', origin);
+  await kvSet(env, 'webhook', key);
 }
 // Owner: ADMIN_TG_ID var, or the first person who sends /admin to the bot.
 async function adminId(env) { return env.ADMIN_TG_ID || (await kvGet(env, 'admin')); }
@@ -484,7 +486,7 @@ export default {
       ctx.waitUntil(ensureWebhook(env, origin).catch((e) => console.error('webhook', e)));
       if (p === '/api/health') {
         const bot = await kvGet(env, 'bot_username');
-        return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === origin, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
+        return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);

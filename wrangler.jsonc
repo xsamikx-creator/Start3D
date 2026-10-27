@@ -16,7 +16,7 @@
   // Keep variables added in the dashboard (CARD_TEXT with payment details lives only there).
   "keep_vars": true,
   "vars": {
-    "BOT_USERNAME": "start3d_baku_bot",
+    "BOT_USERNAME": "Strt3d_bot",
     "ADMIN_TG_ID": "",
     "DEPOSIT_PCT": "50"
   }

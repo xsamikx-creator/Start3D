@@ -515,7 +515,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 <footer>
   <span data-i="foot"></span>
-  <span class="mono">Telegram @start3d_baku_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
+  <span class="mono">Telegram @Strt3d_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
 </footer>
 
 <div class="modal" id="m" hidden>
@@ -634,7 +634,7 @@ f_cname:['Adınız (printer ekranı üçün)','Ваше имя (для дисп�
 cname_note:['Çap zamanı bu ad printerin yanındakı kiçik ekranda görünəcək. 16 simvola qədər.','Во время печати это имя будет на мини-дисплее у принтера. До 16 символов.','Під час друку це ім’я буде на мінідисплеї біля принтера. До 16 символів.','During printing this name is shown on the mini display next to the printer. Up to 16 characters.'],
 f_phone:['Əlaqə telefonu','Телефон для связи','Телефон для зв’язку','Contact phone'],
 f_email:['E-poçt','Email','Email','Email'],
-tg_note:['Sifarişdən sonra @start3d_baku_bot-a Start basın və nömrənizi paylaşın — bundan sonra bu nömrəyə olan bütün sifarişlər avtomatik gələcək.','После оформления нажмите Start в @start3d_baku_bot и поделитесь номером — дальше все заказы на этот номер будут приходить автоматически.','Після оформлення натисніть Start у @start3d_baku_bot і поділіться номером — далі всі замовлення на цей номер надходитимуть автоматично.','After ordering, press Start in @start3d_baku_bot and share your number; from then on every order with that number arrives automatically.'],
+tg_note:['Sifarişdən sonra @Strt3d_bot-a Start basın və nömrənizi paylaşın — bundan sonra bu nömrəyə olan bütün sifarişlər avtomatik gələcək.','После оформления нажмите Start в @Strt3d_bot и поделитесь номером — дальше все заказы на этот номер будут приходить автоматически.','Після оформлення натисніть Start у @Strt3d_bot і поділіться номером — далі всі замовлення на цей номер надходитимуть автоматично.','After ordering, press Start in @Strt3d_bot and share your number; from then on every order with that number arrives automatically.'],
 f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
 f_deliv:['Təhvil','Получение','Отримання','Delivery'],
 d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
@@ -772,7 +772,7 @@ issue_sent:['Sualınız operatora göndərildi','Ваш вопрос отпра�
 reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная перепечатка поставлена в очередь','Безкоштовний передрук поставлено в чергу','A free reprint has been queued'],
 tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
 tg_p:['Botu açın, Start basın və «Nömrəni paylaş» düyməsinə toxunun. Bir dəfə kifayətdir: bu nömrəyə olan bütün sifarişlər özü gələcək.','Откройте бота, нажмите Start и «Поделиться номером». Это нужно один раз: все заказы на ваш номер дальше будут приходить сами.','Відкрийте бота, натисніть Start і «Поділитися номером». Це потрібно один раз: усі замовлення на ваш номер далі надходитимуть самі.','Open the bot, press Start and “Share my number”. You only do this once: every order with your number then arrives by itself.'],
-tg_open:['@start3d_baku_bot-u aç','Открыть @start3d_baku_bot','Відкрити @start3d_baku_bot','Open @start3d_baku_bot'],
+tg_open:['@Strt3d_bot-u aç','Открыть @Strt3d_bot','Відкрити @Strt3d_bot','Open @Strt3d_bot'],
 tg_code:['Bot sifariş nömrəsi olmadan cavab versə, ona bu kodu göndərin:','Если бот ответил без номера заказа — отправьте ему этот код:','Якщо бот відповів без номера замовлення — надішліть йому цей код:','If the bot replied without your order number, send it this code:'],
 tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
 tg_wait:['bot qoşulmayıb','бот не подключён','бот не підключений','bot not connected'],
@@ -978,7 +978,7 @@ function copyText(txt){ const ok = () => toast(t('copied') + ': ' + txt); try { 
 const codeOf = id => [...id].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0, 11).toString(36).slice(0,4);
 const MY_REF = 'START-' + codeOf('s3d-me').toUpperCase().padEnd(4,'X');
 let SERVER = null; // {bot} when the Start3D server answers on this origin
-const BOT = () => (SERVER && SERVER.bot) || 'start3d_baku_bot';
+const BOT = () => (SERVER && SERVER.bot) || 'Strt3d_bot';
 const linkOf = o => o.code ? `${location.host}/#track-${o.id}-${o.code}` : `start3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
 async function api(path, body){
   const r = await fetch(path, body ? {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)} : {cache:'no-store'});
