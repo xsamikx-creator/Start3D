@@ -206,8 +206,14 @@ async function onUpdate(env, u, origin) {
   const text = (m.text || '').trim();
   const say = (t, extra = {}) => tg(env, 'sendMessage', { chat_id: chat.id, text: t, ...extra });
 
+  if (/^\/admin(@\w+)?$/.test(text) && chat.type === 'private') {
+    const cur = await adminId(env);
+    if (cur && String(cur) !== String(from.id)) return say('Владелец уже назначен.');
+    if (!cur) await kvSet(env, 'admin', from.id);
+    return say('✅ Вы владелец Start3D.\nТеперь создайте группу для операторов, добавьте туда бота и напишите в группе /operator');
+  }
   if (/^\/operator(@\w+)?$/.test(text)) {
-    if (String(from.id) !== String(env.ADMIN_TG_ID)) return say('Только владелец может назначить операторский чат.');
+    if (String(from.id) !== String(await adminId(env))) return say('Только владелец может назначить операторский чат. Сначала напишите боту в личку /admin');
     await kvSet(env, 'operator_chat', chat.id);
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
@@ -247,7 +253,7 @@ async function onUpdate(env, u, origin) {
 async function onCallback(env, q, origin) {
   const [act, id] = String(q.data || '').split(/:(.+)/);
   const opChat = await kvGet(env, 'operator_chat');
-  const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(env.ADMIN_TG_ID);
+  const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
   if (!allowed) return answer('Нет доступа');
   const o = await getOrder(env, id);
@@ -272,6 +278,23 @@ async function onCallback(env, q, origin) {
   return answer(note);
 }
 
+// Registers the webhook once per origin, so no manual /tg/setup call is needed.
+async function ensureWebhook(env, origin) {
+  if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET || origin.includes('localhost')) return;
+  if ((await kvGet(env, 'webhook')) === origin) return;
+  const r = await tg(env, 'setWebhook', { url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
+  if (!r.ok) return console.error('setWebhook failed', r.description);
+  await tg(env, 'setMyCommands', { commands: [
+    { command: 'orders', description: 'Мои заказы' },
+    { command: 'id', description: 'Мой Telegram ID' },
+  ] });
+  const me = await tg(env, 'getMe', {});
+  if (me.ok) await kvSet(env, 'bot_username', me.result.username);
+  await kvSet(env, 'webhook', origin);
+}
+// Owner: ADMIN_TG_ID var, or the first person who sends /admin to the bot.
+async function adminId(env) { return env.ADMIN_TG_ID || (await kvGet(env, 'admin')); }
+
 async function setup(env, origin) {
   const hook = await tg(env, 'setWebhook', {
     url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true,
@@ -291,7 +314,11 @@ export default {
     if (!p.startsWith('/api/') && !p.startsWith('/tg/')) return env.ASSETS.fetch(req);
     try {
       await init(env);
-      if (p === '/api/health') return json({ ok: true, bot: env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN });
+      ctx.waitUntil(ensureWebhook(env, origin).catch((e) => console.error('webhook', e)));
+      if (p === '/api/health') {
+        const bot = await kvGet(env, 'bot_username');
+        return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === origin, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
+      }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
