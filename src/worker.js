@@ -20,6 +20,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS orders_chat ON orders(tg_chat_id)`,
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`,
   `CREATE TABLE IF NOT EXISTS phones (phone TEXT PRIMARY KEY, chat_id INTEGER NOT NULL, name TEXT, updated_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
 async function init(env) {
@@ -133,11 +134,20 @@ function opText(o) {
     `Клиент: ${esc(o.client)} · ${esc(o.contact || '')}`,
     `Уведомления: ${o.ch === 'email' ? 'email ' + esc(o.email || '') : o.tg_chat_id ? 'Telegram ✓' : 'Telegram (бот ещё не подключён)'}`,
     `Цена: <b>${price}</b>`,
+    d.printer ? `Принтер: ${esc(printerName(d.printer))}` : '',
     o.reason ? `Причина отказа: ${esc(o.reason)}` : '',
     d.accept === 'ok' ? '✅ Клиент принял деталь' : d.accept === 'issue' ? `❓ Вопрос клиента: «${esc(d.issueText)}»` : d.accept === 'reprint' ? `🔁 Перепечатка №${d.reprints || 1}` : '',
     d.answer ? `💬 Ответ: ${esc(d.answer)}` : '',
   ].filter(Boolean).join('\n');
 }
+// Print farm. Ids must match "id" in bridge/config.json on the workshop computer.
+const PRINTERS = [
+  { id: 'a1-1', name: 'A1 #1' },
+  { id: 'a1-2', name: 'A1 #2' },
+  { id: 'k2', name: 'K2 Plus' },
+  { id: 'ender', name: 'Ender 3 V3' },
+];
+const printerName = (pid) => (PRINTERS.find((p) => p.id === pid) || { name: pid }).name;
 const STATUS_RU = { review: 'ждёт проверки', pay: 'ждёт оплаты', paycheck: 'проверить оплату', queue: 'в очереди', printing: 'печатается', post: 'постобработка', ready: 'готов к выдаче', done: 'выдан', rejected: 'отклонён' };
 const statusRu = (s) => STATUS_RU[s] || s;
 function opButtons(o) {
@@ -202,9 +212,10 @@ async function createOrder(env, req, origin) {
   return json({ id, code, status: o.status, tgLinked: !!o.tg_chat_id, bot: env.BOT_USERNAME || null });
 }
 
-function publicOrder(env, o) {
+function publicOrder(env, o, live) {
   const d = JSON.parse(o.data || '{}');
   return {
+    printer: d.printer || null, printerName: d.printer ? printerName(d.printer) : null, live: live || null,
     id: o.id, status: o.status, price: o.price, lo: o.lo, hi: o.hi, reason: o.reason,
     deposit: o.price ? deposit(env, o.price) : null, tgLinked: !!o.tg_chat_id, ch: o.ch, updated: o.updated_at,
     name: d.name, mat: d.mat, color: d.color ?? 0, qty: d.qty, layers: d.layers, hours: d.hours, grams: d.grams,
@@ -216,7 +227,76 @@ function publicOrder(env, o) {
 async function readOrder(env, id, code) {
   const o = await getOrder(env, id);
   if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
-  return json(publicOrder(env, o));
+  return json(publicOrder(env, o, await liveFor(env, o)));
+}
+async function liveFor(env, o) {
+  const pid = JSON.parse(o.data || '{}').printer;
+  if (!pid || o.status !== 'printing') return null;
+  const r = await env.DB.prepare('SELECT status, order_id, frame_at FROM printers WHERE id=?').bind(pid).first();
+  if (!r || r.order_id !== o.id) return null;
+  const st = JSON.parse(r.status || '{}');
+  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < 60000 };
+}
+
+/* ---------- workshop bridge ---------- */
+const bridgeOk = (env, req) => !!env.BRIDGE_KEY && req.headers.get('authorization') === `Bearer ${env.BRIDGE_KEY}`;
+async function bridgeStatus(env, req, origin, pid) {
+  if (!PRINTERS.some((p) => p.id === pid)) return json({ error: 'unknown_printer' }, 400);
+  const b = await req.json().catch(() => ({}));
+  const st = {
+    state: clip(b.state, 16), percent: Math.max(0, Math.min(100, +b.percent || 0)), layer: +b.layer || 0, layers: +b.layers || 0,
+    remaining: +b.remaining || 0, error: b.error ? clip(b.error, 120) : null, task: clip(b.task, 80), hours: +b.hours || null, at: now(),
+  };
+  const prev = await env.DB.prepare('SELECT status, order_id FROM printers WHERE id=?').bind(pid).first();
+  await env.DB.prepare('INSERT INTO printers(id, status, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at')
+    .bind(pid, JSON.stringify(st), now()).run();
+  const was = JSON.parse(prev?.status || '{}').state;
+  // The print just finished or failed: tell operators, using the order card flow.
+  if (prev?.order_id && was && was !== st.state && ['FINISH', 'FAILED'].includes(st.state)) {
+    const opChat = await kvGet(env, 'operator_chat');
+    const o = await getOrder(env, prev.order_id);
+    if (opChat && o && o.status === 'printing') {
+      if (st.state === 'FINISH') {
+        const r = await tg(env, 'sendMessage', { chat_id: Number(opChat),
+          text: `✅ ${printerName(pid)} закончил ${o.id} (${o.client}). Снимите деталь и пришлите 1–3 фото ОТВЕТОМ на это сообщение.`,
+          reply_markup: { inline_keyboard: [[{ text: 'Готово без фото', callback_data: `dn:${o.id}` }]] } });
+        if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, o.id);
+        await setStatus(env, o.id, { status: 'post' });
+      } else {
+        await tg(env, 'sendMessage', { chat_id: Number(opChat), text: `⚠️ ${printerName(pid)}: печать ${o.id} остановилась с ошибкой${st.error ? ': ' + st.error : ''}. Проверьте принтер.` });
+      }
+    }
+  }
+  return json({ ok: true });
+}
+async function bridgeFrame(env, req, pid) {
+  if (!PRINTERS.some((p) => p.id === pid)) return json({ error: 'unknown_printer' }, 400);
+  const buf = await req.arrayBuffer();
+  if (buf.byteLength < 100 || buf.byteLength > 900000) return json({ error: 'bad_size' }, 400);
+  await env.DB.prepare('INSERT INTO printers(id, frame, frame_at, updated_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET frame=excluded.frame, frame_at=excluded.frame_at')
+    .bind(pid, buf, now(), now()).run();
+  const r = await env.DB.prepare('SELECT watched_at FROM printers WHERE id=?').bind(pid).first();
+  // The bridge sends a frame every few seconds while someone watches, otherwise about once a minute.
+  return json({ watched: !!r?.watched_at && now() - r.watched_at < 30000 });
+}
+
+/* ---------- camera for viewers ---------- */
+async function camFrame(env, url, pid) {
+  const r = await env.DB.prepare('SELECT order_id, frame, frame_at, watched_at FROM printers WHERE id=?').bind(pid).first();
+  if (!r || !r.frame || !r.order_id) return new Response('no frame', { status: 404 });
+  const o = await getOrder(env, r.order_id);
+  const pub = o && JSON.parse(o.data || '{}').pub;
+  const own = o && url.searchParams.get('order') === o.id && url.searchParams.get('code') === o.code;
+  if (!o || o.status !== 'printing' || !(pub || own)) return new Response('forbidden', { status: 403 });
+  if (!r.watched_at || now() - r.watched_at > 10000) await env.DB.prepare('UPDATE printers SET watched_at=? WHERE id=?').bind(now(), pid).run();
+  return new Response(r.frame, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-frame-at': String(r.frame_at) } });
+}
+async function liveList(env) {
+  const rs = await env.DB.prepare("SELECT p.id AS pid, p.status, p.frame_at, o.id, o.client, o.data FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
+  return json(rs.results.filter((r) => JSON.parse(r.data || '{}').pub).map((r) => {
+    const d = JSON.parse(r.data || '{}'), st = JSON.parse(r.status || '{}');
+    return { id: r.id, name: d.name, client: r.client, mat: d.mat, color: d.color ?? 0, printer: r.pid, printerName: printerName(r.pid), percent: st.percent || 0, layer: st.layer || 0, layers: st.layers || 0, remaining: st.remaining || 0, cam: !!r.frame_at && now() - r.frame_at < 60000 };
+  }));
 }
 async function orderPhoto(env, id, code, n) {
   const o = await getOrder(env, id);
@@ -375,12 +455,17 @@ async function onUpdate(env, u, origin) {
 const phoneKeyboard = (lang) => ({ reply_markup: { keyboard: [[{ text: tx('share_btn', lang), request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } });
 async function hasPhone(env, chatId) { return !!(await env.DB.prepare('SELECT 1 FROM phones WHERE chat_id=? LIMIT 1').bind(chatId).first()); }
 
+async function freePrinter(env, orderId) {
+  await env.DB.prepare('UPDATE printers SET order_id=NULL WHERE order_id=?').bind(orderId).run();
+}
+
 async function operatorPhoto(env, origin, id, fileId, say) {
   const o = await getOrder(env, id);
   if (!o) return say('Заказ не найден');
   const d = JSON.parse(o.data || '{}');
   d.photos = (d.photos || []).concat(fileId).slice(-5);
   const first = o.status !== 'ready' && o.status !== 'done';
+  if (first) await freePrinter(env, id);
   const n = await setStatus(env, id, first ? { data: JSON.stringify(d), status: 'ready' } : { data: JSON.stringify(d) });
   if (n.tg_chat_id) {
     const rest = n.price ? n.price - deposit(env, n.price) : 0;
@@ -397,7 +482,9 @@ async function operatorPhoto(env, origin, id, fileId, say) {
 }
 
 async function onCallback(env, q, origin) {
-  const [act, id] = String(q.data || '').split(/:(.+)/);
+  let [act, id] = String(q.data || '').split(/:(.+)/);
+  let pid = null;
+  if (act === 'sp') [pid, id] = String(id).split('|');
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
@@ -424,7 +511,21 @@ async function onCallback(env, q, origin) {
   if (act === 'c' && o.status === 'review') { n = await setStatus(env, id, { status: 'pay', price: base }); await notifyClient(env, origin, n, 'confirmed'); note = 'Цена подтверждена'; }
   else if (act === 'r' && o.status === 'review') { n = await setStatus(env, id, { status: 'rejected', reason: TX.rj_geo[1] }); await notifyClient(env, origin, n, 'rejected', { w: tx('rj_geo', n.lang) }); note = 'Отклонён'; }
   else if (act === 'p' && ['pay', 'paycheck'].includes(o.status)) { n = await setStatus(env, id, { status: 'queue' }); await notifyClient(env, origin, n, 'paid'); note = 'Оплата отмечена'; }
-  else if (act === 's' && o.status === 'queue') { n = await setStatus(env, id, { status: 'printing' }); await notifyClient(env, origin, n, 'printing'); note = 'Печать началась'; }
+  else if (act === 's' && o.status === 'queue') {
+    const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
+    const rows = PRINTERS.map((p) => {
+      const b = busy.results.find((r) => r.id === p.id);
+      return [{ text: `🖨 ${p.name}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `sp:${p.id}|${o.id}` }];
+    });
+    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    return answer('На каком принтере?');
+  }
+  else if (act === 'sp' && o.status === 'queue' && PRINTERS.some((p) => p.id === pid)) {
+    const d = JSON.parse(o.data || '{}'); d.printer = pid;
+    n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
+    await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(pid, id, now()).run();
+    await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(pid)}`;
+  }
   else if (act === 'd' && ['printing', 'post'].includes(o.status)) {
     n = await setStatus(env, id, { status: 'post' });
     const r = await tg(env, 'sendMessage', { chat_id: q.message.chat.id,
@@ -433,7 +534,7 @@ async function onCallback(env, q, origin) {
     if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, id);
     note = 'Жду фото';
   }
-  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
+  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
   else if (act === 'rp' && ['ready', 'done'].includes(o.status)) {
     const d = JSON.parse(o.data || '{}'); d.reprints = (d.reprints || 0) + 1; d.accept = 'reprint';
     n = await setStatus(env, id, { status: 'queue', data: JSON.stringify(d) });
@@ -489,6 +590,14 @@ export default {
         return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
+      if (p === '/api/live') return liveList(env);
+      let b = p.match(/^\/api\/cam\/([a-z0-9-]+)$/);
+      if (b) return camFrame(env, url, b[1]);
+      b = p.match(/^\/api\/bridge\/(status|frame)\/([a-z0-9-]+)$/);
+      if (b && req.method === 'POST') {
+        if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403);
+        return b[1] === 'status' ? bridgeStatus(env, req, origin, b[2]) : bridgeFrame(env, req, b[2]);
+      }
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/photo\/(\d)$/);

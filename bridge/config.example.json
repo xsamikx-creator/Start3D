@@ -1,0 +1,14 @@
+{
+  "server": "https://start3d.xsamikx.workers.dev",
+  "bridgeKey": "ВСТАВЬТЕ_ТОТ_ЖЕ_КЛЮЧ_ЧТО_BRIDGE_KEY_В_CLOUDFLARE",
+  "printers": [
+    {
+      "id": "a1-1",
+      "type": "bambu",
+      "ip": "192.168.0.107",
+      "serial": "СЕРИЙНЫЙ_НОМЕР_С_ЭКРАНА_УСТРОЙСТВО",
+      "accessCode": "8_ЦИФР_ACCESS_CODE_С_ЭКРАНА_СЕТЬ",
+      "camera": "auto"
+    }
+  ]
+}

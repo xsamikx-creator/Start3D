@@ -1,0 +1,8 @@
+{
+  "name": "start3d-bridge",
+  "private": true,
+  "type": "module",
+  "description": "Start3D workshop bridge: printer status and camera frames to the Start3D server",
+  "scripts": { "start": "node bridge.mjs" },
+  "dependencies": { "mqtt": "5.10.1" }
+}
