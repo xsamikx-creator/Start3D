@@ -1945,47 +1945,119 @@ function badges(){
    the part passes the check gate and the photo booth and drops into the «ready» bin; then the next one starts ---------- */
 const FAC = { p:.35, phase:'print', k:0, n:0, colOv:null, items:[], made:37, last:0, flash:0, gate:0, mx:-1, my:-1, id:1043, seeded:false };
 const F_NAMES = ['Leyla','Murad','Aysel','Samir','Nigar','Elvin','Kamran','Günay','Rauf','Lala'];
-const F_L = 72, F_PRINT = 8;
-/* Baku landmarks as print silhouettes: seg(k) returns the filled spans of layer k (0 = bed, 1 = top) in units of the half-width */
-const sq = v => Math.sqrt(Math.max(0, v));
+const F_L = 90, F_PRINT = 8.5;
+/* Baku landmarks: each is a detailed silhouette in its own units (origin = bottom centre, y up, height 100, width wu).
+   It is rendered once into a sprite (shape → material colour → shading → details → layer lines); the printer reveals it row by row. */
+const poly = (g, pts) => { g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); };
+const arch = (g, x, y, w, h) => { g.moveTo(x - w/2, y); g.lineTo(x - w/2, y + h - w*.55); g.quadraticCurveTo(x - w/2, y + h - w*.1, x, y + h); g.quadraticCurveTo(x + w/2, y + h - w*.1, x + w/2, y + h - w*.55); g.lineTo(x + w/2, y); g.closePath(); };
+const flame = (g, cx, bw, h, lean) => {
+  g.moveTo(cx - bw/2, 4);
+  g.bezierCurveTo(cx - bw*.78, h*.42, cx - bw*.42 + lean*.4, h*.82, cx + lean, h);
+  g.bezierCurveTo(cx + bw*.18 + lean*.5, h*.86, cx + bw*.8, h*.55, cx + bw/2, 4); g.closePath(); };
 const LANDMARKS = [
-  {k:'lm_maiden', col:'#C49A62', wf:.78, hf:.95, seg:k => {           // Qız qalası: tapering tower + the buttress on its side, slits and a crown band
-    const h = .52 - .06*k, out = [[-h, h]];
-    if (k < .86) out.push([h - .02, h + .3 - .12*k]);
-    if (k > .9) out[0] = [-h - .04, h + .04];
-    if ((k > .3 && k < .34) || (k > .6 && k < .64)) out[0] = [-h, -.08], out.splice(1, 0, [.04, h]);
-    return out; }},
-  {k:'lm_flame', col:'#3D7BE0', wf:1.25, hf:1, seg:k => {             // Alov qüllələri: three flame-shaped towers on one podium
-    if (k < .05) return [[-.95, .95]];
-    return [[-.58, .78], [0, 1], [.58, .86]].flatMap(([c, H]) => { if (k > H) return []; const u = k / H, w = .27*(1 - Math.pow(u, 2.4))*(.85 + .3*Math.sin(u*Math.PI)), x = c + Math.sign(c)*.09*u*u; return [[x - w, x + w]]; }); }},
-  {k:'lm_hac', col:'#EDEDE6', wf:1.45, hf:.72, seg:k => {               // Heydər Əliyev Mərkəzi: flowing white wave, low on the left, the big curl on the right
-    const H = x => Math.max(.38*Math.exp(-(((x + .55)/.32)**2)), Math.exp(-(((x - .28)/.36)**2))*(x > .5 ? 1 - (x - .5)*1.1 : 1), x > -.95 && x < .95 ? .12 : 0);
-    const out = []; let st = null;
-    for (let i = 0; i <= 60; i++){ const x = -1 + i/30, on = i < 60 && H(x) > k; if (on && st === null) st = x; if (!on && st !== null){ out.push([st, x]); st = null; } }
-    return out; }},
-  {k:'lm_tv', col:'#9AA3AD', wf:.8, hf:1, seg:k => {                    // Bakı Teleqülləsi: slim shaft, the restaurant pod, antenna
-    if (k > .62 && k < .74) return [[-.12 - .3*Math.sin((k - .62)/.12*Math.PI), .12 + .3*Math.sin((k - .62)/.12*Math.PI)]];
-    if (k > .86) return [[-.025, .025]];
-    const w = k < .08 ? .3 - k*2 : .14 - .05*k; return [[-w, w]]; }},
-  {k:'lm_mosque', col:'#D7C49B', wf:1.1, hf:.95, seg:k => {             // Bibiheybət məscidi: base, the dome with a finial, two minarets with balconies
-    const out = [];
-    if (k < .3) out.push([-.6, .6]);
-    else if (k < .78){ const w = .46*sq(1 - ((k - .3)/.48)**1.6); if (w > .02) out.push([-w, w]); }
-    else if (k < .86) out.push([-.025, .025]);
-    for (const c of [-.82, .82]){ const w = k > .78 && k < .82 ? .13 : k < .92 ? .07 : .07*(1 - (k - .92)/.08); if (w > .005) out.push([c - w, c + w]); }
-    return out; }},
-  {k:'lm_buta', col:'#D2402E', wf:.85, hf:.85, seg:k => {               // Buta: the teardrop with the curled tip
-    const out = [], c = .34, r = .34;
-    if (k < c + r){ const w = .78*sq(r*r - (k - c)**2)/r; if (w > .01) out.push([-w - .05, w - .05]); }
-    if (k > .5){ const u = (k - .5)/.5, xc = -.05 + .62*Math.pow(u, 1.35), th = .3*(1 - u) + .04; out.push([xc - th, xc + th]); }
-    return out; }},
-  {k:'lm_nar', col:'#B8222E', wf:.8, hf:.85, seg:k => {                 // Nar: the pomegranate with its crown
-    const c = .4, r = .4;
-    if (k < .8) return [[-.85*sq(r*r - (k - c)**2)/r, .85*sq(r*r - (k - c)**2)/r]];
-    const u = (k - .8)/.2; if (u < .25) return [[-.32, .32]];
-    return [-.26, 0, .26].map(x => { const w = .1*(1 - u); return [x - w, x + w]; }); }},
+  {k:'lm_flame', wu:116, hf:1, col:null,
+    flames:[[-35, 30, 76, -7], [0, 34, 100, 0], [35, 30, 86, 7]],
+    shape(g){ g.rect(-56, 0, 112, 5); for (const f of this.flames) flame(g, ...f); },
+    paint(g){ // glass that turns into fire towards the tips — the towers' night-time LED flames
+      const gr = g.createLinearGradient(0, 0, 0, 100); gr.addColorStop(0, '#16336E'); gr.addColorStop(.38, '#2D63C8'); gr.addColorStop(.62, '#E2602A'); gr.addColorStop(.85, '#FF9A2E'); gr.addColorStop(1, '#FFD45E'); return gr; },
+    detail(g){
+      g.fillStyle = 'rgba(255,255,255,.16)'; for (let y = 8; y < 100; y += 3.2) g.fillRect(-60, y, 120, .35);
+      for (const f of this.flames){ const [cx, bw, h] = f; g.save(); g.beginPath(); flame(g, ...f); g.clip();
+        const hl = g.createLinearGradient(cx - bw/2, 0, cx + bw/2, 0); hl.addColorStop(0, 'rgba(0,0,0,.4)'); hl.addColorStop(.35, 'rgba(255,255,255,.25)'); hl.addColorStop(.55, 'rgba(255,255,255,0)'); hl.addColorStop(1, 'rgba(0,0,0,.45)');
+        g.fillStyle = hl; g.fillRect(cx - bw, 0, bw*2, h + 2); g.fillStyle = 'rgba(255,255,255,.07)'; for (let x = cx - bw/2; x < cx + bw/2; x += 3) g.fillRect(x, 4, .3, h); g.restore(); }
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(-56, 0, 112, 1.2); }},
+  {k:'lm_maiden', wu:68, hf:1, col:'#C9A06A',
+    shape(g){ poly(g, [-22,0, -20,90, -21.5,90, -21.5,100, 21.5,100, 21.5,90, 20,90, 22,0]); poly(g, [19,0, 19,80, 23,82, 33,73, 34,0]); },
+    detail(g){
+      const cy = g.createLinearGradient(-22, 0, 22, 0); cy.addColorStop(0, 'rgba(0,0,0,.42)'); cy.addColorStop(.38, 'rgba(255,255,255,.16)'); cy.addColorStop(1, 'rgba(0,0,0,.3)');
+      g.fillStyle = cy; g.fillRect(-22, 0, 44, 100); g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(19, 0, 15, 82);
+      g.fillStyle = 'rgba(60,35,10,.18)'; for (let y = 2.6, r = 0; y < 90; y += 2.6, r++){ g.fillRect(-23, y, 58, .3); for (let x = -20 + (r % 2) * 3; x < 34; x += 6) g.fillRect(x, y, .3, 2.6); }
+      g.fillStyle = 'rgba(25,14,4,.85)'; g.beginPath(); arch(g, -5, 0, 7, 13); for (const [x, y] of [[-9,30],[6,44],[-3,58],[9,70],[-11,80],[2,84]]) arch(g, x, y, 2.4, 6); g.fill();
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(-21.5, 89.6, 43, 1.1); for (let x = -19; x < 20; x += 6) g.fillRect(x, 96, 2.4, 4); }},
+  {k:'lm_hac', wu:172, hf:.62, col:'#F1F0EA',
+    shape(g){ g.moveTo(-86, 0);
+      g.bezierCurveTo(-72, 2, -64, 22, -50, 26); g.bezierCurveTo(-38, 29, -30, 19, -18, 21);
+      g.bezierCurveTo(0, 24, 10, 70, 34, 95); g.bezierCurveTo(42, 102, 54, 101, 62, 92);
+      g.bezierCurveTo(73, 79, 79, 55, 86, 40); g.bezierCurveTo(88, 35, 86, 31, 81, 34);
+      g.bezierCurveTo(72, 40, 64, 52, 56, 58); g.bezierCurveTo(49, 62, 45, 40, 45, 0); g.closePath(); },
+    detail(g){
+      const tl = g.createLinearGradient(0, 0, 0, 100); tl.addColorStop(0, 'rgba(0,0,0,.25)'); tl.addColorStop(.5, 'rgba(0,0,0,0)'); tl.addColorStop(1, 'rgba(255,255,255,.2)'); g.fillStyle = tl; g.fillRect(-90, 0, 180, 100);
+      g.fillStyle = '#1B2229'; g.beginPath(); g.moveTo(-16, 0); g.lineTo(-16, 13); g.bezierCurveTo(0, 16, 12, 48, 32, 76); g.bezierCurveTo(38, 70, 41, 58, 42, 40); g.lineTo(42, 0); g.closePath();
+      g.moveTo(-60, 0); g.lineTo(-60, 10); g.bezierCurveTo(-52, 15, -44, 16, -36, 12); g.lineTo(-36, 0); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(140,190,230,.22)'; for (let x = -14; x < 42; x += 4) g.fillRect(x, 0, .5, 80); for (let x = -58; x < -36; x += 4) g.fillRect(x, 0, .5, 15);
+      g.strokeStyle = 'rgba(0,0,0,.13)'; g.lineWidth = .5;
+      for (let o = 4; o < 30; o += 5){ g.beginPath(); g.moveTo(-86 + o, 0); g.bezierCurveTo(-70 + o, 4, -60, 22 - o*.4, -48, 25 - o*.5); g.bezierCurveTo(-30, 18, -6, 22 - o*.3, 8, 40 - o*.2); g.bezierCurveTo(18, 62, 30, 88 - o, 44, 96 - o); g.bezierCurveTo(56, 98 - o, 66, 86 - o, 78, 52 - o*.4); g.stroke(); } }},
+  {k:'lm_tv', wu:40, hf:1, col:'#B9C0C8',
+    shape(g){ g.moveTo(-12, 0); g.quadraticCurveTo(-6, 7, -4.4, 18); g.lineTo(-3, 62); g.lineTo(3, 62); g.lineTo(4.4, 18); g.quadraticCurveTo(6, 7, 12, 0); g.closePath();
+      poly(g, [-4,61, -17,65.5, -18.5,68.5, -17,71, -12,73, -14.5,76, -15,78, -13,79.5, -4,81, 4,81, 13,79.5, 15,78, 14.5,76, 12,73, 17,71, 18.5,68.5, 17,65.5, 4,61]);
+      g.rect(-2.6, 80, 5.2, 9); g.rect(-3.6, 87.5, 7.2, 1.6); g.rect(-1.1, 89, 2.2, 11); },
+    detail(g){
+      const cy = g.createLinearGradient(-19, 0, 19, 0); cy.addColorStop(0, 'rgba(0,0,0,.4)'); cy.addColorStop(.4, 'rgba(255,255,255,.2)'); cy.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = cy; g.fillRect(-20, 0, 40, 100);
+      g.fillStyle = '#1B2229'; g.fillRect(-19, 67.6, 38, 2.2); g.fillRect(-16, 76.2, 32, 1.9);
+      g.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 6; y < 60; y += 6) g.fillRect(-5, y, 10, .35); g.fillRect(-1.1, 92, 2.2, .8); g.fillRect(-1.1, 96, 2.2, .8);
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(-17.6, 71.2, 35, .6); }},
+  {k:'lm_mosque', wu:94, hf:.92, col:'#DAC59B',
+    shape(g){ g.rect(-31, 0, 62, 34); g.rect(-13, 0, 26, 44);
+      g.rect(-16, 34, 32, 8); g.moveTo(-17, 41); g.bezierCurveTo(-17.5, 60, -6, 66, 0, 73); g.bezierCurveTo(6, 66, 17.5, 60, 17, 41); g.closePath();
+      g.rect(-.6, 72, 1.2, 8); g.moveTo(1.6, 82); g.arc(0, 82, 1.7, 0, Math.PI*2);
+      for (const sx of [-1, 1]){ const x = 23*sx; g.moveTo(x - 7, 34); g.bezierCurveTo(x - 7, 42, x - 2, 44, x, 48); g.bezierCurveTo(x + 2, 44, x + 7, 42, x + 7, 34); g.closePath();
+        const m = 40*sx; g.rect(m - 3.3, 0, 6.6, 70); poly(g, [m - 3.3,70, m - 5.2,72, m - 5.2,74, m + 5.2,74, m + 5.2,72, m + 3.3,70]); g.rect(m - 2.4, 74, 4.8, 13); poly(g, [m - 3.4,87, m + 3.4,87, m,98]); g.rect(m - .35, 97, .7, 3); } },
+    detail(g){
+      const tl = g.createLinearGradient(-47, 0, 47, 0); tl.addColorStop(0, 'rgba(0,0,0,.35)'); tl.addColorStop(.45, 'rgba(255,255,255,.15)'); tl.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = tl; g.fillRect(-48, 0, 96, 100);
+      g.strokeStyle = 'rgba(70,45,10,.35)'; g.lineWidth = .45;
+      for (let i = -3; i <= 3; i++){ g.beginPath(); g.moveTo(i*4.6, 42); g.bezierCurveTo(i*4.2, 58, i*1.6, 66, 0, 73); g.stroke(); }
+      g.fillStyle = 'rgba(25,14,4,.8)'; g.beginPath(); arch(g, 0, 0, 12, 34); for (const x of [-26, -19, 19, 26]) arch(g, x, 6, 4.2, 16); for (const x of [-40, 40]) for (const y of [20, 44]) arch(g, x, y, 1.8, 6); g.fill();
+      g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(-31, 33.4, 62, 1); g.fillRect(-13, 43.4, 26, 1); for (const m of [-40, 40]) g.fillRect(m - 5.2, 73.4, 10.4, .8);
+      g.strokeStyle = 'rgba(70,45,10,.4)'; g.strokeRect(-10, 2, 20, 39); }},
+  {k:'lm_buta', wu:66, hf:.86, col:'#C8372D',
+    outline(g, s){ g.moveTo(0, 2*s);
+      g.bezierCurveTo(-28*s, 2*s, -32*s, 34*s, -16*s, 50*s); g.bezierCurveTo(-4*s, 62*s, 14*s, 66*s, 16*s, 82*s);
+      g.bezierCurveTo(17*s, 92*s, 8*s, 97*s, -2*s, 94*s); g.bezierCurveTo(6*s, 104*s, 26*s, 100*s, 29*s, 82*s);
+      g.bezierCurveTo(32*s, 58*s, 28*s, 28*s, 18*s, 12*s); g.bezierCurveTo(13*s, 5*s, 7*s, 2*s, 0, 2*s); g.closePath(); },
+    shape(g){ this.outline(g, 1); },
+    detail(g){
+      const rg = g.createRadialGradient(-6, 26, 2, 0, 34, 46); rg.addColorStop(0, 'rgba(255,255,255,.22)'); rg.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = rg; g.fillRect(-40, 0, 80, 100);
+      g.strokeStyle = 'rgba(255,225,190,.55)'; g.lineWidth = 1.1; g.save(); g.translate(1, 7); g.beginPath(); this.outline(g, .8); g.stroke(); g.restore();
+      g.lineWidth = .8; g.save(); g.translate(2, 13); g.beginPath(); this.outline(g, .58); g.stroke(); g.restore();
+      g.fillStyle = 'rgba(255,225,190,.6)'; g.beginPath(); for (const [x, y] of [[0,24],[-6,30],[6,30],[0,36],[-4,44],[5,48],[12,62],[10,72]]){ g.moveTo(x + 1.4, y); g.arc(x, y, 1.4, 0, Math.PI*2); } g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = .9; g.beginPath(); this.outline(g, 1); g.stroke(); }},
+  {k:'lm_nar', wu:84, hf:.86, col:'#B3202D',
+    body(g){ g.moveTo(0, 1); g.bezierCurveTo(-24, 1, -37, 17, -37, 37); g.bezierCurveTo(-37, 55, -26, 66, -11, 69); g.lineTo(11, 69); g.bezierCurveTo(26, 66, 37, 55, 37, 37); g.bezierCurveTo(37, 17, 24, 1, 0, 1); g.closePath(); },
+    crown(g){ poly(g, [-11,66, -10.5,78, -19,93, -9,86, -6.5,100, -1.5,88, 1.5,88, 6.5,100, 9,86, 19,93, 10.5,78, 11,66]); },
+    leaf(g){ g.moveTo(10, 72); g.bezierCurveTo(18, 84, 32, 86, 41, 80); g.bezierCurveTo(32, 72, 20, 68, 10, 72); g.closePath(); },
+    shape(g){ this.body(g); this.crown(g); this.leaf(g); },
+    detail(g){
+      const rg = g.createRadialGradient(-14, 50, 2, -4, 38, 46); rg.addColorStop(0, 'rgba(255,220,200,.32)'); rg.addColorStop(.3, 'rgba(255,255,255,.05)'); rg.addColorStop(1, 'rgba(0,0,0,.55)');
+      g.save(); g.beginPath(); this.body(g); g.clip(); g.fillStyle = rg; g.fillRect(-40, 0, 80, 70);
+      g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = .8; for (const x of [-20, 0, 20]){ g.beginPath(); g.moveTo(x*.4, 68); g.bezierCurveTo(x*1.3, 50, x*1.3, 18, x*.5, 2); g.stroke(); }
+      g.fillStyle = 'rgba(255,190,170,.18)'; g.beginPath(); for (const [x, y, r] of [[-16,22,5],[12,16,4],[20,44,6],[-24,46,3.5],[4,30,3]]){ g.moveTo(x + r, y); g.ellipse(x, y, r, r*.7, .4, 0, Math.PI*2); } g.fill(); g.restore();
+      g.fillStyle = 'rgba(0,0,0,.42)'; g.beginPath(); this.crown(g); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(-11, 66, 4, 14);
+      g.fillStyle = 'rgba(20,60,25,.75)'; g.beginPath(); this.leaf(g); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = .6; g.beginPath(); g.moveTo(11, 72); g.bezierCurveTo(20, 77, 30, 79, 40, 80); g.stroke();
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(0, 68.5, 10, 2, 0, 0, Math.PI*2); g.fill(); }},
 ];
 const lmOf = n => LANDMARKS[((n % LANDMARKS.length) + LANDMARKS.length) % LANDMARKS.length];
+const LM_CACHE = new Map();
+function lmSprite(lm, col, W, H, lh){
+  const dpr = devicePixelRatio || 1, key = [lm.k, col, Math.round(W), Math.round(H), dpr].join('|');
+  if (LM_CACHE.has(key)) return LM_CACHE.get(key);
+  if (LM_CACHE.size > 40) LM_CACHE.clear();
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(W * dpr); cv.height = Math.ceil(H * dpr);
+  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  g.save(); g.translate(W/2, H); g.scale(W / lm.wu, -H / 100);
+  g.beginPath(); lm.shape(g); g.fillStyle = col || (lm.paint ? lm.paint(g) : '#999'); g.fill();
+  g.globalCompositeOperation = 'source-atop'; g.beginPath(); lm.detail(g); g.restore();
+  g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(0,0,0,.14)';
+  for (let y = H; y > 0; y -= lh) g.fillRect(0, y - lh, W, Math.max(.4, lh * .32));
+  const d = g.getImageData(0, 0, cv.width, cv.height).data, runs = [];
+  for (let r = 0; r < Math.ceil(H); r++){
+    const py = Math.min(cv.height - 1, Math.floor((r + .5) * dpr)), row = []; let st = -1;
+    for (let x = 0; x <= cv.width; x++){ const on = x < cv.width && d[(py * cv.width + x) * 4 + 3] > 60; if (on && st < 0) st = x; if (!on && st >= 0){ row.push([st / dpr, x / dpr]); st = -1; } }
+    runs.push(row);
+  }
+  const sp = { cv, runs }; LM_CACHE.set(key, sp); return sp;
+}
 function facLayout(w, h){
   const s = Math.min(1.25, Math.max(.62, h / 330));
   const pw = Math.min(w * .4, h * 1.02), px = Math.max(14, w * .045), colW = 16 * s;
@@ -1994,20 +2066,14 @@ function facLayout(w, h){
   const b0 = px + pw + 8 * s, b1 = binX + 8 * s, bl = b1 - b0;
   return { s, pw, px, colW, bedY, bedW, bcx, floor: h * .93, maxH: h * .4, objW: bedW * .32, b0, b1, bl, binX, binW, gateX: b0 + bl * .33, camX: b0 + bl * .68, v: Math.max(48, bl / 5.2) };
 }
-/* draws the first `frac` of a landmark's layers; returns the top y and the spans of the last layer (for the nozzle) */
+/* draws the first `frac` of a landmark's layers; returns the top y, the spans of the next layer (for the nozzle) and the layer height */
+const lmSize = (lm, F) => { const H = F.maxH * lm.hf; return { H, W: lm.wu * H / 100 }; };
 function facObj(g, cx, baseY, lm, color, frac, F){
-  const H = F.maxH * lm.hf, W = F.objW * lm.wf, lh = H / F_L, n = Math.floor(frac * F_L), rects = [];
-  for (let i = 0; i < n; i++){
-    const y = baseY - (i + 1) * lh;
-    for (const [a, b] of lm.seg((i + .5) / F_L)){ rects.push([cx + a*W, y, (b - a)*W, lh + .6]); }
-  }
-  if (!rects.length) return { top: baseY, spans: [] };
-  g.fillStyle = color; for (const r of rects) g.fillRect(...r);
-  g.save(); g.beginPath(); for (const r of rects) g.rect(...r); g.clip();
-  g.fillStyle = 'rgba(0,0,0,.16)'; for (let i = 0; i < n; i += 2) g.fillRect(cx - W*1.1, baseY - (i + 1)*lh, W*2.2, Math.max(.4, lh*.35));
-  const sh = g.createLinearGradient(cx - W, 0, cx + W, 0); sh.addColorStop(0, 'rgba(0,0,0,.42)'); sh.addColorStop(.42, 'rgba(255,255,255,.14)'); sh.addColorStop(1, 'rgba(0,0,0,.5)');
-  g.fillStyle = sh; g.fillRect(cx - W*1.1, baseY - H - 2, W*2.2, H + 2); g.restore();
-  return { top: baseY - n * lh, spans: lm.seg(Math.min(1, (n + .5) / F_L)).map(([a, b]) => [cx + a*W, cx + b*W]) };
+  const { H, W } = lmSize(lm, F), lh0 = F.maxH / F_L, N = Math.max(1, Math.round(H / lh0)), lh = H / N;
+  const sp = lmSprite(lm, color, W, H, lh), n = Math.floor(frac * N), hh = n * lh;
+  if (n > 0){ const sy = (H - hh) / H * sp.cv.height; g.drawImage(sp.cv, 0, sy, sp.cv.width, sp.cv.height - sy, cx - W/2, baseY - hh, W, hh); }
+  const r = Math.max(0, Math.min(sp.runs.length - 1, Math.floor(H - hh - lh * .5)));
+  return { top: baseY - hh, spans: sp.runs[r].map(([a, b]) => [cx - W/2 + a, cx - W/2 + b]), lh };
 }
 function facTag(g, x, y, txt, F, ok){
   g.font = `${Math.round(10.5 * F.s)}px "JetBrains Mono", monospace`;
@@ -2018,7 +2084,7 @@ function facTag(g, x, y, txt, F, ok){
 function drawFactory(cv, now){
   const c = sizeCanvas(cv); if (!c) return; const {g, w, h} = c, F = facLayout(w, h);
   let dt = FAC.last ? Math.min(.05, (now - FAC.last) / 1000) : 0; FAC.last = now; if (reduce) dt = 0;
-  const tm = reduce ? 2 : now / 1000, lm = lmOf(FAC.n), col = FAC.colOv || lm.col;
+  const tm = reduce ? 2 : now / 1000, lm = lmOf(FAC.n), col = FAC.colOv || lm.col, half = lmSize(lm, F).W / 2;
   if (!FAC.seeded){ FAC.seeded = true;
     FAC.items = [{x: F.b0 + F.bl * .55, lm: lmOf(-1), col: lmOf(-1).col, id:'S3D-1042', who:'Aysel', qc:true, ph:false, fall:0}]; }
 
@@ -2026,7 +2092,7 @@ function drawFactory(cv, now){
   if (FAC.phase === 'print'){ FAC.p += dt / F_PRINT; if (FAC.p >= 1){ FAC.p = 1; FAC.phase = 'park'; FAC.k = 0; } }
   else if (FAC.phase === 'park'){ FAC.k += dt / .8; if (FAC.k >= 1){ FAC.phase = 'push'; FAC.k = 0; } }
   else if (FAC.phase === 'push'){ FAC.k += dt / 1.2;
-    if (FAC.k >= 1){ FAC.items.push({x: F.b0 + F.objW * lm.wf, lm, col, id:'S3D-' + FAC.id, who:F_NAMES[FAC.id % F_NAMES.length], qc:false, ph:false, fall:0});
+    if (FAC.k >= 1){ FAC.items.push({x: F.b0 + half + 4, lm, col, id:'S3D-' + FAC.id, who:F_NAMES[FAC.id % F_NAMES.length], qc:false, ph:false, fall:0});
       FAC.id++; FAC.n++; FAC.colOv = null; FAC.p = 0; FAC.phase = 'print'; } }
   for (const it of FAC.items){
     if (it.fall){ it.fall += dt; continue; }
@@ -2056,7 +2122,7 @@ function drawFactory(cv, now){
   const pushK = FAC.phase === 'push' ? FAC.k * FAC.k * (3 - 2 * FAC.k) : 0;
   g.fillStyle = '#30353C'; g.fillRect(F.bcx - F.bedW / 2, F.bedY + 2 * S, F.bedW, 7 * S);
   g.fillStyle = '#8A6A33'; g.fillRect(F.bcx - F.bedW / 2, F.bedY, F.bedW, 2.5 * S);
-  const objX = F.bcx + pushK * (F.b0 + F.objW * lm.wf - F.bcx);
+  const objX = F.bcx + pushK * (F.b0 + half + 4 - F.bcx);
   const part = facObj(g, objX, F.bedY, lm, col, FAC.phase === 'print' ? FAC.p : 1, F);
   // arm + head
   const parkY = topY + 30 * S, layerY = part.top;
@@ -2065,8 +2131,8 @@ function drawFactory(cv, now){
   const sp = part.spans.length ? part.spans : [[F.bcx - 4, F.bcx + 4]], lo = Math.min(...sp.map(v => v[0])), hi = Math.max(...sp.map(v => v[1]));
   const hx = FAC.phase === 'print' ? (lo + hi) / 2 + Math.sin(tm * 3.4) * (hi - lo) / 2 * .97 : F.bcx + (F.px + F.pw * .8 - F.bcx) * Math.min(1, FAC.phase === 'park' ? FAC.k : 1);
   if (FAC.phase === 'print'){ // the fresh, still-hot trace of the current layer
-    const lh = F.maxH * lm.hf / F_L;
-    for (const [a, b] of sp){ const e = Math.min(b, hx); if (e > a){ const gl = g.createLinearGradient(a, 0, Math.max(a + 1, hx), 0); gl.addColorStop(0, col); gl.addColorStop(1, '#FFC27A'); g.fillStyle = gl; g.fillRect(a, layerY - lh, e - a, lh + .8); } }
+    const lh = part.lh;
+    for (const [a, b] of sp){ const e = Math.min(b, hx); if (e > a){ const gl = g.createLinearGradient(a, 0, Math.max(a + 1, hx), 0); gl.addColorStop(0, col || '#FF9A2E'); gl.addColorStop(1, '#FFC27A'); g.fillStyle = gl; g.fillRect(a, layerY - lh, e - a, lh + .8); } }
     const glow = g.createRadialGradient(hx, layerY, 0, hx, layerY, 60 * S); glow.addColorStop(0, 'rgba(255,170,80,.35)'); glow.addColorStop(1, 'rgba(255,170,80,0)');
     g.fillStyle = glow; g.fillRect(hx - 60 * S, layerY - 60 * S, 120 * S, 120 * S);
   }
@@ -2078,7 +2144,7 @@ function drawFactory(cv, now){
   g.fillStyle = '#9EA39D'; g.beginPath(); g.moveTo(hx - 5 * S, hy + hh); g.lineTo(hx + 5 * S, hy + hh); g.lineTo(hx, hy + hh + 7 * S); g.fill();
   if (FAC.phase === 'print'){ g.fillStyle = '#FFD08A'; g.beginPath(); g.arc(hx, hy + hh + 7 * S, 1.8 * S, 0, Math.PI * 2); g.fill(); }
   g.strokeStyle = 'rgba(220,224,218,.35)'; g.lineWidth = 2 * S; g.beginPath(); g.moveTo(F.px + F.colW / 2, topY); g.bezierCurveTo(F.px + F.pw * .3, topY - 20 * S, hx, hy - 60 * S, hx, hy); g.stroke();
-  g.strokeStyle = col; g.lineWidth = 3 * S; g.beginPath(); g.arc(F.px + F.colW / 2, topY + 4 * S, 9 * S, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = col || '#FF9A2E'; g.lineWidth = 3 * S; g.beginPath(); g.arc(F.px + F.colW / 2, topY + 4 * S, 9 * S, 0, Math.PI * 2); g.stroke();
   // what is being printed right now
   const nm = t(lm.k);
   if (FAC.phase === 'print') facTag(g, F.bcx, F.bedY - F.maxH - 44 * S, `${nm} · ${Math.floor(FAC.p * 100)}%`, F, false);
@@ -2095,7 +2161,7 @@ function drawFactory(cv, now){
   for (const rx of [F.b0 + bt / 2, F.b1 - bt / 2]){ g.save(); g.translate(rx, by + 1 + bt / 2); g.rotate(tm * F.v / (bt / 2));
     g.strokeStyle = '#4A5159'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-bt * .35, 0); g.lineTo(bt * .35, 0); g.moveTo(0, -bt * .35); g.lineTo(0, bt * .35); g.stroke(); g.restore(); }
   const lab = (x, txt) => { g.font = `${Math.round(10 * S)}px "JetBrains Mono", monospace`; g.fillStyle = '#7C847D'; const tw = g.measureText(txt).width; g.fillText(txt, x - tw / 2, F.floor + 14 * S); };
-  const gh = F.maxH + 26 * S, gx = F.gateX, gw = Math.min(F.bl * .3, F.objW * 3.1);
+  const gh = F.maxH + 26 * S, gx = F.gateX, gw = Math.min(F.bl * .34, F.maxH * 1.2);
   g.strokeStyle = '#2C3238'; g.lineWidth = 5 * S; g.beginPath(); g.moveTo(gx - gw / 2, by); g.lineTo(gx - gw / 2, by - gh); g.lineTo(gx + gw / 2, by - gh); g.lineTo(gx + gw / 2, by); g.stroke();
   const scanY = by - gh + 6 * S + (Math.sin(tm * 2.2) * .5 + .5) * (gh - 12 * S);
   g.fillStyle = FAC.gate > 0 ? `rgba(92,208,142,${.5 + FAC.gate * .5})` : 'rgba(127,168,255,.45)'; g.fillRect(gx - gw / 2 + 3 * S, scanY, gw - 6 * S, 1.6 * S);
