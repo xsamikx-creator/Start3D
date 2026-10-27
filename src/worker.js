@@ -20,6 +20,10 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS orders_chat ON orders(tg_chat_id)`,
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`,
   `CREATE TABLE IF NOT EXISTS phones (phone TEXT PRIMARY KEY, chat_id INTEGER NOT NULL, name TEXT, updated_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS free_apps (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, contact TEXT,
+     link TEXT, idea TEXT, lang TEXT, status TEXT NOT NULL, tg_chat_id INTEGER, op_msg_id INTEGER, order_id TEXT, created_at INTEGER)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS free_day_phone ON free_apps(day, phone)`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
@@ -75,6 +79,10 @@ const TX = {
   st_ready: ['hazır', 'готов', 'готове', 'ready'],
   st_done: ['təhvil verildi', 'выдан', 'видано', 'collected'],
   st_rejected: ['rədd edildi', 'отклонён', 'відхилено', 'rejected'],
+  free_ok: ['🎁 Pulsuz çap üçün müraciətiniz №{n} qəbul edildi. Qalibi bu gün saat 20:00-da seçirik — nəticə bura gələcək.', '🎁 Заявка №{n} на бесплатную печать принята. Победителя выбираем сегодня в 20:00 — результат придёт сюда.', '🎁 Заявку №{n} на безкоштовний друк прийнято. Переможця обираємо сьогодні о 20:00 — результат надійде сюди.', '🎁 Free print application #{n} received. We draw the winner today at 20:00 Baku time — the result will arrive here.'],
+  free_won: ['🎉 Təbrik edirik! Bu günün pulsuz çapını siz qazandınız. Sifariş {id} növbəyə əlavə olundu — çapa canlı baxa bilərsiniz.', '🎉 Поздравляем! Бесплатная печать дня — ваша. Заказ {id} уже в очереди, печать можно будет смотреть вживую.', '🎉 Вітаємо! Безкоштовний друк дня — ваш. Замовлення {id} уже в черзі, друк можна буде дивитися наживо.', '🎉 Congratulations! Today\'s free print is yours. Order {id} is queued — you can watch it print live.'],
+  free_lost: ['Bu gün qalib başqası oldu. Sabah yenidən müraciət edin — hər gün yeni qalib! Məsləhət: kiçik, maraqlı model şansı artırır.', 'Сегодня повезло другому. Подайте заявку завтра — каждый день новый победитель! Совет: небольшая интересная модель повышает шансы.', 'Сьогодні пощастило іншому. Подайте заявку завтра — щодня новий переможець! Порада: невелика цікава модель підвищує шанси.', 'Someone else won today. Apply again tomorrow — a new winner every day! Tip: a small, interesting model improves your chances.'],
+  free_no: ['Bu günün müraciəti qaydalara uyğun gəlmədi (ölçü, çəki və ya məzmun). Sabah başqa modellə cəhd edin.', 'Сегодняшняя заявка не подошла под правила (размер, вес или содержание). Попробуйте завтра с другой моделью.', 'Сьогоднішня заявка не підійшла під правила (розмір, вага чи зміст). Спробуйте завтра з іншою моделлю.', 'Today\'s application didn\'t fit the rules (size, weight or content). Try again tomorrow with another model.'],
   rj_geo: ['model çapa yararsızdır', 'модель непригодна для печати', 'модель непридатна для друку', 'model is not printable'],
 };
 const tx = (k, lang, v = {}) => {
@@ -132,6 +140,11 @@ function opText(o) {
     d.check ? `Проверка: ${esc(d.check)}` : '',
     d.link ? `🔗 <a href="${esc(d.link).replace(/"/g, '&quot;')}">Модель по ссылке</a> — скачайте, проверьте лицензию (модели с запретом коммерческого использования за деньги печатать нельзя)` : '',
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
+    d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 50 г / 4 ч, PLA' : '',
+    d.disc ? `Скидка на сайте: −${d.discPct || 0}% (${esc(d.disc)})` : '',
+    d.nth ? (d.nth % 5 === 0 ? `🎉 <b>${d.nth}-й заказ клиента</b> — положена скидка −30%` : `Заказ клиента №${d.nth} по этому номеру`) : '',
+    d.kids ? '🧸 Детская игрушка (−15%)' : '',
+    d.student ? '🎓 Студент (−15%) — проверить студенческий при выдаче' : '',
     `Клиент: ${esc(o.client)} · ${esc(o.contact || '')}`,
     `Уведомления: ${o.ch === 'email' ? 'email ' + esc(o.email || '') : o.tg_chat_id ? 'Telegram ✓' : 'Telegram (бот ещё не подключён)'}`,
     `Цена: <b>${price}</b>`,
@@ -197,10 +210,14 @@ async function createOrder(env, req, origin) {
   const data = {
     name: clip(b.name, 80), mat: clip(b.mat, 8), colorName: clip(b.colorName, 20), color: Math.max(0, Math.min(6, +b.color || 0)), layers: Math.max(1, Math.min(5000, +b.layers || 200)), qty: Math.max(1, Math.min(50, +b.qty || 1)),
     grams: +b.grams || 0, hours: +b.hours || 0, check: clip(b.check, 200), comment: clip(b.comment, 500),
-    pub: !!b.pub, copy: !!b.copy, gift: b.gift ? clip(b.gift, 16) : null, urgent: !!b.urgent, student: !!b.student,
+    pub: !!b.pub, copy: !!b.copy, gift: b.gift ? clip(b.gift, 16) : null, urgent: !!b.urgent, student: !!b.student, kids: !!b.kids,
+    disc: clip(b.disc, 120) || null, discPct: Math.max(0, Math.min(30, Math.round(+b.discPct || 0))), phone9: normPhone(contact),
     deliv: !!b.deliv, kind: ['photo', 'link'].includes(b.kind) ? b.kind : 'file', file: clip(b.file, 120),
     link: /^https?:\/\/[^\s"<>]+$/.test(String(b.link || '')) ? clip(b.link, 400) : null,
   };
+  // n-th order of this phone number (every 5th one gets −30%); free prints and rejected orders don't count
+  const prev = await env.DB.prepare("SELECT COUNT(*) AS c FROM orders WHERE status <> 'rejected' AND json_extract(data,'$.phone9') = ? AND json_extract(data,'$.free') IS NULL").bind(data.phone9).first();
+  data.nth = (prev?.c || 0) + 1;
   await env.DB.prepare(`INSERT INTO orders (id, code, status, client, contact, ch, email, lang, price, lo, hi, data, created_at, updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
     id, code, fixed ? 'pay' : 'review', client, contact, ch, email, langOf(b.lang), fixed,
@@ -373,6 +390,11 @@ async function onUpdate(env, u, origin) {
     await kvSet(env, 'operator_chat', chat.id);
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
+  if (/^\/draw(@\w+)?$/.test(text)) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    const r = await drawFree(env, origin, bakuDay(now()), true);
+    return r.posted ? undefined : say(r.msg);
+  }
   if (/^\/id(@\w+)?$/.test(text)) return say(`Telegram ID: ${from.id}\nChat ID: ${chat.id}`);
   if (chat.type !== 'private') {
     const opChat = await kvGet(env, 'operator_chat');
@@ -400,6 +422,7 @@ async function onUpdate(env, u, origin) {
     await env.DB.prepare('INSERT INTO phones(phone, chat_id, name, updated_at) VALUES(?,?,?,?) ON CONFLICT(phone) DO UPDATE SET chat_id=excluded.chat_id, name=excluded.name, updated_at=excluded.updated_at')
       .bind(phone, chat.id, clip(m.contact.first_name, 40), now()).run();
     await say(tx('phone_ok', lang, { n: phone.length === 9 ? `+994 ${phone.slice(0, 2)} ${phone.slice(2, 5)} ${phone.slice(5, 7)} ${phone.slice(7)}` : phone }), { reply_markup: { remove_keyboard: true } });
+    await env.DB.prepare("UPDATE free_apps SET tg_chat_id=? WHERE phone=? AND tg_chat_id IS NULL").bind(chat.id, phone).run();
     const rs = await env.DB.prepare("SELECT * FROM orders WHERE tg_chat_id IS NULL AND ch='tg' AND status NOT IN ('done','rejected') AND created_at > ?").bind(now() - 60 * 864e5).all();
     for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
       const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
@@ -495,6 +518,18 @@ async function onCallback(env, q, origin) {
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
+  if (act === 'fo' || act === 'fx') {
+    if (!allowed) return answer('—');
+    const a = await env.DB.prepare('SELECT * FROM free_apps WHERE id=?').bind(+id).first();
+    if (!a) return answer('—');
+    if (['won', 'lost'].includes(a.status)) return answer('Розыгрыш уже прошёл');
+    const st = act === 'fo' ? 'ok' : 'no';
+    await env.DB.prepare('UPDATE free_apps SET status=? WHERE id=?').bind(st, a.id).run();
+    const n = { ...a, status: st };
+    if (q.message) await tg(env, 'editMessageText', { chat_id: q.message.chat.id, message_id: q.message.message_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(n) }, link_preview_options: n.link ? { url: n.link, prefer_small_media: true } : { is_disabled: true } });
+    if (st === 'no' && a.status !== 'no' && a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: tx('free_no', a.lang) });
+    return answer(st === 'ok' ? 'Допущена к розыгрышу' : 'Не подходит');
+  }
   if (act === 'ka' || act === 'kq') {
     const o = await getOrder(env, id);
     if (!o || String(o.tg_chat_id) !== String(q.message?.chat?.id)) return answer('—');
@@ -584,8 +619,99 @@ async function setup(env, origin) {
   return json({ webhook: hook, commands: cmds.ok, bot: me.result ? '@' + me.result.username : me.description, operator_chat: (await kvGet(env, 'operator_chat')) ? 'set' : 'not set' });
 }
 
+/* ---------- daily free print ----------
+   Applications made before 20:00 Baku time take part in that evening's draw, later ones in the next day's.
+   The operator approves each one (fits the rules) or turns it down; at 20:00 a random approved one wins
+   and becomes a free order in the queue. Limits: one application per number per day, one win per 30 days. */
+const BAKU = 4 * 3600e3;
+const bakuDay = (t) => new Date(t + BAKU).toISOString().slice(0, 10);
+const entryDay = (t) => new Date(t + BAKU + 4 * 3600e3).toISOString().slice(0, 10); // after 20:00 → tomorrow
+const FREE_STATUS = { new: '🕓 ждёт проверки', ok: '✅ допущена к розыгрышу', no: '❌ не подходит', won: '🎉 ПОБЕДИТЕЛЬ', lost: 'не выиграла' };
+function freeText(a) {
+  return [`🎁 <b>Бесплатная печать дня · заявка №${a.id}</b>`, `Розыгрыш: ${a.day} в 20:00 · ${FREE_STATUS[a.status] || a.status}`,
+    `${esc(a.name)} · ${esc(a.contact || '')} · ${a.tg_chat_id ? 'Telegram ✓' : 'бот не подключён'}`,
+    a.link ? `🔗 <a href="${esc(a.link).replace(/"/g, '&quot;')}">Модель</a>` : '', a.idea ? `«${esc(a.idea)}»` : '',
+    a.status === 'new' ? 'Проверьте: до 50 г, до 4 ч печати, до 150 мм, PLA, 1 шт., без оружия и 18+.' : '',
+    a.order_id ? `Заказ: ${a.order_id}` : ''].filter(Boolean).join('\n');
+}
+const freeButtons = (a) => ['new', 'ok', 'no'].includes(a.status) ? [[{ text: a.status === 'ok' ? '✅ Подходит ✓' : '✅ Подходит', callback_data: `fo:${a.id}` }, { text: a.status === 'no' ? '❌ Не подходит ✓' : '❌ Не подходит', callback_data: `fx:${a.id}` }]] : [];
+
+async function freeApply(env, req, origin) {
+  const b = await req.json().catch(() => null);
+  if (!b) return json({ error: 'bad_json' }, 400);
+  const name = clip(b.name, 30), contact = clip(b.contact, 40), phone = normPhone(contact);
+  const link = /^https?:\/\/[^\s"<>]+$/.test(String(b.link || '').trim()) ? clip(b.link, 400) : null, idea = clip(b.idea, 300);
+  if (!name) return json({ error: 'need_name' }, 400);
+  if (phone.length < 7) return json({ error: 'need_contact' }, 400);
+  if (!link && idea.length < 10) return json({ error: 'need_model' }, 400);
+  if (!b.agree) return json({ error: 'need_agree' }, 400);
+  const won = await env.DB.prepare("SELECT 1 FROM free_apps WHERE phone=? AND status='won' AND created_at > ?").bind(phone, now() - 30 * 864e5).first();
+  if (won) return json({ error: 'won_recently' }, 409);
+  const day = entryDay(now()), known = await env.DB.prepare('SELECT chat_id FROM phones WHERE phone=?').bind(phone).first();
+  let r;
+  try {
+    r = await env.DB.prepare('INSERT INTO free_apps (day, name, phone, contact, link, idea, lang, status, tg_chat_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *')
+      .bind(day, name, phone, contact, link, idea || null, langOf(b.lang), 'new', known ? known.chat_id : null, now()).first();
+  } catch (e) { return json({ error: 'already_today' }, 409); }
+  const chat = await kvGet(env, 'operator_chat');
+  if (chat) {
+    const m = await tg(env, 'sendMessage', { chat_id: Number(chat), text: freeText(r), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(r) }, link_preview_options: link ? { url: link, prefer_small_media: true } : { is_disabled: true } });
+    if (m.ok) await env.DB.prepare('UPDATE free_apps SET op_msg_id=? WHERE id=?').bind(m.result.message_id, r.id).run();
+  }
+  if (r.tg_chat_id) await tg(env, 'sendMessage', { chat_id: r.tg_chat_id, text: tx('free_ok', r.lang, { n: r.id }) });
+  const bot = (await kvGet(env, 'bot_username')) || env.BOT_USERNAME;
+  return json({ ok: true, id: r.id, day, tgLinked: !!r.tg_chat_id, bot });
+}
+
+async function freeInfo(env) {
+  const day = entryDay(now());
+  const c = await env.DB.prepare('SELECT COUNT(*) AS c FROM free_apps WHERE day=?').bind(day).first();
+  const w = await env.DB.prepare("SELECT f.day, f.name, f.order_id, o.data FROM free_apps f LEFT JOIN orders o ON o.id = f.order_id WHERE f.status='won' ORDER BY f.day DESC LIMIT 7").all();
+  return json({ day, count: c?.c || 0, winners: w.results.map((x) => ({ day: x.day, name: String(x.name).split(/\s+/)[0], order: x.order_id, model: JSON.parse(x.data || '{}').title || null })) });
+}
+
+async function drawFree(env, origin, day, manual) {
+  if (await kvGet(env, 'free_drawn:' + day)) return { msg: `Розыгрыш за ${day} уже проведён.` };
+  const all = (await env.DB.prepare('SELECT * FROM free_apps WHERE day=?').bind(day).all()).results;
+  const pool = all.filter((a) => a.status === 'ok');
+  const chat = await kvGet(env, 'operator_chat');
+  if (!pool.length) {
+    const msg = `🎁 Розыгрыш ${day}: нет одобренных заявок (всего ${all.length}, ждут проверки ${all.filter((a) => a.status === 'new').length}).` + (manual ? '' : ' Одобрите заявки и отправьте /draw.');
+    if (!manual && chat) await tg(env, 'sendMessage', { chat_id: Number(chat), text: msg });
+    return { msg, posted: !manual };
+  }
+  const win = pool[crypto.getRandomValues(new Uint32Array(1))[0] % pool.length];
+  await kvSet(env, 'free_drawn:' + day, win.id);
+  const seq = await env.DB.prepare("INSERT INTO kv(k,v) VALUES('seq','1031') ON CONFLICT(k) DO UPDATE SET v=CAST(v AS INTEGER)+1 RETURNING v").first();
+  const id = 'S3D-' + seq.v, code = rnd(6), t = now();
+  const data = { name: 'Бесплатная печать дня', title: null, mat: 'PLA', colorName: '', color: 0, layers: 200, qty: 1, grams: 0, hours: 0, comment: win.idea || '', pub: true, copy: false,
+    free: true, kind: win.link ? 'link' : 'photo', link: win.link, phone9: win.phone };
+  await env.DB.prepare(`INSERT INTO orders (id, code, status, client, contact, ch, email, lang, tg_chat_id, price, lo, hi, data, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, code, 'queue', win.name, win.contact, 'tg', null, win.lang, win.tg_chat_id, 0, null, null, JSON.stringify(data), t, t).run();
+  await env.DB.prepare("UPDATE free_apps SET status='won', order_id=? WHERE id=?").bind(id, win.id).run();
+  await env.DB.prepare("UPDATE free_apps SET status='lost' WHERE day=? AND id<>? AND status IN ('ok','new')").bind(day, win.id).run();
+  for (const a of all) {
+    const n = a.id === win.id ? { ...a, status: 'won', order_id: id } : (['ok', 'new'].includes(a.status) ? { ...a, status: 'lost' } : a);
+    if (chat && a.op_msg_id && n.status !== a.status) await tg(env, 'editMessageText', { chat_id: Number(chat), message_id: a.op_msg_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: [] }, link_preview_options: { is_disabled: true } });
+    if (!a.tg_chat_id || a.status === 'no') continue;
+    if (a.id === win.id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: tx('free_won', a.lang, { id }), reply_markup: { inline_keyboard: [[{ text: tx('open', a.lang), url: `${origin}/#track-${id}-${code}` }]] } });
+    else await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: tx('free_lost', a.lang) });
+  }
+  if (chat) await tg(env, 'sendMessage', { chat_id: Number(chat), text: `🎉 Розыгрыш ${day}: победитель — ${win.name} (${win.contact}), заявка №${win.id} из ${pool.length} допущенных. Создан бесплатный заказ ${id} — он в очереди, назначьте принтер.` });
+  const o = await getOrder(env, id);
+  await postToOperators(env, o);
+  return { msg: 'ok', posted: true };
+}
+
 /* ---------- router ---------- */
+let seenOrigin = '';
 export default {
+  // 16:00 UTC = 20:00 in Baku: the daily free-print draw
+  async scheduled(ev, env, ctx) {
+    await init(env);
+    const origin = (await kvGet(env, 'origin')) || 'https://start3d.xsamikx.workers.dev';
+    ctx.waitUntil(drawFree(env, origin, bakuDay(Date.now()), false).catch((e) => console.error('draw', e)));
+  },
   async fetch(req, env, ctx) {
     const url = new URL(req.url), p = url.pathname, origin = url.origin;
     if (!p.startsWith('/api/') && !p.startsWith('/tg/')) return env.ASSETS.fetch(req);
@@ -597,6 +723,8 @@ export default {
         return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
+      if (p === '/api/free') { if (req.method === 'POST') return freeApply(env, req, origin); return freeInfo(env); }
+      if (seenOrigin !== origin){ seenOrigin = origin; ctx.waitUntil(kvSet(env, 'origin', origin)); }
       if (p === '/api/live') return liveList(env);
       let b = p.match(/^\/api\/cam\/([a-z0-9-]+)$/);
       if (b) return camFrame(env, url, b[1]);

@@ -13,6 +13,8 @@
     { "binding": "DB", "database_name": "start3d" }
   ],
   "observability": { "enabled": true },
+  // Daily free-print draw at 20:00 Baku time (16:00 UTC)
+  "triggers": { "crons": ["0 16 * * *"] },
   // Keep variables added in the dashboard (CARD_TEXT with payment details lives only there).
   "keep_vars": true,
   "vars": {

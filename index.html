@@ -82,7 +82,7 @@ nav a .cnt{font-family:var(--f-mono);font-size:11px;background:var(--accent);col
 .live{color:#FF6B57;font-weight:600}
 .live::before{content:"●";margin-right:5px;animation:blink 1.4s infinite}
 @keyframes blink{50%{opacity:.25}}
-.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-block:1px solid var(--line);padding-block:20px;margin-block:8px 40px}
+.facts{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;border-block:1px solid var(--line);padding-block:20px;margin-block:8px 40px}
 .facts div{display:grid;gap:2px}
 .facts b{font-family:var(--f-display);font-size:24px;font-weight:700}
 .facts span{color:var(--muted);font-size:13.5px}
@@ -257,6 +257,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   .hero,.split{grid-template-columns:1fr}
   .quote{position:static}
   .steps,.facts,.printers,.counters,.stats{grid-template-columns:1fr 1fr}
+  .facts div:first-child{grid-column:1/-1}
   .cat,.live-grid,.services{grid-template-columns:1fr 1fr}
   .track{grid-template-columns:repeat(3,1fr);row-gap:12px}
   nav{margin-left:0;order:3;width:100%}
@@ -366,6 +367,20 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 @media (max-width:720px){[data-skin="c"] .hero>div:first-child{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){[data-skin="c"] .svc,[data-skin="c"] .item,[data-skin="c"] .lcard{transition:none;transform:none!important}}
 .skin-switch{display:flex;gap:6px;align-items:center}
+/* daily free print */
+.free-banner{display:flex;gap:14px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 20px;border-radius:14px;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));
+  background:linear-gradient(100deg,var(--accent-soft),transparent 70%),var(--surface);margin-bottom:40px}
+.free-banner b{font-family:var(--f-display);font-size:18px}
+.free-banner p{color:var(--muted);margin-top:4px;max-width:60ch}
+.free-count{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.free-count div{display:grid;gap:2px;padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.free-count b{font-family:var(--f-mono);font-size:24px;font-variant-numeric:tabular-nums}
+.rules{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px}
+.rules b{font-weight:600}
+.winners{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:14px}
+.winners li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:6px}
+.free-ok{display:grid;gap:10px;padding:16px;border-radius:12px;border:1px solid var(--good);background:color-mix(in srgb,var(--good) 10%,transparent)}
+.disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 </style>
@@ -378,6 +393,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
     <nav aria-label="Menu">
       <a href="#new" data-route="new" data-i="nav_new"></a>
       <a href="#catalog" data-route="catalog" data-i="nav_catalog"></a>
+      <a href="#free" data-route="free" data-i="nav_free"></a>
       <a href="#live" data-route="live"><span data-i="nav_live"></span><span class="cnt" id="live-cnt" hidden></span></a>
       <a href="#orders" data-route="orders"><span data-i="nav_orders"></span><span class="cnt" id="my-cnt" hidden></span></a>
       <a href="#admin" data-route="admin"><span data-i="nav_admin"></span><span class="cnt" id="adm-cnt" hidden></span></a>
@@ -410,9 +426,14 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   <div class="facts">
     <div><b>30</b><span data-i="f1"></span></div>
     <div><b class="mono">350 mm</b><span data-i="f2"></span></div>
-    <div><b class="mono">0,12 mm</b><span data-i="f3"></span></div>
+    <div><b class="mono">0,06 mm</b><span data-i="f3"></span></div>
+    <div><b class="mono">0,56 mm</b><span data-i="f3b"></span></div>
     <div><b data-i="f4v"></b><span data-i="f4"></span></div>
   </div>
+  <a class="free-banner" href="#free" style="text-decoration:none;color:inherit">
+    <div><b data-i="fr_banner_h"></b><p data-i="fr_banner_p"></p></div>
+    <span class="btn btn-primary" data-i="fr_cta"></span>
+  </a>
   <div class="section">
     <h2 data-i="svc_h"></h2>
     <div class="services">
@@ -526,10 +547,38 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
         <span class="note" id="promo-msg" style="flex:1 1 150px"></span>
       </div>
       <label class="check"><input type="checkbox" id="f-student"><span data-i="f_student"></span></label>
+      <label class="check"><input type="checkbox" id="f-kids"><span data-i="f_kids"></span></label>
       <div class="field"><label for="f-comment" data-i="f_comment"></label><textarea id="f-comment" data-ip="f_comment_ph"></textarea></div>
       <label class="check note" id="rights-row"><input type="checkbox" id="f-rights"><span data-i="f_rights"></span></label>
     </form>
     <div class="panel quote" id="quote-out" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- FREE PRINT OF THE DAY -->
+<section id="view-free" hidden>
+  <div class="page-head"><div><p class="label" data-i="fr_label"></p><h1 data-i="fr_h"></h1><p data-i="fr_p"></p></div></div>
+  <div class="split">
+    <div style="display:grid;gap:16px;align-content:start">
+      <form class="panel" id="free-form" style="display:grid;gap:14px" novalidate>
+        <div class="row"><div class="field" style="flex:1 1 180px"><label for="fr-name" data-i="f_cname"></label><input type="text" id="fr-name" maxlength="30" autocomplete="given-name"></div>
+          <div class="field" style="flex:1 1 180px"><label for="fr-phone" data-i="f_phone"></label><input type="tel" id="fr-phone" placeholder="+994 50 123 45 67" autocomplete="tel"></div></div>
+        <div class="field"><label for="fr-link" data-i="fr_link"></label><input type="url" id="fr-link" placeholder="https://makerworld.com/..."></div>
+        <div class="field"><label for="fr-idea" data-i="fr_idea"></label><textarea id="fr-idea" maxlength="300" data-ip="fr_idea_ph"></textarea></div>
+        <label class="check"><input type="checkbox" id="fr-agree"><span data-i="fr_agree"></span></label>
+        <p class="err" id="fr-err" hidden></p>
+        <button type="submit" class="btn-primary" id="fr-send" data-i="fr_send"></button>
+        <div id="fr-done" hidden></div>
+      </form>
+      <div class="panel" style="display:grid;gap:12px"><span class="label" data-i="fr_rules_h"></span><ol class="rules" id="fr-rules"></ol></div>
+    </div>
+    <div style="display:grid;gap:16px;align-content:start">
+      <div class="panel" style="display:grid;gap:12px">
+        <div class="free-count"><div><span class="note" data-i="fr_left"></span><b id="fr-timer">—</b></div><div><span class="note" data-i="fr_today"></span><b id="fr-count">—</b></div></div>
+        <p class="note" data-i="fr_how"></p>
+      </div>
+      <div class="panel" style="display:grid;gap:10px"><span class="label" data-i="fr_winners"></span><ul class="winners" id="fr-winners"></ul></div>
+    </div>
   </div>
 </section>
 
@@ -656,6 +705,43 @@ const T = {
 nav_new:['Sifariş ver','Заказать','Замовити','Order'],
 nav_catalog:['Kataloq','Каталог','Каталог','Catalog'],
 nav_live:['Canlı','Эфир','Ефір','Live'],
+nav_free:['🎁 Pulsuz','🎁 Бесплатно','🎁 Безкоштовно','🎁 Free'],
+fr_banner_h:['🎁 Günün pulsuz çapı','🎁 Бесплатная печать дня','🎁 Безкоштовний друк дня','🎁 Free print of the day'],
+fr_banner_p:['Hər axşam saat 20:00-da bir çapı pulsuz edirik. Modeli göndərin — bəlkə sabah o sizin olacaq.','Каждый вечер в 20:00 разыгрываем одну печать бесплатно. Пришлите модель — возможно, завтра она ваша.','Щовечора о 20:00 розігруємо один друк безкоштовно. Надішліть модель — можливо, завтра він ваш.','Every evening at 20:00 we give one print away for free. Send your model — tomorrow it could be yours.'],
+fr_cta:['Müraciət et','Подать заявку','Подати заявку','Apply'],
+fr_label:['Hər gün saat 20:00-da · Bakı vaxtı','Каждый день в 20:00 · по Баку','Щодня о 20:00 · за Баку','Every day at 20:00 · Baku time'],
+fr_h:['Günün pulsuz çapı','Бесплатная печать дня','Безкоштовний друк дня','Free print of the day'],
+fr_p:['Model linkini göndərin və ya nə çap etmək istədiyinizi yazın. Hər gün qaydalara uyğun müraciətlər arasından bir qalib seçirik — onun modeli pulsuz çap olunur və canlı yayımda göstərilir.','Пришлите ссылку на модель или опишите, что хотите напечатать. Каждый день среди подходящих заявок выбираем одного победителя — его модель печатаем бесплатно и показываем в прямом эфире.','Надішліть посилання на модель або опишіть, що хочете надрукувати. Щодня серед відповідних заявок обираємо одного переможця — його модель друкуємо безкоштовно й показуємо в прямому ефірі.','Send a model link or describe what you want printed. Every day we pick one winner among the applications that fit the rules — we print their model for free and stream it live.'],
+fr_link:['Model linki (MakerWorld, Printables, Thingiverse…)','Ссылка на модель (MakerWorld, Printables, Thingiverse…)','Посилання на модель (MakerWorld, Printables, Thingiverse…)','Model link (MakerWorld, Printables, Thingiverse…)'],
+fr_idea:['Və ya nə çap edək və nə üçün','Или что напечатать и зачем','Або що надрукувати й навіщо','Or what to print and why'],
+fr_idea_ph:['Məsələn: qızım üçün adı yazılmış brelok','Например: брелок с именем для дочки','Наприклад: брелок з іменем для доньки','e.g. a keychain with my daughter\'s name'],
+fr_agree:['Qaydalarla razıyam: 50 q-a qədər, 4 saata qədər, PLA, 1 ədəd; çap canlı yayımda adımla göstərilə bilər','С правилами согласен(на): до 50 г, до 4 ч, PLA, 1 шт.; печать могут показать в эфире с моим именем','З правилами згоден(на): до 50 г, до 4 год, PLA, 1 шт.; друк можуть показати в ефірі з моїм ім\'ям','I accept the rules: up to 50 g, up to 4 h, PLA, 1 piece; the print may be streamed live with my name'],
+fr_send:['Müraciət göndər','Отправить заявку','Надіслати заявку','Send application'],
+fr_rules_h:['Qaydalar','Правила','Правила','Rules'],
+fr_left:['Seçimə qədər','До розыгрыша','До розіграшу','Until the draw'],
+fr_today:['Bu gün müraciət','Заявок сегодня','Заявок сьогодні','Applications today'],
+fr_how:['Qalib saat 20:00-da yoxlanmış müraciətlər arasından təsadüfi seçilir. 20:00-dan sonrakı müraciətlər növbəti günün seçiminə düşür. Nəticə Telegram botuna gəlir.','Победитель выбирается случайно в 20:00 среди проверенных заявок. Заявки после 20:00 участвуют в розыгрыше следующего дня. Результат приходит в Telegram-бот.','Переможця обирають випадково о 20:00 серед перевірених заявок. Заявки після 20:00 беруть участь у розіграші наступного дня. Результат надходить у Telegram-бот.','The winner is picked at random at 20:00 among checked applications. Applications after 20:00 go into the next day\'s draw. The result arrives in the Telegram bot.'],
+fr_winners:['Son qaliblər','Последние победители','Останні переможці','Recent winners'],
+fr_no_winners:['İlk qalib bu axşam olacaq.','Первый победитель будет уже этим вечером.','Перший переможець буде вже цього вечора.','The first winner will be picked this evening.'],
+fr_ok:['🎉 Müraciət №{n} qəbul edildi! Seçim saat 20:00-da ({d}).','🎉 Заявка №{n} принята! Розыгрыш в 20:00 ({d}).','🎉 Заявку №{n} прийнято! Розіграш о 20:00 ({d}).','🎉 Application #{n} received! The draw is at 20:00 ({d}).'],
+fr_ok_tg:['Nəticə Telegram-a gələcək.','Результат придёт в Telegram.','Результат надійде в Telegram.','The result will arrive in Telegram.'],
+fr_ok_bot:['Nəticəni öyrənmək üçün botu qoşun və nömrənizi paylaşın:','Чтобы узнать результат, подключите бота и поделитесь номером:','Щоб дізнатися результат, підключіть бота й поділіться номером:','To get the result, open the bot and share your number:'],
+fr_bot_btn:['Telegram botu aç','Открыть Telegram-бот','Відкрити Telegram-бот','Open the Telegram bot'],
+fr_demo:['(demo: server olmadan müraciət heç yerə getmir)','(демо: без сервера заявка никуда не уходит)','(демо: без сервера заявка нікуди не йде)','(demo: without the server the application goes nowhere)'],
+fr_e_model:['Model linkini və ya ideyanı yazın (ən azı 10 simvol).','Укажите ссылку на модель или опишите идею (от 10 символов).','Вкажіть посилання на модель або опишіть ідею (від 10 символів).','Add a model link or describe the idea (10+ characters).'],
+fr_e_agree:['Qaydalarla razılığı qeyd edin.','Отметьте согласие с правилами.','Позначте згоду з правилами.','Please accept the rules.'],
+fr_e_today:['Bu nömrədən bu gün artıq müraciət var. Sabah gəlin!','С этого номера сегодня уже есть заявка. Приходите завтра!','З цього номера сьогодні вже є заявка. Приходьте завтра!','There is already an application from this number today. Come back tomorrow!'],
+fr_e_won:['Son 30 gündə artıq qalib olmusunuz — bir az sonra yenidən iştirak edin.','Вы уже выигрывали за последние 30 дней — участвуйте снова чуть позже.','Ви вже вигравали за останні 30 днів — беріть участь знову трохи згодом.','You already won within the last 30 days — please join again a bit later.'],
+fr_e_net:['Göndərmək alınmadı, bir az sonra yenidən cəhd edin.','Не получилось отправить, попробуйте чуть позже.','Не вдалося надіслати, спробуйте трохи згодом.','Could not send, please try again shortly.'],
+fr_rules:[
+ ['Hər gün <b>bir qalib</b>. Seçim Bakı vaxtı ilə 20:00-da yoxlanmış müraciətlər arasından təsadüfi aparılır.','Каждый день <b>один победитель</b>. Розыгрыш в 20:00 по Баку — случайный выбор среди заявок, прошедших проверку.','Щодня <b>один переможець</b>. Розіграш о 20:00 за Баку — випадковий вибір серед перевірених заявок.','<b>One winner</b> every day, drawn at random at 20:00 Baku time among checked applications.'],
+ ['Limit: <b>1 detal, 50 q-a qədər plastik, 4 saata qədər çap, 150×150×150 mm-ə qədər</b>. Material PLA, rəng mövcud olanlardan.','Лимит: <b>1 деталь, до 50 г пластика, до 4 ч печати, до 150×150×150 мм</b>. Материал PLA, цвет из наличия.','Ліміт: <b>1 деталь, до 50 г пластику, до 4 год друку, до 150×150×150 мм</b>. Матеріал PLA, колір із наявних.','Limit: <b>1 part, up to 50 g of plastic, up to 4 h of printing, up to 150×150×150 mm</b>. PLA in a colour we have in stock.'],
+ ['Bir nömrədən gündə <b>bir müraciət</b>. Qalib yenidən <b>30 gündən sonra</b> iştirak edə bilər.','С одного номера — <b>одна заявка в день</b>. Победитель может снова участвовать <b>через 30 дней</b>.','З одного номера — <b>одна заявка на день</b>. Переможець може знову брати участь <b>через 30 днів</b>.','<b>One application per phone number per day</b>. A winner can take part again <b>after 30 days</b>.'],
+ ['Olmaz: silah və onun hissələri, 18+, təhqiramiz məzmun, satış üçün başqasının brendi, lisenziyası qadağan edən modellər. Operator səbəbsiz imtina edə bilər.','Нельзя: оружие и его детали, 18+, оскорбительное, чужие бренды на продажу, модели с запретом в лицензии. Оператор может отклонить заявку без объяснения причин.','Не можна: зброя та її деталі, 18+, образливе, чужі бренди на продаж, моделі із забороною в ліцензії. Оператор може відхилити заявку без пояснень.','Not allowed: weapons or their parts, 18+, offensive content, other brands for resale, models whose licence forbids it. The operator may decline without giving a reason.'],
+ ['Model limitdən böyükdürsə — kiçildilmiş surətini və ya endirimli çap təklif edərik.','Если модель больше лимита — предложим уменьшенную копию или печать со скидкой.','Якщо модель більша за ліміт — запропонуємо зменшену копію або друк зі знижкою.','If the model is over the limit, we offer a scaled-down copy or a discounted print.'],
+ ['Qalibin çapı <b>canlı yayımda</b> printer bannerində adı ilə göstərilir; hazır detalın fotosunu dərc edə bilərik.','Печать победителя идёт <b>в прямом эфире</b> с его именем на баннере принтера; фото готовой детали можем опубликовать.','Друк переможця йде <b>у прямому ефірі</b> з його ім\'ям на банері принтера; фото готової деталі можемо опублікувати.','The winner\'s print is <b>streamed live</b> with their name on the printer banner; we may publish a photo of the part.'],
+ ['Detalı Bakıda <b>7 gün ərzində</b> götürmək lazımdır (kuryer — tarif üzrə).','Забрать деталь в Баку <b>в течение 7 дней</b> (курьер — по тарифу).','Забрати деталь у Баку <b>протягом 7 днів</b> (кур\'єр — за тарифом).','Collect the part in Baku <b>within 7 days</b> (courier at the usual rate).'],
+],
 nav_orders:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
 nav_admin:['Operator','Оператор','Оператор','Operator'],
 demo:['Demo versiya: qiymət həqiqi hesablanır; çap, ödəniş, kamera və mesajlar simulyasiyadır.','Демо: цены считаются по-настоящему; печать, оплата, камера и сообщения — симуляция.','Демо: ціни рахуються по-справжньому; друк, оплата, камера й повідомлення — симуляція.','Demo: prices are calculated for real; printing, payment, camera and messages are simulated.'],
@@ -667,7 +753,8 @@ cta_quote:['Qiyməti hesabla','Рассчитать цену','Розрахув�
 cta_live:['Canlı çaplara bax','Смотреть эфир','Дивитися ефір','Watch live prints'],
 f1:['printer sifarişinizi gözləyir','принтеров ждут ваш заказ','принтерів чекають на ваше замовлення','printers waiting for your order'],
 f2:['maksimal detal ölçüsü','максимальный размер детали','максимальний розмір деталі','largest part size'],
-f3:['ən nazik qat','самый тонкий слой','найтонший шар','finest layer'],
+f3:['ən nazik qat · 0.2 mm ucluq','самый тонкий слой · сопло 0.2 мм','найтонший шар · сопло 0.2 мм','finest layer · 0.2 mm nozzle'],
+f3b:['ən qalın qat · 0.8 mm ucluq, sürətli və möhkəm','самый толстый слой · сопло 0.8 мм, быстро и прочно','найтовщий шар · сопло 0.8 мм, швидко й міцно','thickest layer · 0.8 mm nozzle, fast and strong'],
 f4v:['24 saat','24 ч','24 год','24 h'],
 f4:['təcili sifariş','срочный заказ','термінове замовлення','rush order'],
 svc_h:['Nə edirik','Что мы делаем','Що ми робимо','What we do'],
@@ -713,7 +800,7 @@ a3:['Təsdiqdən sonra kart nömrəsi sifariş səhifəsində görünür və Tel
 q4:['Çap uğursuz olsa?','Что если печать не удалась?','Що як друк не вдався?','What if a print fails?'],
 a4:['Təhvildən əvvəl detalın fotosunu göndəririk. Qəbul etməzdən öncə sual verə bilərsiniz; bizim səhvimizdən olan qüsuru pulsuz yenidən çap edirik.','Перед выдачей присылаем фото детали. До приёмки можно задать вопрос; брак по нашей вине перепечатываем бесплатно.','Перед видачею надсилаємо фото деталі. До приймання можна поставити запитання; брак із нашої вини передруковуємо безкоштовно.','We send photos before collection. You can raise a question before accepting; defects caused by us are reprinted free.'],
 q5:['Endirimlər varmı?','Есть скидки?','Є знижки?','Any discounts?'],
-a5:['Hər 5-ci sifariş −10%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Tədris layihələri −15%.','Каждый 5-й заказ −10%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Учебные проекты −15%.','Кожне 5-те замовлення −10%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Навчальні проєкти −15%.','Every 5th order is 10% off. Give a friend your code: 10% off for them and for your next order. Student projects get 15% off.'],
+a5:['Hər 5-ci sifariş −30%. Tələbələrə istənilən sifarişə −15%, uşaq oyuncaqlarına −15%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Endirimlər toplanmır — ən böyüyü tətbiq olunur. Hər gün isə bir çapı pulsuz edirik.','Каждый 5-й заказ −30%. Студентам −15% на любой заказ, детские игрушки −15%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Скидки не суммируются — действует наибольшая. А ещё каждый день одну печать разыгрываем бесплатно.','Кожне 5-те замовлення −30%. Студентам −15% на будь-яке замовлення, дитячі іграшки −15%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Знижки не сумуються — діє найбільша. А ще щодня один друк розігруємо безкоштовно.','Every 5th order is 30% off. Students get 15% off any order, kids\' toys 15% off. Give a friend your code: 10% off for them and for your next order. Discounts don\'t stack — the largest applies. And every day we give one print away for free.'],
 q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
 a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
 skin_l:['Dizayn:','Оформление:','Оформлення:','Style:'],
@@ -788,7 +875,11 @@ vis_pub_n:['«Canlı» bölməsində hər kəs yalnız çap prosesini və printe
 f_copy:['Başqalarına eyni modeli sifariş etməyə icazə ver','Разрешить другим заказать такую же модель','Дозволити іншим замовити таку ж модель','Let others order the same model'],
 f_disc:['Endirimlər','Скидки','Знижки','Discounts'],
 f_promo:['Promokod və ya dostun kodu','Промокод или код друга','Промокод або код друга','Promo or friend’s code'],
-f_student:['Tədris layihəsi (−15%, təhvil zamanı tələbə vəsiqəsini göstərin)','Учебный проект (−15%, покажите студенческий при получении)','Навчальний проєкт (−15%, покажіть студентський при отриманні)','Student project (−15%, show your student ID on collection)'],
+f_student:['Mən tələbəyəm (istənilən sifarişə −15%, təhvil zamanı tələbə vəsiqəsini göstərin)','Я студент (−15% на любой заказ, покажите студенческий при получении)','Я студент (−15% на будь-яке замовлення, покажіть студентський при отриманні)','I\'m a student (−15% on any order, show your student ID on collection)'],
+f_kids:['Uşaq üçün oyuncaq (−15%)','Игрушка для ребёнка (−15%)','Іграшка для дитини (−15%)','A toy for a child (−15%)'],
+d_kids:['Uşaq oyuncağı','Детская игрушка','Дитяча іграшка','Kids\' toy'],
+d_rule:['Endirimlər toplanmır — ən böyüyü tətbiq olunur','Скидки не суммируются — действует наибольшая','Знижки не сумуються — діє найбільша','Discounts don\'t stack — the largest one applies'],
+set_kids:['Uşaq oyuncaqları, %','Детские игрушки, %','Дитячі іграшки, %','Kids\' toys, %'],
 promo_ok:['Kod tətbiq edildi: −{p}%','Код применён: −{p}%','Код застосовано: −{p}%','Code applied: −{p}%'],
 promo_bad:['Belə kod yoxdur','Такого кода нет','Такого коду немає','No such code'],
 promo_own:['Öz kodunuzu istifadə etmək olmaz','Свой код использовать нельзя','Свій код використати не можна','You can’t use your own code'],
@@ -818,7 +909,7 @@ sp_ready:['Hazır olacaq','Готово','Готово','Ready'],
 ready_n:['2–3 günə','через 2–3 дня','за 2–3 дні','in 2–3 days'],
 ready_f:['24 saata','за 24 часа','за 24 години','within 24 h'],
 d_loyal:['Hər 5-ci sifariş','Каждый 5-й заказ','Кожне 5-те замовлення','Every 5th order'],
-d_student:['Tədris layihəsi','Учебный проект','Навчальний проєкт','Student project'],
+d_student:['Tələbə','Студент','Студент','Student'],
 d_promo:['Kod {c}','Код {c}','Код {c}','Code {c}'],
 place:['Yoxlamaya göndər','Отправить на проверку','Надіслати на перевірку','Send for review'],
 place_note:['İndi ödəmək lazım deyil. Yoxlamadan sonra yekun qiymət və kart Telegram-a və ya e-poçta gələcək.','Платить сейчас не нужно. После проверки итоговая цена и номер карты придут в Telegram или на почту.','Платити зараз не потрібно. Після перевірки підсумкова ціна й номер картки надійдуть у Telegram або на пошту.','No payment now. After review the final price and card details arrive on Telegram or by email.'],
@@ -834,9 +925,9 @@ cancel:['Ləğv et','Отмена','Скасувати','Cancel'],
 ord_h:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
 ord_p:['Bu brauzerdən verilmiş sifarişlər.','Заказы, оформленные в этом браузере.','Замовлення, оформлені в цьому браузері.','Orders placed from this browser.'],
 ord_empty:['Hələ sifariş yoxdur.','Заказов пока нет.','Замовлень поки немає.','No orders yet.'],
-loy_h:['Hər 5-ci sifariş −10%','Каждый 5-й заказ −10%','Кожне 5-те замовлення −10%','Every 5th order −10%'],
+loy_h:['Hər 5-ci sifariş −30%','Каждый 5-й заказ −30%','Кожне 5-те замовлення −30%','Every 5th order −30%'],
 loy_next:['Endirimli sifarişə qədər daha {k} sifariş','До заказа со скидкой ещё {k}','До замовлення зі знижкою ще {k}','{k} more orders until the discounted one'],
-loy_now:['Növbəti sifarişiniz −10% olacaq','Следующий заказ будет со скидкой −10%','Наступне замовлення буде зі знижкою −10%','Your next order gets 10% off'],
+loy_now:['Növbəti sifarişiniz −30% olacaq','Следующий заказ будет со скидкой −30%','Наступне замовлення буде зі знижкою −30%','Your next order gets 30% off'],
 ref_h:['Dostunuz üçün kod','Код для друга','Код для друга','Code for a friend'],
 ref_p:['Dostunuza −10%, sizə növbəti sifarişdə −10%.','Другу −10%, вам −10% на следующий заказ.','Другу −10%, вам −10% на наступне замовлення.','10% off for your friend and 10% off your next order.'],
 repeat:['Təkrarla','Повторить','Повторити','Repeat'],
@@ -1078,7 +1169,7 @@ function seed(){
   const now = Date.now(), nf = (k, v, ago) => ({at: now - ago, k, v});
   return {
     seq:1031,
-    settings:{cg:.05, a1:2, k2:3, setup:3, min:10, dep:50, cour:5, student:15, loyal:10, lube:100, nozzle:300},
+    settings:{cg:.05, a1:2, k2:3, setup:3, min:10, dep:50, cour:5, student:15, kids:15, loyal:30, lube:100, nozzle:300},
     history:{revenue:1840, orders:71, repeat:34},
     stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
     printers:[
@@ -1141,7 +1232,7 @@ async function detectServer(){
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
   qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
-  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
+  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, kids:o.kids, disc:o.discName || '', discPct:o.disc || 0, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
 async function pushOrder(o, extra){
   if (!SERVER) return true;
   try {
@@ -1230,9 +1321,12 @@ const loyaltyNext = () => (myCount() + 1) % 5 === 0;
 function discounts(){
   const list = [], pr = promoPct();
   if (pr.pct) list.push([t('d_promo',{c:pr.code}), pr.pct]);
-  if ($('f-student').checked) list.push([t('d_student'), S.settings.student]);
+  if ($('f-student').checked) list.push([t('d_student'), S.settings.student ?? 15]);
+  if ($('f-kids').checked) list.push([t('d_kids'), S.settings.kids ?? 15]);
   if (loyaltyNext()) list.push([t('d_loyal'), S.settings.loyal]);
-  return {list, total: Math.min(30, list.reduce((a,b) => a + b[1], 0))};
+  // discounts don't stack: the largest one applies
+  const best = list.reduce((a, b) => (b[1] > (a ? a[1] : -1) ? b : a), null);
+  return {list, best, total: best ? Math.min(30, best[1]) : 0};
 }
 
 /* ---------- pricing ---------- */
@@ -1254,7 +1348,7 @@ function compute(m){
   if (!available(mat, form.color)) reasons.push('r_nostock');
   return {mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
 }
-const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(([n,p]) => `<div><span>${esc(n)}</span><span class="mono">−${p}%</span></div>`).join('')}</div>` : '';
+const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(it => `<div class="${it === d.best ? '' : 'off'}"><span>${esc(it[0])}</span><span class="mono">−${it[1]}%</span></div>`).join('')}${d.list.length > 1 ? `<p class="note">${t('d_rule')}</p>` : ''}</div>` : '';
 const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>`;
 
 const SITES = {'makerworld.com':'MakerWorld','printables.com':'Printables','thingiverse.com':'Thingiverse','thangs.com':'Thangs','cults3d.com':'Cults3D','myminifactory.com':'MyMiniFactory','grabcad.com':'GrabCAD','sketchfab.com':'Sketchfab'};
@@ -1318,7 +1412,7 @@ function bindPlace(q){
       grams: q ? q.grams*q.qty : 60, hours: q ? q.hours*q.qty : 3, layers: Math.max(60, Math.round((m.z||40)/({draft:.28,std:.2,fine:.12})[form.quality])),
       lo: q ? q.lo : null, hi: q ? q.hi : null, status:'review', progress:0, deliv:+form.deliv, mine:true,
       pub: form.vis === 'public', copy: form.vis === 'public' && $('f-copy').checked, gift, urgent: form.urgent === '1',
-      student: $('f-student').checked, disc: d.total, kind: form.kind,
+      student: $('f-student').checked, kids: $('f-kids').checked, disc: d.total, discName: d.best ? d.best[0] : '', kind: form.kind,
       check: li ? `${t('r_link')} · ${li.site}` : form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
       comment: $('f-comment').value.trim(), file: m.file, z: m.z, shape: m.lathe ? 'pot' : undefined, created: Date.now(), notifs: [], react:{fire:0,clap:0,wow:0}
     };
@@ -1441,6 +1535,7 @@ seg('seg-n','notify', v => { $('email-f').hidden = v !== 'email'; $('tg-note').h
 $('f-gift').addEventListener('change', e => { $('gift-block').hidden = !e.target.checked; });
 $('f-promo').addEventListener('input', () => { promoCheck(); renderQuote(); });
 $('f-student').addEventListener('change', renderQuote);
+$('f-kids').addEventListener('change', renderQuote);
 $('f-mat').addEventListener('input', () => { renderSwatches(); renderQuote(); });
 $('f-qty').addEventListener('input', renderQuote);
 $('f-link').addEventListener('input', () => { if (form.kind === 'link') renderQuote(); });
@@ -1858,7 +1953,7 @@ function renderStats(){
   const g = {}; S.orders.forEach(o => g[o.mat] = (g[o.mat]||0) + (o.grams||0)); const mx = Math.max(1, ...Object.values(g));
   $('matshare').innerHTML = MATS.map(m => `<div class="hbar"><span>${m}</span><div class="bar-line"><i style="width:${(g[m]||0)/mx*100}%"></i></div><span class="mono">${Math.round(g[m]||0)}</span></div>`).join('');
 }
-const SET_KEYS = [['cg','set_cg',.01],['a1','set_a1',.5],['k2','set_k2',.5],['setup','set_setup',1],['min','set_min',1],['dep','set_dep',5],['cour','set_cour',1],['student','set_student',1],['loyal','set_loyal',1],['lube','set_lube',10],['nozzle','set_nozzle',10]];
+const SET_KEYS = [['cg','set_cg',.01],['a1','set_a1',.5],['k2','set_k2',.5],['setup','set_setup',1],['min','set_min',1],['dep','set_dep',5],['cour','set_cour',1],['student','set_student',1],['kids','set_kids',1],['loyal','set_loyal',1],['lube','set_lube',10],['nozzle','set_nozzle',10]];
 function renderSettings(){
   $('settings').innerHTML = SET_KEYS.map(([k,l,st]) => `<div class="field"><label for="set-${k}">${t(l)}</label><input type="number" id="set-${k}" step="${st}" min="0" value="${S.settings[k]}"></div>`).join('');
   SET_KEYS.forEach(([k]) => $('set-'+k).addEventListener('change', e => { const v = +e.target.value; if (v >= 0){ S.settings[k] = v; save(); renderQuote(); } }));
@@ -1866,7 +1961,47 @@ function renderSettings(){
 $('reset').onclick = () => { S = seed(); save(); toast(t('t_reset')); renderSwatches(); full(); badges(); };
 
 /* ---------- render orchestration ---------- */
-const ROUTES = ['home','new','catalog','live','orders','track','admin'];
+/* ---------- free print of the day ---------- */
+const BAKU_MS = 4 * 3600e3;
+function drawCountdown(){ // ms until the next 20:00 in Baku
+  const b = new Date(Date.now() + BAKU_MS), next = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate(), 20));
+  if (b >= next) next.setUTCDate(next.getUTCDate() + 1);
+  return next - b;
+}
+let FREE = null;
+const DEMO_WINNERS = () => [{day:'—', name:'Aysel', model:t('lm_robot')}, {day:'—', name:'Murad', model:t('lm_benchy')}];
+async function loadFree(){ if (!SERVER) return; try { FREE = await api('/api/free'); if (route() === 'free') renderFree(); } catch(e){} }
+function renderFree(){
+  $('fr-rules').innerHTML = T.fr_rules.map(r => `<li>${(r[LANGS.indexOf(lang)] ?? r[1])}</li>`).join('');
+  const ms = drawCountdown(); $('fr-timer').textContent = fmtH(ms/36e5);
+  $('fr-count').textContent = FREE ? FREE.count : (SERVER ? '…' : '7');
+  const w = FREE ? FREE.winners : (SERVER ? [] : DEMO_WINNERS());
+  $('fr-winners').innerHTML = w.length ? w.map(x => `<li><span>🎉 ${esc(x.name)}${x.model ? ' · ' + esc(x.model) : ''}</span><span class="mono note">${esc(x.day)}</span></li>`).join('') : `<li class="note">${t('fr_no_winners')}</li>`;
+  if (SERVER && !FREE) loadFree();
+}
+setInterval(() => { if (route() === 'free'){ const ms = drawCountdown(); $('fr-timer').textContent = fmtH(ms/36e5); } }, 30000);
+$('free-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('fr-err'), fail = (k, el) => { err.textContent = t(k); err.hidden = false; if (el) el.focus(); };
+  err.hidden = true;
+  const name = $('fr-name').value.trim(), contact = $('fr-phone').value.trim(), link = $('fr-link').value.trim(), idea = $('fr-idea').value.trim();
+  if (!name) return fail('need_name', $('fr-name'));
+  if (!contactOk(contact)) return fail('need_contact', $('fr-phone'));
+  if (!(link && linkInfo(link)) && idea.length < 10) return fail('fr_e_model', $('fr-link'));
+  if (!$('fr-agree').checked) return fail('fr_e_agree', $('fr-agree'));
+  $('fr-send').disabled = true;
+  let r = null;
+  if (SERVER){
+    try { r = await api('/api/free', {name, contact, link: link && linkInfo(link) ? linkInfo(link).url : '', idea, agree:true, lang}); }
+    catch(ex){ $('fr-send').disabled = false; return fail(ex.code === 'already_today' ? 'fr_e_today' : ex.code === 'won_recently' ? 'fr_e_won' : ex.code === 'need_model' ? 'fr_e_model' : 'fr_e_net'); }
+  } else r = {id: Math.floor(100 + Math.random()*900), day: new Date(Date.now() + BAKU_MS + 4*36e5).toISOString().slice(0,10), demo:true};
+  $('fr-send').disabled = false; $('fr-send').hidden = true;
+  const bot = `https://t.me/${(r && r.bot) || BOT()}?start=free`;
+  $('fr-done').innerHTML = `<div class="free-ok"><b>${t('fr_ok', {n: r.id, d: r.day})}</b>${r.tgLinked ? `<p>${t('fr_ok_tg')}</p>` : `<p>${t('fr_ok_bot')}</p><a class="btn btn-primary" href="${bot}" target="_blank" rel="noopener">${t('fr_bot_btn')}</a>`}${r.demo ? `<p class="note">${t('fr_demo')}</p>` : ''}</div>`;
+  $('fr-done').hidden = false; if (FREE) FREE.count++; renderFree();
+});
+
+const ROUTES = ['home','new','free','catalog','live','orders','track','admin'];
 function route(){
   const h = location.hash.slice(1);
   if (h.startsWith('track-')){ const parts = h.slice(6).split('-'); trackId = parts.slice(0,2).join('-').toUpperCase(); trackCode = (parts[2] || '').toLowerCase(); return 'track'; }
@@ -1879,6 +2014,7 @@ let lastSig = '';
 function full(){
   const r = route();
   if (r === 'orders') renderOrders();
+  if (r === 'free') renderFree();
   if (r === 'track'){ if (!O(trackId) && trackCode) adoptOrder(trackId, trackCode); renderTrack(); }
   if (r === 'admin'){ adminSeen = true; renderAdmin(); }
   if (r === 'live' || r === 'home') renderLive();
