@@ -8,7 +8,7 @@
 <title>Start3D</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=IBM+Plex+Mono:wght@400;500;700&family=Onest:wght@400;500;700&display=swap">
 <style>
 /* Layout: one app column, layer-line motif from FDM printing; views routed by hash (home / new / catalog / live / orders / track-ID / admin) */
 :root{
@@ -263,6 +263,60 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 }
 @media (max-width:560px){.cat,.live-grid,.services,.grid2,.printers{grid-template-columns:1fr}.big-pct{font-size:46px}.price{font-size:32px}.ocard{grid-template-columns:1fr}.ocard>div{justify-items:start!important}}
 @media (prefers-reduced-motion:reduce){.live::before{animation:none}.bar-line i{transition:none}}
+
+/* ===== Skin B · «Чертёж»: light technical sheet, millimetre grid, cobalt accent ===== */
+:root[data-skin="b"]{
+  --bg:#F6F8FA; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#4F5B6D; --line:#C7D0DC;
+  --accent:#1F4FFF; --accent-ink:#FFFFFF; --accent-soft:#E7EDFF;
+  --good:#0F7B5F; --warn:#9A6200; --bad:#C8361A; --info:#1F4FFF; --wa:#0F7B5F;
+  --f-display:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --f-body:"Onest","Golos Text",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+[data-skin="b"] body{background-color:var(--bg);background-image:linear-gradient(#E4E9F0 1px,transparent 1px),linear-gradient(90deg,#E4E9F0 1px,transparent 1px);background-size:24px 24px}
+[data-skin="b"] header{border-bottom:2px solid var(--ink)}
+[data-skin="b"] .mark{display:none}
+[data-skin="b"] .logo b{letter-spacing:-.02em;text-transform:uppercase}
+[data-skin="b"] .logo b::before{content:"["}
+[data-skin="b"] .logo b::after{content:"]"}
+[data-skin="b"] h1,[data-skin="b"] h2{text-transform:uppercase;letter-spacing:-.03em}
+[data-skin="b"] .hero h1 span:nth-child(3){background:var(--accent);color:var(--accent-ink);padding:0 .15em;align-self:flex-start;display:inline-block}
+[data-skin="b"] nav a{border-radius:0;text-transform:uppercase;font-family:var(--f-mono);font-size:13px;letter-spacing:.03em}
+[data-skin="b"] nav a[aria-current="page"]{background:transparent;box-shadow:inset 0 -2px 0 var(--accent);color:var(--ink)}
+[data-skin="b"] button,[data-skin="b"] .btn{border-radius:0;border:2px solid var(--ink);text-transform:uppercase;font-family:var(--f-mono);font-size:13px;letter-spacing:.03em}
+[data-skin="b"] .btn-primary{background:var(--ink);border-color:var(--ink);color:#FFFFFF}
+[data-skin="b"] .btn-sm{border-width:1.5px}
+[data-skin="b"] .panel,[data-skin="b"] .cardbox,[data-skin="b"] .svc,[data-skin="b"] .item,[data-skin="b"] .lcard,[data-skin="b"] .ocard,[data-skin="b"] .printer,[data-skin="b"] .counter{border-radius:0;border:2px solid var(--ink)}
+[data-skin="b"] .panel,[data-skin="b"] .lcard,[data-skin="b"] .item{box-shadow:6px 6px 0 var(--ink)}
+[data-skin="b"] .screen,[data-skin="b"] .viewer,[data-skin="b"] .drop,[data-skin="b"] .photos canvas,[data-skin="b"] .thumbs img{border-radius:0}
+[data-skin="b"] .hero-art,[data-skin="b"] .cam{border:2px solid var(--ink);box-shadow:8px 8px 0 var(--ink)}
+[data-skin="b"] .drop{border:2px dashed var(--ink)}
+[data-skin="b"] select,[data-skin="b"] input[type=number],[data-skin="b"] input[type=text],[data-skin="b"] input[type=tel],[data-skin="b"] input[type=email],[data-skin="b"] input[type=url],[data-skin="b"] textarea{border-radius:0;border:1.5px solid var(--ink);background:#FFFFFF}
+[data-skin="b"] .seg{border-radius:0;border:2px solid var(--ink)}
+[data-skin="b"] .seg button{border:0;border-right:1.5px solid var(--ink)}
+[data-skin="b"] .seg button:last-child{border-right:0}
+[data-skin="b"] .seg button[aria-pressed="true"]{background:var(--ink);color:#FFFFFF}
+[data-skin="b"] .pill{border-radius:0;border:1.5px solid currentColor;background:#FFFFFF;font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase}
+[data-skin="b"] .langs{border-radius:0;border:1.5px solid var(--ink)}
+[data-skin="b"] .langs button{border:0;text-transform:none}
+[data-skin="b"] .langs button[aria-pressed="true"]{background:var(--ink);color:#FFFFFF}
+[data-skin="b"] .facts{border-block:2px solid var(--ink)}
+[data-skin="b"] .facts b,[data-skin="b"] .price,[data-skin="b"] .big-pct{font-family:var(--f-mono);letter-spacing:-.04em}
+[data-skin="b"] .steps li{border-top:2px solid var(--ink)}
+[data-skin="b"] .steps li:first-child{border-color:var(--accent)}
+[data-skin="b"] .msg{border-radius:0;border-left:4px solid var(--accent)}
+[data-skin="b"] .banner{border-radius:0;background:#FFFFFF;color:var(--ink);border:1.5px solid var(--ink)}
+[data-skin="b"] .banner b{color:var(--accent);font-family:var(--f-mono)}
+[data-skin="b"] .banner b::before{content:"["}[data-skin="b"] .banner b::after{content:"]"}
+[data-skin="b"] .bar-line{border-radius:0;height:12px;border:1.5px solid var(--ink);background:#FFFFFF}
+[data-skin="b"] .bar-line i{background:repeating-linear-gradient(90deg,var(--accent) 0 6px,#163CC4 6px 8px)}
+[data-skin="b"] .toast{border-radius:0;border:2px solid var(--ink);background:#FFFFFF;color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
+[data-skin="b"] .sw{border-radius:0}
+[data-skin="b"] footer{border-top:2px solid var(--ink)}
+.skin-switch{display:flex;gap:6px;align-items:center}
+.skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
+.skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 </style>
 
 </head>
@@ -523,6 +577,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 <footer>
   <span data-i="foot"></span>
+  <span class="skin-switch" role="group" aria-label="Оформление"><span data-i="skin_l"></span><button type="button" data-skin="a">A</button><button type="button" data-skin="b">B</button></span>
   <span class="mono">Telegram @Strt3d_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
 </footer>
 
@@ -610,6 +665,7 @@ q5:['Endirimlər varmı?','Есть скидки?','Є знижки?','Any disco
 a5:['Hər 5-ci sifariş −10%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Tədris layihələri −15%.','Каждый 5-й заказ −10%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Учебные проекты −15%.','Кожне 5-те замовлення −10%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Навчальні проєкти −15%.','Every 5th order is 10% off. Give a friend your code: 10% off for them and for your next order. Student projects get 15% off.'],
 q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
 a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
+skin_l:['Dizayn:','Оформление:','Оформлення:','Style:'],
 foot:['Start3D — Bakıda 3D çap','Start3D — 3D-печать в Баку','Start3D — 3D-друк у Баку','Start3D — 3D printing in Baku'],
 sample_word:['nümunə','пример','приклад','sample'],
 new_h:['Yeni sifariş','Новый заказ','Нове замовлення','New order'],
@@ -1080,6 +1136,10 @@ function applyLang(){
   renderSwatches(); visNote(); promoCheck(); renderCatalog(); renderQuote(); full();
 }
 document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('s3d-lang', lang); } catch(e){} applyLang(); });
+/* skin: ?skin=a|b in the link, remembered per browser */
+function setSkin(k){ k = k === 'b' ? 'b' : 'a'; document.documentElement.dataset.skin = k; document.querySelectorAll('.skin-switch button').forEach(b => b.setAttribute('aria-pressed', b.dataset.skin === k)); try { localStorage.setItem('s3d-skin', k); } catch(e){} }
+document.querySelectorAll('.skin-switch button').forEach(b => b.onclick = () => { setSkin(b.dataset.skin); try { drawThumbs(); } catch(e){} });
+try { setSkin(new URLSearchParams(location.search).get('skin') || localStorage.getItem('s3d-skin') || 'a'); } catch(e){ setSkin('a'); }
 try { lang = localStorage.getItem('s3d-lang') || ({az:'az', ru:'ru', uk:'uk', en:'en'})[(navigator.language||'ru').slice(0,2)] || 'ru'; } catch(e){}
 
 /* ---------- discounts ---------- */
