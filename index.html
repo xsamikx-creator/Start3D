@@ -1,67 +1,1708 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#090b0d" />
-  <title>Start3D</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <main class="home-shell">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Start3D">START<span>3D</span></a>
-      <div class="status"><i></i> Сервис онлайн</div>
-    </header>
+<title>Qat 3D-печать</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one app column, layer-line motif from FDM printing; views routed by hash (home / new / catalog / live / orders / track-ID / admin) */
+:root{
+  --bg:#EEF0EC; --surface:#FAFBF8; --ink:#1C1F22; --muted:#5E6660; --line:#D5D9D2;
+  --accent:#B9771A; --accent-ink:#FFFFFF; --accent-soft:#F3E4C8;
+  --good:#2E8B57; --warn:#B07D0E; --bad:#C0442F; --info:#2F63C9; --wa:#1F9D55;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141619; --surface:#1C1F23; --ink:#ECEDE8; --muted:#9AA19B; --line:#2E3338;
+  --accent:#E3A84A; --accent-ink:#1A1408; --accent-soft:#3A2E19;
+  --good:#5CC48A; --warn:#E6B640; --bad:#EE7A63; --info:#7EA5F2; --wa:#4CD08A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141619; --surface:#1C1F23; --ink:#ECEDE8; --muted:#9AA19B; --line:#2E3338;
+  --accent:#E3A84A; --accent-ink:#1A1408; --accent-soft:#3A2E19;
+  --good:#5CC48A; --warn:#E6B640; --bad:#EE7A63; --info:#7EA5F2; --wa:#4CD08A; color-scheme:dark}
 
-    <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">3D PRINTING ON DEMAND</p>
-        <h1>Что будем<br><em>печатать?</em></h1>
-        <p class="subtitle">Загрузи модель, получи расчёт и следи за печатью онлайн.</p>
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1100px;margin:0 auto;padding-block:0 48px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em;font-weight:700}
+h2{font-size:clamp(20px,3vw,26px)} h3{font-size:15px;font-weight:500}
+p{margin:0}
+a{color:var(--accent)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+button,.btn{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-ghost{background:transparent}
+.btn-sm{padding:6px 10px;font-size:13px;border-radius:8px}
+button:disabled{opacity:.45;cursor:not-allowed}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px 14px;padding-block:10px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.mark{display:grid;gap:2px;width:22px}
+.mark i{display:block;height:4px;border-radius:2px;background:var(--accent)}
+.mark i:nth-child(1){width:60%;margin:0 auto}.mark i:nth-child(2){width:80%;margin:0 auto}.mark i:nth-child(3){width:100%}
+.logo b{font-family:var(--f-display);font-size:20px;font-weight:700}
+nav{display:flex;gap:2px;flex-wrap:wrap;margin-left:auto}
+nav a{color:var(--muted);text-decoration:none;padding:7px 10px;border-radius:8px;font-weight:500;font-size:14px}
+nav a[aria-current="page"]{color:var(--ink);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+nav a .cnt{font-family:var(--f-mono);font-size:11px;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 6px;margin-left:4px}
+.langs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.langs button{border:0;border-radius:0;padding:6px 9px;font-size:12px;background:transparent;color:var(--muted)}
+.langs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.demo-note{font-size:12.5px;color:var(--muted);text-align:center;padding:8px 0 0}
+
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:32px;align-items:center;padding-block:36px 24px}
+.hero h1{font-size:clamp(30px,5.2vw,52px);line-height:1.05}
+.hero h1 span{display:block}
+.hero h1 span:nth-child(2){color:var(--accent)}
+.hero p{margin-top:16px;max-width:46ch;color:var(--muted);font-size:16.5px}
+.hero-cta{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}
+.screen{background:#111316;border-radius:16px;position:relative;overflow:hidden;max-width:100%}
+.screen canvas{width:100%;height:100%;display:block}
+.hero-art{aspect-ratio:4/3}
+.hud{position:absolute;left:12px;right:12px;bottom:10px;display:flex;justify-content:space-between;gap:8px;color:#C9CEC8;font-family:var(--f-mono);font-size:11.5px}
+.live{color:#FF6B57;font-weight:600}
+.live::before{content:"●";margin-right:5px;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-block:1px solid var(--line);padding-block:20px;margin-block:8px 40px}
+.facts div{display:grid;gap:2px}
+.facts b{font-family:var(--f-display);font-size:24px;font-weight:700}
+.facts span{color:var(--muted);font-size:13.5px}
+.section{display:grid;gap:20px;margin-bottom:48px}
+.services{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.svc{padding:20px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:grid;gap:8px;align-content:start}
+.svc h3{font-family:var(--f-display);font-size:16px;font-weight:700}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:0;padding:0;counter-reset:s}
+.steps li{list-style:none;border-top:2px solid var(--line);padding-top:12px;counter-increment:s}
+.steps li::before{content:"0" counter(s);display:block;font-family:var(--f-mono);font-size:12px;color:var(--accent);margin-bottom:4px;font-weight:600}
+.steps li:first-child{border-color:var(--accent)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.mat-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;border:1px solid var(--line)}
+details{border-bottom:1px solid var(--line);padding-block:14px}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::after{content:"+";font-family:var(--f-mono);color:var(--accent)}
+details[open] summary::after{content:"–"}
+details p{margin-top:8px;color:var(--muted);max-width:70ch}
+footer{border-top:1px solid var(--line);padding-block:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px;max-width:1100px;margin:0 auto}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:clamp(16px,3vw,24px)}
+.split{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;align-items:start}
+.split>*{min-width:0}
+.page-head{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;padding-block:28px 20px}
+.page-head h1{font-size:clamp(24px,4vw,34px)}
+.page-head p{color:var(--muted);margin-top:6px;max-width:62ch}
+.form{display:grid;gap:18px}
+.field{display:grid;gap:6px;min-width:0}
+.field>label,.field>.flabel{font-weight:600;font-size:13.5px}
+select,input[type=number],input[type=text],input[type=tel],input[type=email],textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+textarea{min-height:70px;resize:vertical}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row>.field{flex:1 1 150px}
+.check{display:flex;gap:8px;align-items:start;font-size:14px}
+.check input{margin-top:4px}
+.fieldset-h{font-family:var(--f-display);font-size:14px;font-weight:500;border-top:1px solid var(--line);padding-top:16px}
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:20px;text-align:center;display:grid;gap:6px;place-items:center;cursor:pointer;background:var(--bg);position:relative}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.viewer{aspect-ratio:16/10;border-radius:12px;background:var(--bg);border:1px solid var(--line);position:relative;overflow:hidden;cursor:grab;touch-action:none}
+.viewer canvas{width:100%;height:100%;display:block}
+.viewer .vhint{position:absolute;bottom:8px;right:10px;font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);padding:0;position:relative}
+.sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.sw:disabled::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--bad);transform:rotate(45deg)}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;border-radius:0;flex:1 1 auto;font-weight:500;padding:9px 10px;background:var(--bg);font-size:13.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.quote{display:grid;gap:14px;align-content:start;position:sticky;top:calc(env(safe-area-inset-top,0px) + 72px)}
+.price{font-family:var(--f-display);font-size:40px;font-weight:700;line-height:1}
+.price small{font-size:16px;font-weight:500;color:var(--muted)}
+dl.specs{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;margin:0}
+dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)} .pill.info{color:var(--info)} .pill.acc{color:var(--accent)} .pill.mut{color:var(--muted)} .pill.wa{color:var(--wa)}
+.pill.wrap{white-space:normal}
+.note{font-size:13px;color:var(--muted)}
+.err{font-size:13px;color:var(--bad)}
+.ok{font-size:13px;color:var(--good)}
+.formula{font-family:var(--f-mono);font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;overflow-x:auto;white-space:nowrap}
+.disc{display:grid;gap:4px;font-size:13.5px}
+.disc div{display:flex;justify-content:space-between;gap:8px}
+.disc .mono{color:var(--good)}
+
+.cat,.live-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+.item canvas{width:100%;aspect-ratio:4/3;display:block;background:var(--bg);max-width:100%}
+.item .body{padding:16px;display:grid;gap:10px;align-content:space-between}
+.item .meta,.lcard .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.item .cost{font-family:var(--f-display);font-size:20px;font-weight:700}
+.lcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid}
+.lcard .screen{border-radius:0;aspect-ratio:4/3}
+.lcard .screen>a{display:block;height:100%}
+.lcard .body{padding:12px 14px;display:grid;gap:6px}
+.lcard .body a{color:var(--ink);text-decoration:none}
+.lcard .body a:hover b{color:var(--accent)}
+.ov{position:absolute;top:8px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;font-family:var(--f-mono);font-size:11px;color:#C9CEC8;pointer-events:none}
+.play{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.65);color:#fff;border-color:rgba(255,255,255,.35)}
+.badge-ch{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--ink);color:var(--bg);white-space:nowrap}
+
+.olist{display:grid;gap:10px}
+.ocard{display:grid;grid-template-columns:1fr auto;gap:6px 16px;align-items:center;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.ocard>*{min-width:0}
+.ocard a.t{color:var(--ink);text-decoration:none}
+.ocard a.t:hover b{color:var(--accent)}
+.ocard .sub{color:var(--muted);font-size:13px}
+.loyal{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.loyal i{width:22px;height:8px;border-radius:4px;background:var(--line)}
+.loyal i.on{background:var(--accent)}
+.track{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:20px}
+.track div{display:grid;gap:6px;font-size:12.5px;color:var(--muted);min-width:0}
+.track div::before{content:"";height:6px;border-radius:3px;background:var(--line)}
+.track .done::before{background:var(--accent)}
+.track .now{color:var(--ink);font-weight:600}
+.track .now::before{background:linear-gradient(90deg,var(--accent) 40%,var(--line) 40%)}
+.cam{aspect-ratio:16/10}
+.cam .tag{position:absolute;top:10px;left:12px;right:12px;font-family:var(--f-mono);font-size:11.5px;color:#C9CEC8;display:flex;gap:12px;flex-wrap:wrap}
+.big-pct{font-family:var(--f-display);font-size:60px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.bar-line{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.bar-line i{display:block;height:100%;background:var(--accent);width:0;transition:width .8s linear}
+.bar-line.sm{height:6px}
+.msg{border-left:3px solid var(--accent);padding:12px 16px;background:var(--accent-soft);border-radius:0 10px 10px 0}
+.msg.bad{border-color:var(--bad)}
+.cardbox{border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px;background:var(--surface)}
+.cardnum{font-family:var(--f-mono);font-size:19px;letter-spacing:.06em;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.reacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.reacts:empty{display:none}
+.reacts button{padding:6px 12px;border-radius:99px;font-size:14px}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.photos canvas{width:100%;aspect-ratio:1;border-radius:10px;display:block;background:var(--bg);max-width:100%}
+.feed{display:grid;gap:8px;max-height:260px;overflow:auto}
+.feed div{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13.5px;padding:8px 10px;border-radius:10px;background:var(--bg)}
+.feed .ch{font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--accent)}
+.feed .ch.tg{color:var(--info)}
+.feed time{grid-column:1/-1;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+
+.counters{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.counter{padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.counter b{display:block;font-family:var(--f-display);font-size:28px}
+.counter.hot{border-color:var(--accent)}
+.alerts{display:grid;gap:8px;margin-bottom:16px}
+.alerts:empty{display:none}
+.alert{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--bad);background:var(--surface);flex-wrap:wrap}
+.alert b{color:var(--bad)}
+.printers{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.printer{padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:grid;gap:10px;align-content:start;min-width:0}
+.printer.err{border-color:var(--bad)}
+.printer .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.printer .model{font-size:13px;color:var(--muted)}
+.spool{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.adm table{min-width:820px}
+.adm td{font-size:14px}
+.act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.act input,.act select{width:auto;padding:6px 8px;font-size:13px;max-width:220px}
+.act input[type=number]{width:76px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.stock input{width:76px;padding:5px 6px;font-size:13px;font-family:var(--f-mono)}
+.stock td.low input{border-color:var(--warn)}
+.stock td.out input{border-color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.hbar{display:grid;grid-template-columns:100px 1fr 52px;gap:10px;align-items:center;font-size:13px}
+.hbar .bar-line{height:8px}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.empty{padding:20px;text-align:center;color:var(--muted)}
+.gap-top{margin-top:32px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid2>*{min-width:0}
+
+.oled{position:absolute;right:10px;bottom:10px;width:min(48%,190px);aspect-ratio:2/1;background:#000;border:3px solid #2B2F33;border-radius:6px;padding:6px 8px;font-family:var(--f-mono);color:#8FE9FF;font-size:10px;line-height:1.2;display:grid;align-content:space-between;box-shadow:0 0 14px rgba(143,233,255,.18);max-width:100%}
+.oled b{font-size:15px;color:#E9FBFF;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
+.oled .ob{height:6px;border:1px solid #8FE9FF}.oled .ob i{display:block;height:100%;background:#8FE9FF}
+.oled .orow{display:flex;justify-content:space-between;gap:6px}
+.oled.inline{position:static;width:100%}
+.oled .qr{display:grid;grid-template-columns:repeat(9,1fr);width:40px;height:40px}
+.oled .qr i{background:#8FE9FF}.oled .qr i.o{background:transparent}
+.modal{position:fixed;inset:0;z-index:30;background:rgba(10,12,14,.55);display:grid;place-items:center;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.modal .panel{width:min(440px,100%)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:500;z-index:40;max-width:calc(100% - 32px)}
+
+@media (max-width:900px){
+  .hero,.split{grid-template-columns:1fr}
+  .quote{position:static}
+  .steps,.facts,.printers,.counters,.stats{grid-template-columns:1fr 1fr}
+  .cat,.live-grid,.services{grid-template-columns:1fr 1fr}
+  .track{grid-template-columns:repeat(3,1fr);row-gap:12px}
+  nav{margin-left:0;order:3;width:100%}
+}
+@media (max-width:560px){.cat,.live-grid,.services,.grid2,.printers{grid-template-columns:1fr}.big-pct{font-size:46px}.price{font-size:32px}.ocard{grid-template-columns:1fr}.ocard>div{justify-items:start!important}}
+@media (prefers-reduced-motion:reduce){.live::before{animation:none}.bar-line i{transition:none}}
+</style>
+
+<header>
+  <div class="bar">
+    <a class="logo" href="#home" aria-label="Qat"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><b>qat</b></a>
+    <nav aria-label="Menu">
+      <a href="#new" data-route="new" data-i="nav_new"></a>
+      <a href="#catalog" data-route="catalog" data-i="nav_catalog"></a>
+      <a href="#live" data-route="live"><span data-i="nav_live"></span><span class="cnt" id="live-cnt" hidden></span></a>
+      <a href="#orders" data-route="orders"><span data-i="nav_orders"></span><span class="cnt" id="my-cnt" hidden></span></a>
+      <a href="#admin" data-route="admin"><span data-i="nav_admin"></span><span class="cnt" id="adm-cnt" hidden></span></a>
+    </nav>
+    <div class="langs" role="group" aria-label="Language" id="langs">
+      <button type="button" data-lang="az">AZ</button><button type="button" data-lang="ru">RU</button><button type="button" data-lang="uk">UK</button><button type="button" data-lang="en">EN</button>
+    </div>
+  </div>
+</header>
+<p class="demo-note" data-i="demo"></p>
+
+<div class="wrap">
+
+<!-- HOME -->
+<section id="view-home">
+  <div class="hero">
+    <div>
+      <h1><span data-i="h1a"></span><span data-i="h1b"></span><span data-i="h1c"></span></h1>
+      <p data-i="hero_p"></p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#new" data-i="cta_quote"></a>
+        <a class="btn btn-ghost" href="#live" data-i="cta_live"></a>
       </div>
+    </div>
+    <div class="screen hero-art" role="img" aria-label="3D print animation">
+      <canvas id="hero-canvas"></canvas>
+      <div class="hud"><span class="live">LIVE</span><span id="hero-hud"></span></div>
+    </div>
+  </div>
+  <div class="facts">
+    <div><b>4</b><span data-i="f1"></span></div>
+    <div><b class="mono">350 mm</b><span data-i="f2"></span></div>
+    <div><b class="mono">0,12 mm</b><span data-i="f3"></span></div>
+    <div><b data-i="f4v"></b><span data-i="f4"></span></div>
+  </div>
+  <div class="section">
+    <h2 data-i="svc_h"></h2>
+    <div class="services">
+      <div class="svc"><span class="label" data-i="svc1_l"></span><h3 data-i="svc1"></h3><p class="note" data-i="svc1_p"></p><a href="#new" data-i="nav_new"></a></div>
+      <div class="svc"><span class="label" data-i="svc2_l"></span><h3 data-i="svc2"></h3><p class="note" data-i="svc2_p"></p><a href="#new" id="go-model" data-i="svc2_cta"></a></div>
+      <div class="svc"><span class="label" data-i="soon"></span><h3 data-i="svc3"></h3><p class="note" data-i="svc3_p"></p></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="page-head" style="padding:0"><h2 data-i="live_h"></h2><a href="#live" data-i="cat_all"></a></div>
+    <div class="live-grid" id="live-teaser"></div>
+  </div>
+  <div class="section">
+    <h2 data-i="how_h"></h2>
+    <ol class="steps"><li data-i="s1"></li><li data-i="s2"></li><li data-i="s3"></li><li data-i="s4"></li></ol>
+  </div>
+  <div class="section">
+    <h2 data-i="mat_h"></h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th data-i="th_mat"></th><th data-i="th_for"></th><th data-i="th_k"></th><th data-i="th_print"></th></tr></thead>
+      <tbody>
+        <tr><td><span class="mat-dot" style="background:#E2702F"></span><b>PLA</b></td><td data-i="m_pla"></td><td class="mono">× 1,0</td><td>A1, Ender, K2 Plus</td></tr>
+        <tr><td><span class="mat-dot" style="background:#2F5FD0"></span><b>PETG</b></td><td data-i="m_petg"></td><td class="mono">× 1,2</td><td>A1, Ender, K2 Plus</td></tr>
+        <tr><td><span class="mat-dot" style="background:#2A2D31"></span><b>ABS / ASA</b></td><td data-i="m_abs"></td><td class="mono">× 1,4</td><td>K2 Plus</td></tr>
+        <tr><td><span class="mat-dot" style="background:#3E9B5A"></span><b>TPU</b></td><td data-i="m_tpu"></td><td class="mono">× 1,8</td><td>A1, Ender</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note" data-i="mat_note"></p>
+  </div>
+  <div class="section">
+    <div class="page-head" style="padding:0"><h2 data-i="cat_h"></h2><a href="#catalog" data-i="cat_all"></a></div>
+    <div class="cat" id="cat-teaser"></div>
+  </div>
+  <div class="section">
+    <h2 data-i="faq_h"></h2>
+    <div>
+      <details><summary data-i="q1"></summary><p data-i="a1"></p></details>
+      <details><summary data-i="q2"></summary><p data-i="a2"></p></details>
+      <details><summary data-i="q3"></summary><p data-i="a3"></p></details>
+      <details><summary data-i="q4"></summary><p data-i="a4"></p></details>
+      <details><summary data-i="q5"></summary><p data-i="a5"></p></details>
+      <details><summary data-i="q6"></summary><p data-i="a6"></p></details>
+    </div>
+  </div>
+</section>
 
-      <div class="entry-grid" aria-label="Разделы Start3D">
-        <button class="entry-card primary" data-screen="order">
-          <span class="icon">＋</span>
-          <span class="entry-text">
-            <b>Заказать</b>
-            <small>Загрузить модель и рассчитать стоимость</small>
-          </span>
-          <span class="arrow">↗</span>
-        </button>
-
-        <button class="entry-card" data-screen="my-order">
-          <span class="icon">◎</span>
-          <span class="entry-text">
-            <b>Мой заказ</b>
-            <small>Статус, прогресс и live-камера</small>
-          </span>
-          <span class="arrow">→</span>
-        </button>
-
-        <button class="entry-card operator" data-screen="operator">
-          <span class="icon">⌘</span>
-          <span class="entry-text">
-            <b>Оператор</b>
-            <small>Заявки, очередь и 4 принтера</small>
-          </span>
-          <span class="arrow">→</span>
-        </button>
+<!-- NEW ORDER -->
+<section id="view-new" hidden>
+  <div class="page-head"><div><h1 data-i="new_h"></h1><p data-i="new_p"></p></div></div>
+  <div class="split">
+    <form class="panel form" id="order-form" novalidate>
+      <div class="seg" id="seg-k"><button type="button" data-v="file" data-i="k_file"></button><button type="button" data-v="photo" data-i="k_photo"></button></div>
+      <div id="file-block" class="form">
+        <label class="drop" id="drop" for="file">
+          <input type="file" id="file" accept=".stl,.3mf,.obj,.step,.stp">
+          <strong id="drop-title" data-i="drop_t"></strong>
+          <span class="note" id="drop-sub" data-i="drop_s"></span>
+        </label>
+        <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><span class="vhint" data-i="drag"></span></div>
+        <button type="button" class="btn-ghost" id="sample-btn" data-i="sample_btn"></button>
       </div>
-    </section>
+      <div id="photo-block" class="form" hidden>
+        <label class="drop" for="photos">
+          <input type="file" id="photos" accept="image/*" multiple>
+          <strong data-i="ph_t"></strong>
+          <span class="note" data-i="ph_s"></span>
+        </label>
+        <div class="thumbs" id="ph-thumbs"></div>
+        <div class="field"><label for="f-dims" data-i="f_dims"></label><input type="text" id="f-dims" placeholder="45 × 20 × 12 mm"></div>
+      </div>
+      <div class="field"><label for="f-name" data-i="f_name"></label><input type="text" id="f-name" data-ip="f_name_ph"></div>
+      <div class="row">
+        <div class="field"><label for="f-mat" data-i="f_mat"></label>
+          <select id="f-mat"><option value="PLA">PLA</option><option value="PETG">PETG</option><option value="ABS">ABS / ASA</option><option value="TPU">TPU</option></select></div>
+        <div class="field"><label for="f-qty" data-i="f_qty"></label><input type="number" id="f-qty" min="1" max="50" value="1"></div>
+      </div>
+      <div class="field"><span class="flabel"><span data-i="f_color"></span>: <span id="color-name"></span></span><div class="swatches" id="swatches"></div><span class="note" data-i="stock_note"></span></div>
+      <div class="field" id="q-field"><span class="flabel" data-i="f_quality"></span>
+        <div class="seg" id="seg-q"><button type="button" data-v="draft" data-i="q_draft"></button><button type="button" data-v="std" data-i="q_std"></button><button type="button" data-v="fine" data-i="q_fine"></button></div></div>
+      <div class="field" id="i-field"><span class="flabel" data-i="f_infill"></span>
+        <div class="seg" id="seg-i"><button type="button" data-v="15">15%</button><button type="button" data-v="30">30%</button><button type="button" data-v="60">60%</button></div></div>
+      <div class="field"><span class="flabel" data-i="f_urg"></span>
+        <div class="seg" id="seg-u"><button type="button" data-v="0" data-i="urg_n"></button><button type="button" data-v="1" data-i="urg_f"></button></div></div>
 
-    <section class="screen" id="screen" hidden>
-      <button class="back" id="backBtn">← На главную</button>
-      <div id="screenContent"></div>
-    </section>
+      <p class="fieldset-h" data-i="f_contact"></p>
+      <div class="row">
+        <div class="field"><label for="f-cname" data-i="f_cname"></label><input type="text" id="f-cname" autocomplete="name" maxlength="16" required aria-describedby="cname-note"><span class="note" id="cname-note" data-i="cname_note"></span></div>
+        <div class="field"><label for="f-phone" data-i="f_phone"></label><input type="tel" id="f-phone" autocomplete="tel" placeholder="+994 50 000 00 00"></div>
+      </div>
+      <div class="field"><span class="flabel" data-i="f_notify"></span>
+        <div class="seg" id="seg-n"><button type="button" data-v="tg">Telegram</button><button type="button" data-v="email">Email</button></div>
+        <p class="note" id="tg-note" data-i="tg_note"></p>
+        <div class="field" id="email-f" hidden><label for="f-email" data-i="f_email"></label><input type="email" id="f-email" autocomplete="email" placeholder="name@mail.az"></div></div>
+      <div class="field"><span class="flabel" data-i="f_deliv"></span>
+        <div class="seg" id="seg-d"><button type="button" data-v="0" data-i="d_pick"></button><button type="button" data-v="1" data-i="d_cour"></button></div></div>
+      <label class="check"><input type="checkbox" id="f-gift"><span data-i="f_gift"></span></label>
+      <div class="field" id="gift-block" hidden><label for="f-gift-to" data-i="f_gift_to"></label><input type="text" id="f-gift-to" maxlength="16"><span class="note" data-i="gift_note"></span></div>
 
-    <footer>
-      <span>START3D / BAKU</span>
-      <span>Upload → Start → Watch</span>
-    </footer>
-  </main>
+      <p class="fieldset-h" data-i="f_vis"></p>
+      <div class="seg" id="seg-v"><button type="button" data-v="private" data-i="vis_priv"></button><button type="button" data-v="public" data-i="vis_pub"></button></div>
+      <p class="note" id="vis-note"></p>
+      <label class="check" id="copy-row" hidden><input type="checkbox" id="f-copy" checked><span data-i="f_copy"></span></label>
 
-  <script src="app.js"></script>
-</body>
-</html>
+      <p class="fieldset-h" data-i="f_disc"></p>
+      <div class="row" style="align-items:end">
+        <div class="field"><label for="f-promo" data-i="f_promo"></label><input type="text" id="f-promo" placeholder="QAT10" autocomplete="off"></div>
+        <span class="note" id="promo-msg" style="flex:1 1 150px"></span>
+      </div>
+      <label class="check"><input type="checkbox" id="f-student"><span data-i="f_student"></span></label>
+      <div class="field"><label for="f-comment" data-i="f_comment"></label><textarea id="f-comment" data-ip="f_comment_ph"></textarea></div>
+      <label class="check note" id="rights-row"><input type="checkbox" id="f-rights"><span data-i="f_rights"></span></label>
+    </form>
+    <div class="panel quote" id="quote-out" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- CATALOG -->
+<section id="view-catalog" hidden>
+  <div class="page-head"><div><h1 data-i="cat_h"></h1><p data-i="cat_p"></p></div></div>
+  <div class="cat" id="cat-full"></div>
+</section>
+
+<!-- LIVE -->
+<section id="view-live" hidden>
+  <div class="page-head"><div><h1 data-i="live_h"></h1><p data-i="live_p"></p></div></div>
+  <div class="live-grid" id="live-full"></div>
+  <div class="page-head" style="padding-block:40px 16px"><div><h2 data-i="tl_h"></h2><p data-i="tl_p"></p></div></div>
+  <div class="live-grid" id="live-done"></div>
+</section>
+
+<!-- MY ORDERS -->
+<section id="view-orders" hidden>
+  <div class="page-head"><div><h1 data-i="ord_h"></h1><p data-i="ord_p"></p></div><a class="btn btn-primary" href="#new" data-i="nav_new"></a></div>
+  <div class="grid2" style="margin-bottom:16px">
+    <div class="panel" style="display:grid;gap:10px"><span class="label" data-i="loy_h"></span><div class="loyal" id="loyal"></div><p class="note" id="loyal-note"></p></div>
+    <div class="panel" style="display:grid;gap:10px"><span class="label" data-i="ref_h"></span><div class="row"><span class="cardnum" id="ref-code" style="font-size:17px"></span><button type="button" class="btn-sm" id="ref-copy" data-i="copy"></button></div><p class="note" data-i="ref_p"></p></div>
+  </div>
+  <div class="olist" id="olist"></div>
+</section>
+
+<!-- TRACK -->
+<section id="view-track" hidden>
+  <div class="page-head">
+    <div><p class="label" id="t-sub"></p><h1 id="t-title"></h1><div class="row" id="t-badges" style="margin-top:8px;gap:6px"></div></div>
+    <div class="row"><button type="button" id="t-copy" class="btn-sm" data-i="copy_link"></button><a class="btn btn-sm btn-ghost" href="#orders" data-i="back"></a></div>
+  </div>
+  <div class="track" id="track"></div>
+  <p class="msg" id="t-locked" hidden></p>
+  <div class="split" id="t-body">
+    <div style="display:grid;gap:16px">
+      <div class="screen cam"><canvas id="cam-canvas"></canvas>
+        <div class="tag"><span class="live" id="cam-live">LIVE</span><span id="cam-printer"></span><span id="cam-viewers"></span></div>
+        <div id="t-oled"></div></div>
+      <div class="reacts" id="t-reacts"></div>
+      <div id="t-photos"></div>
+      <div id="t-pay"></div>
+      <div id="t-feed"></div>
+    </div>
+    <div class="panel" style="display:grid;gap:18px;align-content:start">
+      <div id="t-state"></div>
+      <div><div class="big-pct" id="t-pct">0%</div><div class="bar-line" style="margin-top:12px"><i id="t-bar"></i></div></div>
+      <dl class="specs" id="t-specs">
+        <dt data-i="o_printer"></dt><dd id="t-printer"></dd>
+        <dt data-i="f_mat"></dt><dd id="t-mat"></dd>
+        <dt data-i="o_layer"></dt><dd id="t-layer"></dd>
+        <dt data-i="o_left"></dt><dd id="t-left"></dd>
+        <dt data-i="o_price"></dt><dd id="t-price"></dd>
+        <dt data-i="f_deliv"></dt><dd id="t-deliv"></dd>
+      </dl>
+      <div id="t-actions" class="row"></div>
+      <p class="note" data-i="speed_note"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN -->
+<section id="view-admin" hidden>
+  <div class="page-head"><div><p class="label" data-i="adm_sub"></p><h1 data-i="adm_h"></h1></div><button type="button" class="btn-sm btn-ghost" id="reset" data-i="reset"></button></div>
+  <div class="alerts" id="alerts"></div>
+  <div class="counters" id="counters"></div>
+  <div class="printers" id="printers"></div>
+  <div class="gap-top adm">
+    <div class="page-head" style="padding-block:0 8px"><h2 data-i="adm_orders"></h2>
+      <div class="tabs" id="adm-tabs"><button type="button" class="btn-sm" data-t="active" data-i="tab_active"></button><button type="button" class="btn-sm" data-t="all" data-i="tab_all"></button></div></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th data-i="col_order"></th><th data-i="col_part"></th><th data-i="col_client"></th><th data-i="col_status"></th><th data-i="col_price"></th><th data-i="col_act"></th></tr></thead>
+      <tbody id="adm-rows"></tbody>
+    </table></div>
+  </div>
+  <div class="gap-top panel">
+    <h2 data-i="stock_h" style="font-size:18px"></h2>
+    <p class="note" data-i="stock_p" style="margin:4px 0 12px"></p>
+    <div class="tbl-wrap stock"><table style="min-width:640px"><thead id="stock-head"></thead><tbody id="stock-rows"></tbody></table></div>
+  </div>
+  <div class="gap-top panel">
+    <h2 data-i="stats_h" style="font-size:18px;margin-bottom:14px"></h2>
+    <div class="stats" id="stats"></div>
+    <div class="grid2" style="margin-top:20px">
+      <div style="display:grid;gap:10px"><span class="label" data-i="util_h"></span><div id="util" style="display:grid;gap:8px"></div></div>
+      <div style="display:grid;gap:10px"><span class="label" data-i="matshare_h"></span><div id="matshare" style="display:grid;gap:8px"></div></div>
+    </div>
+  </div>
+  <div class="gap-top panel">
+    <h2 data-i="set_h" style="font-size:18px;margin-bottom:14px"></h2>
+    <div class="settings" id="settings"></div>
+  </div>
+</section>
+</div>
+
+<footer>
+  <span data-i="foot"></span>
+  <span class="mono">Telegram @qat3d_bot · hello@qat3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
+</footer>
+
+<div class="modal" id="m" hidden>
+  <div class="panel form" role="dialog" aria-modal="true" aria-labelledby="m-h">
+    <h2 id="m-h" style="font-size:18px"></h2>
+    <p class="note mono" id="m-sub"></p>
+    <div class="field" id="m-color-f"><span class="flabel" data-i="f_color"></span><div class="swatches" id="m-swatches"></div></div>
+    <div class="field" id="m-qty-f"><label for="m-qty" data-i="f_qty"></label><input type="number" id="m-qty" min="1" max="50" value="1"></div>
+    <div class="field"><label for="m-name" data-i="f_cname"></label><input type="text" id="m-name" maxlength="16" autocomplete="name"><span class="note" data-i="cname_note"></span></div>
+    <div class="field"><label for="m-phone" data-i="f_phone"></label><input type="tel" id="m-phone" autocomplete="tel" placeholder="+994 50 000 00 00"></div>
+    <p class="err" id="m-err" hidden></p>
+    <div class="row"><button type="button" class="btn-primary" id="m-ok"></button><button type="button" id="m-cancel" data-i="cancel"></button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const LANGS = ['az','ru','uk','en'];
+/* [az, ru, uk, en] */
+const T = {
+nav_new:['Sifariş ver','Заказать','Замовити','Order'],
+nav_catalog:['Kataloq','Каталог','Каталог','Catalog'],
+nav_live:['Canlı','Эфир','Ефір','Live'],
+nav_orders:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
+nav_admin:['Operator','Оператор','Оператор','Operator'],
+demo:['Demo versiya: qiymət həqiqi hesablanır; çap, ödəniş, kamera və mesajlar simulyasiyadır.','Демо: цены считаются по-настоящему; печать, оплата, камера и сообщения — симуляция.','Демо: ціни рахуються по-справжньому; друк, оплата, камера й повідомлення — симуляція.','Demo: prices are calculated for real; printing, payment, camera and messages are simulated.'],
+h1a:['Yüklə.','Загрузи.','Завантаж.','Upload.'],
+h1b:['Bax.','Смотри.','Дивись.','Watch.'],
+h1c:['Götür.','Забирай.','Забирай.','Pick up.'],
+hero_p:['Bakıda izləyə biləcəyiniz 3D çap. Modeli yükləyin, qiyməti saniyələrdə öyrənin və detalınızın qat-qat necə yarandığına baxın.','3D-печать в Баку, которую видно. Загрузите модель, получите цену за секунды и смотрите, как деталь растёт слой за слоем.','3D-друк у Баку, який видно. Завантажте модель, отримайте ціну за секунди й дивіться, як деталь росте шар за шаром.','3D printing in Baku you can actually watch. Upload a model, get a price in seconds, then watch your part grow layer by layer.'],
+cta_quote:['Qiyməti hesabla','Рассчитать цену','Розрахувати ціну','Get a price'],
+cta_live:['Canlı çaplara bax','Смотреть эфир','Дивитися ефір','Watch live prints'],
+f1:['printer paralel işləyir','принтера печатают параллельно','принтери друкують паралельно','printers working in parallel'],
+f2:['maksimal detal ölçüsü','максимальный размер детали','максимальний розмір деталі','largest part size'],
+f3:['ən nazik qat','самый тонкий слой','найтонший шар','finest layer'],
+f4v:['24 saat','24 ч','24 год','24 h'],
+f4:['təcili sifariş','срочный заказ','термінове замовлення','rush order'],
+svc_h:['Nə edirik','Что мы делаем','Що ми робимо','What we do'],
+svc1_l:['Faylınız var','Есть файл','Є файл','You have a file'],
+svc1:['Fayl üzrə çap','Печать по файлу','Друк за файлом','Print from a file'],
+svc1_p:['STL yükləyin — qiymət dərhal, çap 2–3 günə, təcili 24 saata.','Загрузите STL — цена сразу, печать за 2–3 дня, срочно за 24 часа.','Завантажте STL — ціна одразу, друк за 2–3 дні, терміново за 24 години.','Upload an STL: instant price, printed in 2–3 days, rush in 24 hours.'],
+svc2_l:['Fayl yoxdur','Нет файла','Немає файлу','No file'],
+svc2:['Foto üzrə modelləşdirmə','Моделирование по фото','Моделювання за фото','Modelling from photos'],
+svc2_p:['Sınmış detalın fotosunu və ölçülərini göndərin — modeli biz çəkib çap edəcəyik. 20 AZN-dən.','Пришлите фото сломанной детали и размеры — нарисуем модель и напечатаем. От 20 AZN.','Надішліть фото зламаної деталі й розміри — намалюємо модель і надрукуємо. Від 20 AZN.','Send photos and measurements of a broken part; we model and print it. From 20 AZN.'],
+svc2_cta:['Foto göndər','Отправить фото','Надіслати фото','Send photos'],
+soon:['Tezliklə','Скоро','Незабаром','Coming soon'],
+svc3:['3D skanlama','3D-сканирование','3D-сканування','3D scanning'],
+svc3_p:['Detalı gətirin — skan edib dəqiq surətini çap edəcəyik.','Принесите деталь — отсканируем и напечатаем точную копию.','Принесіть деталь — відскануємо й надрукуємо точну копію.','Bring the part; we scan it and print an exact copy.'],
+how_h:['Necə işləyir','Как это работает','Як це працює','How it works'],
+s1:['STL yükləyin, material və rəng seçin','Загрузите STL, выберите материал и цвет','Завантажте STL, оберіть матеріал і колір','Upload an STL, pick material and colour'],
+s2:['Qiymət aralığını dərhal görün, operator yekun qiyməti təsdiqləyir','Сразу видите вилку цены, оператор подтверждает итог','Одразу бачите діапазон ціни, оператор підтверджує підсумок','See a price range instantly; an operator confirms the final price'],
+s3:['50%-i karta köçürün, sifariş növbəyə düşür','Переведите 50% на карту, заказ встаёт в очередь','Переказуєте 50% на картку, замовлення стає в чергу','Transfer 50% to our card and the order joins the queue'],
+s4:['Çapı izləyin, foto və timelapse Telegram-a və ya e-poçta gələcək','Следите за печатью, фото и таймлапс придут в Telegram или на почту','Стежте за друком, фото й таймлапс надійдуть у Telegram або на пошту','Watch the print; photos and a timelapse arrive on Telegram or by email'],
+
+mat_h:['Materiallar','Материалы','Матеріали','Materials'],
+th_mat:['Material','Материал','Матеріал','Material'],
+th_for:['Nə üçün','Для чего','Для чого','Best for'],
+th_k:['Qiymət əmsalı','Коэффициент цены','Коефіцієнт ціни','Price factor'],
+th_print:['Printerlər','Принтеры','Принтери','Printers'],
+m_pla:['dekor, korpuslar, prototiplər','декор, корпуса, прототипы','декор, корпуси, прототипи','decor, enclosures, prototypes'],
+m_petg:['möhkəm hissələr, rütubətə davamlı','прочные детали, влагостойкость','міцні деталі, вологостійкість','strong parts, moisture-resistant'],
+m_abs:['istiliyə davamlı, avtomobil üçün','термостойкие детали, для авто','термостійкі деталі, для авто','heat-resistant, automotive'],
+m_tpu:['elastik: qapaqlar, amortizatorlar','гибкие: чехлы, амортизаторы','гнучкі: чохли, амортизатори','flexible: cases, dampers'],
+mat_note:['Rəngin anbarda olub-olmadığı sifariş formasında görünür. Olmayan rəng sifarişlə, +2–3 gün.','Наличие цвета видно прямо в форме заказа. Других цветов придётся подождать 2–3 дня.','Наявність кольору видно просто у формі замовлення. Інших кольорів доведеться почекати 2–3 дні.','Colour availability shows right in the order form. Other colours take 2–3 extra days.'],
+cat_h:['Hazır modellər','Готовые модели','Готові моделі','Ready-made models'],
+cat_all:['Hamısı →','Смотреть все →','Дивитися всі →','See all →'],
+cat_p:['Sabit qiymət, yoxlama yoxdur: birbaşa ödənişə keçid.','Фиксированная цена без проверки: сразу к оплате.','Фіксована ціна без перевірки: одразу до оплати.','Fixed price, no review: straight to payment.'],
+buy:['Sifariş et','Заказать','Замовити','Order'],
+faq_h:['Suallar','Вопросы','Питання','Questions'],
+q1:['Hansı faylları qəbul edirsiniz?','Какие файлы принимаете?','Які файли приймаєте?','Which files do you accept?'],
+a1:['STL — qiymət dərhal hesablanır. 3MF, OBJ və STEP-i operator əl ilə hesablayır. Fayl yoxdursa, detalın fotosunu göndərin.','STL — цена считается сразу. 3MF, OBJ и STEP оператор считает вручную. Нет файла — пришлите фото детали.','STL — ціна рахується одразу. 3MF, OBJ і STEP оператор рахує вручну. Немає файлу — надішліть фото деталі.','STL is priced instantly. 3MF, OBJ and STEP are priced by an operator. No file? Send photos of the part.'],
+q2:['Niyə əvvəl aralıq, sonra yekun qiymət?','Почему сначала вилка, а потом итоговая цена?','Чому спершу діапазон, а потім підсумкова ціна?','Why a range first and the final price later?'],
+a2:['Avtomatik hesab dəqiqdir, amma dəstəkləri, yığılmanı və mürəkkəb formanı operator yoxlayır. Adətən yekun qiymət aralığın içində olur.','Автоматический расчёт точный, но поддержки, сборку и сложную форму проверяет оператор. Обычно итог попадает в вилку.','Автоматичний розрахунок точний, але підтримки, збирання й складну форму перевіряє оператор. Зазвичай підсумок потрапляє в діапазон.','The automatic estimate is accurate, but an operator checks supports, assembly and tricky shapes. The final price usually lands inside the range.'],
+q3:['Necə ödəyim və bildirişlər haradan gəlir?','Как оплатить и куда приходят уведомления?','Як оплатити й куди надходять сповіщення?','How do I pay and where do updates arrive?'],
+
+a3:['Təsdiqdən sonra kart nömrəsi sifariş səhifəsində görünür və Telegram-a və ya e-poçta gəlir. 50% çapdan əvvəl, qalanı təhvil zamanı.','После подтверждения номер карты появится на странице заказа и придёт в Telegram или на почту. 50% до печати, остальное при получении.','Після підтвердження номер картки з’явиться на сторінці замовлення й надійде в Telegram або на пошту. 50% до друку, решта під час отримання.','After confirmation the card number appears on your order page and arrives on Telegram or by email. 50% before printing, the rest on collection.'],
+
+q4:['Çap uğursuz olsa?','Что если печать не удалась?','Що як друк не вдався?','What if a print fails?'],
+a4:['Təhvildən əvvəl detalın fotosunu göndəririk. Qəbul etməzdən öncə sual verə bilərsiniz; bizim səhvimizdən olan qüsuru pulsuz yenidən çap edirik.','Перед выдачей присылаем фото детали. До приёмки можно задать вопрос; брак по нашей вине перепечатываем бесплатно.','Перед видачею надсилаємо фото деталі. До приймання можна поставити запитання; брак із нашої вини передруковуємо безкоштовно.','We send photos before collection. You can raise a question before accepting; defects caused by us are reprinted free.'],
+q5:['Endirimlər varmı?','Есть скидки?','Є знижки?','Any discounts?'],
+a5:['Hər 5-ci sifariş −10%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Tədris layihələri −15%.','Каждый 5-й заказ −10%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Учебные проекты −15%.','Кожне 5-те замовлення −10%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Навчальні проєкти −15%.','Every 5th order is 10% off. Give a friend your code: 10% off for them and for your next order. Student projects get 15% off.'],
+q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
+a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
+foot:['Qat — Bakıda 3D çap','Qat — 3D-печать в Баку','Qat — 3D-друк у Баку','Qat — 3D printing in Baku'],
+sample_word:['nümunə','пример','приклад','sample'],
+new_h:['Yeni sifariş','Новый заказ','Нове замовлення','New order'],
+new_p:['Modeli yükləyin və ya fotosunu göndərin — qiymət sağda dərhal yenilənir.','Загрузите модель или пришлите фото детали — цена справа обновляется сразу.','Завантажте модель або надішліть фото деталі — ціна праворуч оновлюється одразу.','Upload a model or send photos of the part; the price on the right updates instantly.'],
+k_file:['Modelim var','У меня есть модель','У мене є модель','I have a model'],
+k_photo:['Foto üzrə modelləşdirin','Смоделируйте по фото','Змоделюйте за фото','Model it from photos'],
+drop_t:['STL faylını bura atın və ya seçmək üçün klikləyin','Перетащите STL сюда или нажмите, чтобы выбрать','Перетягніть STL сюди або натисніть, щоб обрати','Drop an STL here or click to choose'],
+drop_s:['Ölçü və həcm brauzerdə hesablanır. 3MF, OBJ, STEP-i operator hesablayacaq.','Размеры и объём считаются в браузере. 3MF, OBJ, STEP посчитает оператор.','Розміри й об’єм рахуються в браузері. 3MF, OBJ, STEP порахує оператор.','Size and volume are measured in your browser. 3MF, OBJ and STEP are priced by an operator.'],
+ph_t:['Detalın fotolarını əlavə edin','Добавьте фото детали','Додайте фото деталі','Add photos of the part'],
+ph_s:['2–5 foto müxtəlif tərəfdən, yanında xətkeş olsa yaxşıdır','2–5 фото с разных сторон, лучше с линейкой рядом','2–5 фото з різних боків, краще з лінійкою поруч','2–5 photos from different sides, ideally with a ruler'],
+f_dims:['Əsas ölçülər','Основные размеры','Основні розміри','Key measurements'],
+drag:['fırlatmaq üçün sürüşdürün','тяните, чтобы вращать','тягніть, щоб обертати','drag to rotate'],
+sample_btn:['Fayl yoxdur? Nümunə: masa üstü saksı','Нет файла? Пример: настольное кашпо','Немає файлу? Приклад: настільне кашпо','No file? Try a sample: desk planter'],
+f_name:['Detalın adı','Название детали','Назва деталі','Part name'],
+f_name_ph:['məs., pult qapağı','например, крышка для пульта','наприклад, кришка для пульта','e.g. remote battery cover'],
+f_mat:['Material','Материал','Матеріал','Material'],
+f_qty:['Say','Количество','Кількість','Quantity'],
+f_color:['Rəng','Цвет','Колір','Colour'],
+stock_note:['Xətt çəkilmiş rəng hazırda bu materialda yoxdur.','Зачёркнутого цвета сейчас нет в этом материале.','Закресленого кольору зараз немає в цьому матеріалі.','A crossed-out colour is out of stock in this material.'],
+f_quality:['Keyfiyyət','Качество','Якість','Quality'],
+q_draft:['Sürətli · 0,28 mm','Быстро · 0,28 мм','Швидко · 0,28 мм','Draft · 0.28 mm'],
+q_std:['Standart · 0,2 mm','Стандарт · 0,2 мм','Стандарт · 0,2 мм','Standard · 0.2 mm'],
+q_fine:['Detallı · 0,12 mm','Детально · 0,12 мм','Детально · 0,12 мм','Fine · 0.12 mm'],
+f_infill:['Doldurma','Заполнение','Заповнення','Infill'],
+f_urg:['Müddət','Срок','Термін','Turnaround'],
+urg_n:['Adi · 2–3 gün','Обычный · 2–3 дня','Звичайний · 2–3 дні','Standard · 2–3 days'],
+urg_f:['Təcili · 24 saat · +50%','Срочно · 24 ч · +50%','Терміново · 24 год · +50%','Rush · 24 h · +50%'],
+f_contact:['Əlaqə və təhvil','Контакты и получение','Контакти й отримання','Contact and delivery'],
+f_cname:['Adınız (printer ekranı üçün)','Ваше имя (для дисплея у принтера)','Ваше ім’я (для дисплея біля принтера)','Your name (for the printer display)'],
+cname_note:['Çap zamanı bu ad printerin yanındakı kiçik ekranda görünəcək. 16 simvola qədər.','Во время печати это имя будет на мини-дисплее у принтера. До 16 символов.','Під час друку це ім’я буде на мінідисплеї біля принтера. До 16 символів.','During printing this name is shown on the mini display next to the printer. Up to 16 characters.'],
+f_phone:['Əlaqə telefonu','Телефон для связи','Телефон для зв’язку','Contact phone'],
+f_email:['E-poçt','Email','Email','Email'],
+tg_note:['Sifarişdən sonra @qat3d_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @qat3d_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @qat3d_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @qat3d_bot and press Start; updates will arrive there.'],
+f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
+f_deliv:['Təhvil','Получение','Отримання','Delivery'],
+d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
+d_cour:['Kuryer · +5 AZN','Курьер · +5 AZN','Кур’єр · +5 AZN','Courier · +5 AZN'],
+f_gift:['Bu hədiyyədir — alana çap linkini göndərəcəyik','Это подарок — получателю отправим ссылку на печать','Це подарунок — отримувачу надішлемо посилання на друк','This is a gift; we send the recipient a link to the print'],
+f_gift_to:['Kimə (ekranda görünəcək)','Кому (будет на дисплее)','Кому (буде на дисплеї)','For (shown on the display)'],
+gift_note:['Ekranda: «FOR Leyla · FROM Samir». Qiymət alana görünmür.','На дисплее: «FOR Лейла · FROM Самир». Цену получатель не видит.','На дисплеї: «FOR Лейла · FROM Самір». Ціну отримувач не бачить.','On the display: “FOR Leyla · FROM Samir”. The recipient never sees the price.'],
+f_vis:['Kim çapa baxa bilər','Кто может смотреть печать','Хто може дивитися друк','Who can watch the print'],
+vis_priv:['Gizli','Приватный','Приватне','Private'],
+vis_pub:['Hamıya açıq','Публичный','Публічне','Public'],
+vis_priv_n:['Çapı yalnız linki olanlar görür.','Печать видят только те, у кого есть ссылка.','Друк бачать лише ті, хто має посилання.','Only people with the link can watch the print.'],
+vis_pub_n:['«Canlı» bölməsində hər kəs yalnız çap prosesini və printer ekranındakı adınızı görəcək. Qiymət, parametrlər və əlaqə məlumatı ancaq sizə görünür.','В «Эфире» любой сможет смотреть только сам процесс печати и ваше имя на дисплее принтера. Цена, параметры и контакты видны только вам.','В «Ефірі» будь-хто бачитиме лише сам процес друку та ваше ім’я на дисплеї принтера. Ціна, параметри й контакти видно тільки вам.','Under Live anyone sees only the printing itself and your name on the printer display. Price, settings and contacts are visible to you alone.'],
+f_copy:['Başqalarına eyni modeli sifariş etməyə icazə ver','Разрешить другим заказать такую же модель','Дозволити іншим замовити таку ж модель','Let others order the same model'],
+f_disc:['Endirimlər','Скидки','Знижки','Discounts'],
+f_promo:['Promokod və ya dostun kodu','Промокод или код друга','Промокод або код друга','Promo or friend’s code'],
+f_student:['Tədris layihəsi (−15%, təhvil zamanı tələbə vəsiqəsini göstərin)','Учебный проект (−15%, покажите студенческий при получении)','Навчальний проєкт (−15%, покажіть студентський при отриманні)','Student project (−15%, show your student ID on collection)'],
+promo_ok:['Kod tətbiq edildi: −{p}%','Код применён: −{p}%','Код застосовано: −{p}%','Code applied: −{p}%'],
+promo_bad:['Belə kod yoxdur','Такого кода нет','Такого коду немає','No such code'],
+promo_own:['Öz kodunuzu istifadə etmək olmaz','Свой код использовать нельзя','Свій код використати не можна','You can’t use your own code'],
+f_comment:['Şərh','Комментарий','Коментар','Comment'],
+f_comment_ph:['məs., üst səth hamar olmalıdır; ya da modelin linki','например, верх должен быть гладким; или ссылка на модель','наприклад, верх має бути гладким; або посилання на модель','e.g. the top must be smooth; or a link to the model'],
+f_rights:['Bu modeli çap etməyə hüququm var','У меня есть право печатать эту модель','Я маю право друкувати цю модель','I have the right to print this model'],
+quote_label:['İlkin qiymət','Предварительная цена','Попередня ціна','Estimated price'],
+quote_empty:['Model yükləyin və ya nümunəni seçin — burada qiymət aralığı, müddət və printer görünəcək.','Загрузите модель или возьмите пример — здесь появятся вилка цены, срок и принтер.','Завантажте модель або візьміть приклад — тут з’являться діапазон ціни, термін і принтер.','Upload a model or use the sample to see the price range, turnaround and printer here.'],
+model_quote:['Modelləşdirmə 20 AZN-dən + çap. Operator fotolara baxıb 2 saat ərzində qiymət deyəcək.','Моделирование от 20 AZN + печать. Оператор посмотрит фото и назовёт цену в течение 2 часов.','Моделювання від 20 AZN + друк. Оператор перегляне фото й назве ціну протягом 2 годин.','Modelling from 20 AZN plus printing. An operator reviews the photos and quotes within 2 hours.'],
+manual_quote:['Bu formatı operator əl ilə hesablayacaq, cavab 2 saat ərzində.','Этот формат оператор посчитает вручную, ответ в течение 2 часов.','Цей формат оператор порахує вручну, відповідь протягом 2 годин.','An operator will price this format by hand within 2 hours.'],
+chk_ok:['Sadə model, operator 2 saat ərzində təsdiqləyəcək','Простая модель, оператор подтвердит за 2 часа','Проста модель, оператор підтвердить за 2 години','Simple model, an operator confirms within 2 hours'],
+chk_rev:['Mütəxəssis yoxlaması lazımdır','Нужна проверка специалиста','Потрібна перевірка фахівця','Needs a specialist check'],
+r_qty:['3-dən çox ədəd','больше 3 штук','понад 3 штуки','more than 3 pieces'],
+r_tpu:['elastik material','гибкий материал','гнучкий матеріал','flexible material'],
+r_tall:['hündür və nazik','высокая и узкая','висока й вузька','tall and narrow'],
+r_tiny:['çox kiçik detal','очень мелкая деталь','дуже дрібна деталь','very small part'],
+r_dense:['çox sıx şəbəkə','очень плотная сетка','дуже щільна сітка','very dense mesh'],
+r_manual:['əl ilə hesab','ручной расчёт','ручний розрахунок','manual pricing'],
+r_model:['foto üzrə modelləşdirmə','моделирование по фото','моделювання за фото','modelling from photos'],
+r_nostock:['rəng anbarda yoxdur','цвета нет на складе','кольору немає на складі','colour out of stock'],
+too_big:['Ən böyük tərəf {n} mm, maksimum isə 350 mm. Operator modeli hissələrə bölə bilər — şərhdə yazın.','Самая большая сторона {n} мм, а максимум 350 мм. Оператор может разрезать модель — напишите в комментарии.','Найбільша сторона {n} мм, а максимум 350 мм. Оператор може розрізати модель — напишіть у коментарі.','The longest side is {n} mm and our maximum is 350 mm. An operator can split the model; say so in the comment.'],
+sp_file:['Fayl','Файл','Файл','File'],
+sp_size:['Ölçülər','Габариты','Габарити','Size'],
+sp_mass:['Kütlə, 1 əd.','Масса, 1 шт.','Маса, 1 шт.','Weight, 1 pc'],
+sp_time:['Çap, 1 əd.','Печать, 1 шт.','Друк, 1 шт.','Print time, 1 pc'],
+sp_ready:['Hazır olacaq','Готово','Готово','Ready'],
+ready_n:['2–3 günə','через 2–3 дня','за 2–3 дні','in 2–3 days'],
+ready_f:['24 saata','за 24 часа','за 24 години','within 24 h'],
+d_loyal:['Hər 5-ci sifariş','Каждый 5-й заказ','Кожне 5-те замовлення','Every 5th order'],
+d_student:['Tədris layihəsi','Учебный проект','Навчальний проєкт','Student project'],
+d_promo:['Kod {c}','Код {c}','Код {c}','Code {c}'],
+place:['Yoxlamaya göndər','Отправить на проверку','Надіслати на перевірку','Send for review'],
+place_note:['İndi ödəmək lazım deyil. Yoxlamadan sonra yekun qiymət və kart Telegram-a və ya e-poçta gələcək.','Платить сейчас не нужно. После проверки итоговая цена и номер карты придут в Telegram или на почту.','Платити зараз не потрібно. Після перевірки підсумкова ціна й номер картки надійдуть у Telegram або на пошту.','No payment now. After review the final price and card details arrive on Telegram or by email.'],
+
+need_name:['Adınızı yazın — o, printer ekranında göstəriləcək','Укажите имя — оно появится на дисплее принтера','Вкажіть ім’я — воно з’явиться на дисплеї принтера','Enter your name; it appears on the printer display'],
+need_contact:['Əlaqə telefonunu yazın','Укажите телефон для связи','Вкажіть телефон для зв’язку','Add a contact phone number'],
+
+need_email:['Düzgün e-poçt ünvanı yazın','Укажите корректный email','Вкажіть коректний email','Enter a valid email address'],
+need_rights:['Modeli çap etmək hüququnu təsdiqləyin','Подтвердите право печатать модель','Підтвердьте право друкувати модель','Confirm you have the right to print the model'],
+need_photos:['Ən azı bir foto əlavə edin','Добавьте хотя бы одно фото','Додайте хоча б одне фото','Add at least one photo'],
+cancel:['Ləğv et','Отмена','Скасувати','Cancel'],
+ord_h:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
+ord_p:['Bu brauzerdən verilmiş sifarişlər.','Заказы, оформленные в этом браузере.','Замовлення, оформлені в цьому браузері.','Orders placed from this browser.'],
+ord_empty:['Hələ sifariş yoxdur.','Заказов пока нет.','Замовлень поки немає.','No orders yet.'],
+loy_h:['Hər 5-ci sifariş −10%','Каждый 5-й заказ −10%','Кожне 5-те замовлення −10%','Every 5th order −10%'],
+loy_next:['Endirimli sifarişə qədər daha {k} sifariş','До заказа со скидкой ещё {k}','До замовлення зі знижкою ще {k}','{k} more orders until the discounted one'],
+loy_now:['Növbəti sifarişiniz −10% olacaq','Следующий заказ будет со скидкой −10%','Наступне замовлення буде зі знижкою −10%','Your next order gets 10% off'],
+ref_h:['Dostunuz üçün kod','Код для друга','Код для друга','Code for a friend'],
+ref_p:['Dostunuza −10%, sizə növbəti sifarişdə −10%.','Другу −10%, вам −10% на следующий заказ.','Другу −10%, вам −10% на наступне замовлення.','10% off for your friend and 10% off your next order.'],
+repeat:['Təkrarla','Повторить','Повторити','Repeat'],
+repeat_h:['Sifarişi təkrarla','Повторить заказ','Повторити замовлення','Repeat order'],
+copy_h:['Mənə də belə','Хочу такую же','Хочу таку ж','I want one too'],
+copy_note:['Qiyməti operator təsdiqləyəcək və bildiriş göndərəcək.','Цену подтвердит оператор и пришлёт уведомление.','Ціну підтвердить оператор і надішле сповіщення.','An operator confirms the price and notifies you.'],
+
+st_review:['Yoxlama','Проверка','Перевірка','Review'],
+st_pay:['Ödəniş','Оплата','Оплата','Payment'],
+st_paycheck:['Ödəniş yoxlanır','Проверка оплаты','Перевірка оплати','Checking payment'],
+st_queue:['Növbə','Очередь','Черга','Queue'],
+st_printing:['Çap','Печать','Друк','Printing'],
+st_post:['Emal','Постобработка','Обробка','Finishing'],
+st_ready:['Hazır','Готово','Готово','Ready'],
+st_done:['Təhvil verildi','Выдан','Видано','Collected'],
+st_rejected:['Rədd edildi','Отклонён','Відхилено','Rejected'],
+st_paused:['Fasilə','Пауза','Пауза','Paused'],
+m_review:['Operator modeli yoxlayır, adətən 2 saata qədər.','Оператор проверяет модель, обычно до 2 часов.','Оператор перевіряє модель, зазвичай до 2 годин.','An operator is checking the model, usually within 2 hours.'],
+m_pay:['Qiymət təsdiqləndi: {p}. Çapa başlamaq üçün {d} köçürün.','Цена подтверждена: {p}. Чтобы начать печать, переведите {d}.','Ціну підтверджено: {p}. Щоб почати друк, переказуйте {d}.','Price confirmed: {p}. Transfer {d} to start printing.'],
+m_paycheck:['Ödənişi yoxlayırıq, adətən 15 dəqiqə.','Проверяем оплату, обычно 15 минут.','Перевіряємо оплату, зазвичай 15 хвилин.','We are checking your payment, usually 15 minutes.'],
+m_queue:['Ödəniş alındı. Sifariş növbədədir, operator printer seçir.','Оплата получена. Заказ в очереди, оператор выбирает принтер.','Оплату отримано. Замовлення в черзі, оператор обирає принтер.','Payment received. Your order is queued and an operator is picking a printer.'],
+m_printing:['Çap gedir. Bu səhifəni istənilən vaxt aça bilərsiniz.','Идёт печать. Эту страницу можно открывать в любой момент.','Триває друк. Цю сторінку можна відкривати будь-коли.','Printing now. Open this page any time to check.'],
+m_paused:['Qısa fasilə: operator printeri yoxlayır. Çap tezliklə davam edəcək.','Короткая пауза: оператор проверяет принтер. Печать скоро продолжится.','Коротка пауза: оператор перевіряє принтер. Друк скоро продовжиться.','Short pause: an operator is checking the printer. Printing resumes shortly.'],
+m_post:['Çap bitdi. Dəstəkləri təmizləyir və keyfiyyəti yoxlayırıq.','Печать закончена. Снимаем поддержки и проверяем качество.','Друк завершено. Знімаємо підтримки й перевіряємо якість.','Printing finished. We are removing supports and checking quality.'],
+m_ready:['Hazırdır! Fotolara baxın və qəbul edin. Təhvil zamanı qalıq: {r}.','Готово! Посмотрите фото и подтвердите приёмку. Остаток при получении: {r}.','Готово! Перегляньте фото й підтвердьте приймання. Залишок під час отримання: {r}.','Ready! Check the photos and accept. Balance on collection: {r}.'],
+m_done:['Sifariş təhvil verildi. Təşəkkür edirik!','Заказ выдан. Спасибо!','Замовлення видано. Дякуємо!','Order collected. Thank you!'],
+m_rejected:['Sifariş rədd edildi: {w}. Faylı düzəldib yenidən göndərə bilərsiniz.','Заказ отклонён: {w}. Можно исправить файл и отправить снова.','Замовлення відхилено: {w}. Можна виправити файл і надіслати знову.','Order rejected: {w}. You can fix the file and send it again.'],
+card_t:['Köçürmə üçün kart','Карта для перевода','Картка для переказу','Card for transfer'],
+card_holder:['Alıcı','Получатель','Отримувач','Recipient'],
+card_amount:['Məbləğ','Сумма','Сума','Amount'],
+card_note:['Nümunə rekvizitlər, real kart qoşulmayıb. Təyinatda sifariş nömrəsini yazın.','Реквизиты-пример, настоящая карта не подключена. В назначении укажите номер заказа.','Реквізити-приклад, справжню картку не підключено. У призначенні вкажіть номер замовлення.','Sample details, no real card is connected. Put the order number in the transfer note.'],
+receipt:['Çeki əlavə edin (istəyə görə)','Приложите чек (необязательно)','Додайте чек (необов’язково)','Attach the receipt (optional)'],
+paid_btn:['Ödədim','Я оплатил','Я оплатив','I’ve paid'],
+copy:['Kopyala','Копировать','Копіювати','Copy'],
+copied:['Kopyalandı','Скопировано','Скопійовано','Copied'],
+copy_link:['Linki kopyala','Скопировать ссылку','Скопіювати посилання','Copy link'],
+back:['← Sifarişlər','← Заказы','← Замовлення','← Orders'],
+o_printer:['Printer','Принтер','Принтер','Printer'],
+o_layer:['Qat','Слой','Шар','Layer'],
+o_left:['Qalıb','Осталось','Залишилось','Time left'],
+o_price:['Qiymət','Стоимость','Вартість','Price'],
+o_paid:['ödənilib','оплачено','сплачено','paid'],
+assign_later:['operator təyin edəcək','назначит оператор','призначить оператор','assigned by operator'],
+cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
+timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
+pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
+manual_price:['operator hesablayır','считает оператор','рахує оператор','operator is pricing'],
+speed_note:['Demoda çap sürətləndirilib; real vaxt sağda göstərilir.','В демо печать ускорена; реальное время показано справа.','У демо друк пришвидшено; реальний час показано праворуч.','Printing is sped up in the demo; real time is shown on the right.'],
+speed_btn:['Demonu sürətləndir','Ускорить демо','Пришвидшити демо','Speed up demo'],
+make_pub:['Hamıya aç','Сделать публичным','Зробити публічним','Make public'],
+make_priv:['Gizli et','Сделать приватным','Зробити приватним','Make private'],
+t_pub:['Sifariş indi «Canlı» bölməsində görünür','Заказ теперь виден в «Эфире»','Замовлення тепер видно в «Ефірі»','The order now shows under Live'],
+t_priv:['Sifariş gizlidir, yalnız link ilə','Заказ приватный, только по ссылке','Замовлення приватне, лише за посиланням','The order is private, link only'],
+locked:['Gizli sifariş. Ona yalnız sahibinin linki ilə baxmaq olar.','Приватный заказ. Посмотреть его можно только по ссылке владельца.','Приватне замовлення. Переглянути його можна лише за посиланням власника.','Private order. It can only be viewed with the owner’s link.'],
+viewer_mode:['Siz izləyici kimi baxırsınız','Вы смотрите как зритель','Ви дивитеся як глядач','You are watching as a viewer'],
+viewers:['{n} izləyir','{n} смотрят','{n} дивляться','{n} watching'],
+gift_badge:['Hədiyyə: {to} üçün','Подарок для {to}','Подарунок для {to}','Gift for {to}'],
+ch_badge:['Mr Gadget Lab videosunda','В ролике Mr Gadget Lab','У ролику Mr Gadget Lab','Featured on Mr Gadget Lab'],
+ch_model:['Mr Gadget Lab-dan','Из Mr Gadget Lab','З Mr Gadget Lab','From Mr Gadget Lab'],
+photos_h:['Hazır detalın fotoları','Фото готовой детали','Фото готової деталі','Photos of the finished part'],
+accept:['Qəbul edirəm','Принимаю','Приймаю','Accept'],
+question:['Sualım var','Есть вопрос','Є запитання','I have a question'],
+q_ph:['Nə xoşunuza gəlmədi? Operator sizinlə əlaqə saxlayacaq.','Что не так? Оператор свяжется с вами.','Що не так? Оператор зв’яжеться з вами.','What’s wrong? The operator will get in touch.'],
+
+send:['Göndər','Отправить','Надіслати','Send'],
+accepted:['Siz detalı qəbul etdiniz','Вы приняли деталь','Ви прийняли деталь','You accepted the part'],
+issue_sent:['Sualınız operatora göndərildi','Ваш вопрос отправлен оператору','Ваше запитання надіслано оператору','Your question was sent to the operator'],
+reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная перепечатка поставлена в очередь','Безкоштовний передрук поставлено в чергу','A free reprint has been queued'],
+tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
+tg_p:['Botu açın və Start basın — bütün statuslar ora gələcək. Bunu etməsəniz, bot sizə yaza bilməz.','Откройте бота и нажмите Start — все статусы будут приходить туда. Без этого бот не сможет вам написать.','Відкрийте бота й натисніть Start — усі статуси надходитимуть туди. Без цього бот не зможе вам написати.','Open the bot and press Start; every update will arrive there. Until then the bot can’t message you.'],
+tg_open:['@qat3d_bot-u aç','Открыть @qat3d_bot','Відкрити @qat3d_bot','Open @qat3d_bot'],
+tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
+tg_wait:['bot qoşulmayıb','бот не подключён','бот не підключений','bot not connected'],
+n_tg_linked:['Bot {id} sifarişinə qoşuldu. Statuslar bura gələcək.','Бот подключён к заказу {id}. Статусы будут приходить сюда.','Бот підключено до замовлення {id}. Статуси надходитимуть сюди.','The bot is linked to order {id}. Updates will arrive here.'],
+feed_h:['Bildirişlər','Уведомления','Сповіщення','Notifications'],
+n_received:['Salam, {c}! {id} sifarişi alındı, operator 2 saat ərzində yoxlayacaq.','Здравствуйте, {c}! Заказ {id} принят, оператор проверит его в течение 2 часов.','Вітаємо, {c}! Замовлення {id} прийнято, оператор перевірить його протягом 2 годин.','Hi {c}! Order {id} received; an operator will check it within 2 hours.'],
+n_confirmed:['{id}: qiymət {p}. Çapa başlamaq üçün {d} 4169 •••• 0000 kartına köçürün.','{id}: цена {p}. Для старта печати переведите {d} на карту 4169 •••• 0000.','{id}: ціна {p}. Для старту друку переказуйте {d} на картку 4169 •••• 0000.','{id}: price {p}. Transfer {d} to card 4169 •••• 0000 to start printing.'],
+n_paid:['{id}: ödəniş alındı, sifariş növbədədir.','{id}: оплата получена, заказ в очереди.','{id}: оплату отримано, замовлення в черзі.','{id}: payment received, your order is queued.'],
+n_started:['{id}: çap başladı! Canlı baxın: {link}','{id}: печать началась! Смотрите вживую: {link}','{id}: друк почався! Дивіться наживо: {link}','{id}: printing started! Watch live: {link}'],
+n_half:['{id}: yarısı hazırdır, 50%.','{id}: половина готова, 50%.','{id}: половина готова, 50%.','{id}: halfway there, 50%.'],
+n_printed:['{id}: çap bitdi, emal edirik.','{id}: печать завершена, делаем постобработку.','{id}: друк завершено, робимо обробку.','{id}: printing finished, now finishing.'],
+n_ready:['{id} hazırdır! Fotolar və timelapse: {link}','{id} готов! Фото и таймлапс: {link}','{id} готове! Фото й таймлапс: {link}','{id} is ready! Photos and timelapse: {link}'],
+n_done:['{id} təhvil verildi. Təşəkkürlər! Dostlar üçün kodunuz: {ref}','{id} выдан. Спасибо! Ваш код для друзей: {ref}','{id} видано. Дякуємо! Ваш код для друзів: {ref}','{id} collected. Thank you! Your code for friends: {ref}'],
+n_rejected:['{id} rədd edildi: {w}.','{id} отклонён: {w}.','{id} відхилено: {w}.','{id} rejected: {w}.'],
+n_paused:['{id}: qısa fasilə, operator printeri yoxlayır.','{id}: короткая пауза, оператор проверяет принтер.','{id}: коротка пауза, оператор перевіряє принтер.','{id}: short pause, the operator is checking the printer.'],
+n_gift:['{to}, sizin üçün hədiyyə çap olunur! Baxın: {link}','{to}, для вас печатается подарок! Смотрите: {link}','{to}, для вас друкується подарунок! Дивіться: {link}','{to}, a gift is being printed for you! Watch: {link}'],
+n_reprint:['{id}: pulsuz yenidən çap növbəyə qoyuldu.','{id}: бесплатная перепечатка поставлена в очередь.','{id}: безкоштовний передрук поставлено в чергу.','{id}: a free reprint has been queued.'],
+adm_sub:['Operator paneli','Панель оператора','Панель оператора','Operator panel'],
+adm_h:['Printer fermi','Ферма принтеров','Ферма принтерів','Print farm'],
+adm_orders:['Sifarişlər','Заказы','Замовлення','Orders'],
+c_review:['yoxlama gözləyir','ждут проверки','чекають перевірки','awaiting review'],
+c_pay:['ödəniş gözləyir','ждут оплаты','чекають оплати','awaiting payment'],
+c_queue:['növbədə','в очереди','у черзі','in queue'],
+c_ready:['təhvil gözləyir','ждут выдачи','чекають видачі','awaiting pickup'],
+p_printing:['Çap edir','Печатает','Друкує','Printing'],
+p_ready:['Boşdur','Свободен','Вільний','Idle'],
+p_maint:['Xidmətdə','Обслуживание','Обслуговування','Maintenance'],
+p_error:['Nasazlıq','Сбой','Збій','Fault'],
+p_to_maint:['Xidmətə','На обслуживание','На обслуговування','Set maintenance'],
+p_back:['İşə qaytar','Вернуть в работу','Повернути в роботу','Back to work'],
+p_can:['Qəbul edir: {m}','Принимает: {m}','Приймає: {m}','Accepts: {m}'],
+p_fail:['Nasazlığı simulyasiya et','Симулировать сбой','Симулювати збій','Simulate fault'],
+p_resume:['Davam et','Продолжить','Продовжити','Resume'],
+p_restart:['Yenidən başla','Начать заново','Почати знову','Restart'],
+spaghetti:['kamera «spagetti» aşkar etdi','камера обнаружила «спагетти»','камера виявила «спагеті»','camera detected “spaghetti”'],
+alert_op:['Operatora Telegram: {p} — {why}, sifariş {id}','Telegram оператору: {p} — {why}, заказ {id}','Telegram оператору: {p} — {why}, замовлення {id}','Telegram to operator: {p} — {why}, order {id}'],
+dismiss:['Bağla','Скрыть','Сховати','Dismiss'],
+motor:['Motor saatı','Моточасы','Мотогодини','Run hours'],
+lube_in:['yağlama {h} saat sonra','смазка через {h} ч','змащення через {h} год','lube in {h} h'],
+nozzle_in:['ucluq {h} saat sonra','сопло через {h} ч','сопло через {h} год','nozzle in {h} h'],
+lube_due:['Yağlamaq vaxtıdır','Пора смазать','Час змастити','Lubrication due'],
+nozzle_due:['Ucluğu dəyişmək vaxtıdır','Пора сменить сопло','Час замінити сопло','Nozzle change due'],
+done_lube:['Yağladım','Смазал','Змастив','Lubed'],
+done_nozzle:['Dəyişdim','Сменил','Замінив','Replaced'],
+spool:['Makara','Катушка','Котушка','Spool'],
+spool_low:['az qalıb','мало','мало','low'],
+best:['tövsiyə','рекомендуем','рекомендуємо','recommended'],
+swap:['makara dəyişəcək','сменится катушка','зміниться котушка','spool will be swapped'],
+no_printer:['uyğun boş printer yoxdur','нет подходящего свободного принтера','немає вільного відповідного принтера','no suitable idle printer'],
+no_stock:['anbarda {m} {c} yoxdur','нет {m} {c} на складе','немає {m} {c} на складі','no {m} {c} in stock'],
+client_paid:['müştəri ödənişi qeyd etdi','клиент отметил оплату','клієнт позначив оплату','client marked as paid'],
+acc_ok:['müştəri qəbul etdi','клиент принял','клієнт прийняв','client accepted'],
+acc_issue:['müştərinin sualı var','у клиента вопрос','у клієнта запитання','client has a question'],
+acc_wait:['müştəri fotolara baxır','клиент смотрит фото','клієнт дивиться фото','client is reviewing photos'],
+acc_reprint:['yenidən çap edilir','перепечатывается','передруковується','being reprinted'],
+reprint:['Pulsuz yenidən çap','Перепечатать бесплатно','Передрукувати безкоштовно','Free reprint'],
+mark_video:['Videoya düşdü','Попал в ролик','Потрапив у ролик','Featured in video'],
+model_tag:['modelləşdirmə','моделирование','моделювання','modelling'],
+student_tag:['tədris','учебный','навчальний','student'],
+rj_geo:['model çapa yararsızdır','модель непригодна для печати','модель непридатна для друку','model is not printable'],
+rj_size:['ölçü uyğun deyil','не подходит по размеру','не підходить за розміром','size does not fit'],
+rj_rights:['modelin istifadə hüququ yoxdur','нет прав на использование модели','немає прав на використання моделі','no rights to use the model'],
+col_order:['Sifariş','Заказ','Замовлення','Order'],
+col_part:['Detal','Деталь','Деталь','Part'],
+col_client:['Müştəri','Клиент','Клієнт','Client'],
+col_status:['Status','Статус','Статус','Status'],
+col_price:['Qiymət, AZN','Цена, AZN','Ціна, AZN','Price, AZN'],
+col_act:['Əməliyyat','Действие','Дія','Action'],
+a_confirm:['Təsdiqlə','Подтвердить','Підтвердити','Confirm'],
+a_reject:['Rədd et','Отклонить','Відхилити','Reject'],
+a_paid:['Ödəniş alındı','Оплата получена','Оплату отримано','Payment received'],
+a_start:['Başlat','Запустить','Запустити','Start'],
+a_photo:['Foto çək və hazırdır','Сфотографировать и готово','Сфотографувати й готово','Take photos, mark ready'],
+a_issue:['Təhvil verildi','Выдан','Видано','Collected'],
+a_open:['Aç','Открыть','Відкрити','Open'],
+tab_active:['Aktiv','Активные','Активні','Active'],
+tab_all:['Hamısı','Все','Усі','All'],
+stock_h:['Filament anbarı','Склад филамента','Склад філаменту','Filament stock'],
+stock_p:['Qramla. Çap bitəndə printerdəki makaradan avtomatik çıxılır; makara dəyişəndə anbardan 1 kq götürülür.','В граммах. После печати списывается с катушки на принтере автоматически; при смене катушки со склада берётся 1 кг.','У грамах. Після друку списується з котушки на принтері автоматично; під час заміни котушки зі складу береться 1 кг.','In grams. Deducted from the printer’s spool after each print; a spool swap takes 1 kg from stock.'],
+stats_h:['Statistika (demo)','Статистика (демо)','Статистика (демо)','Statistics (demo)'],
+s_rev:['Ay üzrə gəlir','Выручка за месяц','Виручка за місяць','Revenue this month'],
+s_orders:['Sifariş','Заказов','Замовлень','Orders'],
+s_avg:['Orta çek','Средний чек','Середній чек','Average order'],
+s_repeat:['Təkrar müştərilər','Повторные клиенты','Повторні клієнти','Repeat clients'],
+util_h:['Printerlərin yüklənməsi','Загрузка принтеров','Завантаження принтерів','Printer utilisation'],
+matshare_h:['Materiallar, qram','Материалы, граммы','Матеріали, грами','Materials, grams'],
+set_h:['Qiymət parametrləri','Параметры цены','Параметри ціни','Pricing settings'],
+set_cg:['1 qram PLA, AZN','1 грамм PLA, AZN','1 грам PLA, AZN','1 g of PLA, AZN'],
+set_a1:['Saat A1 / Ender, AZN','Час A1 / Ender, AZN','Година A1 / Ender, AZN','Hour on A1 / Ender, AZN'],
+set_k2:['Saat K2 Plus, AZN','Час K2 Plus, AZN','Година K2 Plus, AZN','Hour on K2 Plus, AZN'],
+set_setup:['Hazırlıq, AZN','Подготовка, AZN','Підготовка, AZN','Setup, AZN'],
+set_min:['Minimum sifariş, AZN','Минимальный заказ, AZN','Мінімальне замовлення, AZN','Minimum order, AZN'],
+set_dep:['Avans, %','Депозит, %','Депозит, %','Deposit, %'],
+set_cour:['Kuryer, AZN','Курьер, AZN','Кур’єр, AZN','Courier, AZN'],
+set_student:['Tədris endirimi, %','Учебная скидка, %','Навчальна знижка, %','Student discount, %'],
+set_loyal:['Hər 5-ci sifariş, %','Каждый 5-й заказ, %','Кожне 5-те замовлення, %','Every 5th order, %'],
+set_lube:['Yağlama hər, saat','Смазка каждые, ч','Змащення кожні, год','Lube every, h'],
+set_nozzle:['Ucluq hər, saat','Сопло каждые, ч','Сопло кожні, год','Nozzle every, h'],
+reset:['Demonu sıfırla','Сбросить демо','Скинути демо','Reset demo'],
+t_sent:['Sifariş {id} operatora göndərildi','Заказ {id} отправлен оператору','Замовлення {id} надіслано оператору','Order {id} sent to the operator'],
+t_confirmed:['{id}: qiymət təsdiqləndi, müştəriyə bildiriş getdi','{id}: цена подтверждена, клиенту ушло уведомление','{id}: ціну підтверджено, клієнту пішло сповіщення','{id}: price confirmed, the client was notified'],
+
+t_client_paid:['Ödəniş qeyd edildi, operator yoxlayır','Оплата отмечена, оператор проверяет','Оплату позначено, оператор перевіряє','Payment marked, the operator is checking'],
+t_paid:['{id}: ödəniş alındı','{id}: оплата получена','{id}: оплату отримано','{id}: payment received'],
+t_started:['{id} {p}-də başladı','{id} запущен на {p}','{id} запущено на {p}','{id} started on {p}'],
+t_swapped:['{p}: makara dəyişdirildi ({m})','{p}: катушка заменена ({m})','{p}: котушку замінено ({m})','{p}: spool swapped ({m})'],
+t_ready:['{id} hazırdır, müştəriyə foto və timelapse getdi','{id} готов, клиенту ушли фото и таймлапс','{id} готове, клієнту надіслано фото й таймлапс','{id} is ready; photos and timelapse sent to the client'],
+t_rejected:['{id} rədd edildi','{id} отклонён','{id} відхилено','{id} rejected'],
+t_done:['{id} təhvil verildi','{id} выдан','{id} видано','{id} collected'],
+t_reprint:['Pulsuz yenidən çap {id} növbəyə qoyuldu','Бесплатная перепечатка {id} поставлена в очередь','Безкоштовний передрук {id} поставлено в чергу','Free reprint {id} queued'],
+t_bad_file:['Faylı oxumaq alınmadı. STL-in düzgün olduğunu yoxlayın','Не получилось прочитать файл. Проверьте, что это корректный STL','Не вдалося прочитати файл. Перевірте, що це коректний STL','Could not read the file. Check that it is a valid STL'],
+t_reset:['Demo sıfırlandı','Демо сброшено','Демо скинуто','Demo reset'],
+t_print_done:['{id}: çap bitdi','{id}: печать завершена','{id}: друк завершено','{id}: print finished'],
+t_fault:['{p}: nasazlıq! Operatora Telegram getdi','{p}: сбой! Оператору ушло сообщение в Telegram','{p}: збій! Оператору пішло повідомлення в Telegram','{p}: fault! Telegram message sent to the operator'],
+
+live_h:['İndi çap olunur','Сейчас печатается','Зараз друкується','Printing now'],
+live_p:['Sahiblərinin hamıya açdığı çaplar. Qatların necə yarandığına canlı baxın.','Печати, которые владельцы открыли для всех. Смотрите вживую, как модель растёт слой за слоем.','Друки, які власники відкрили для всіх. Дивіться наживо, як модель росте шар за шаром.','Prints their owners opened to everyone. Watch models grow layer by layer, live.'],
+live_empty:['Hazırda açıq çap yoxdur.','Сейчас нет публичных печатей.','Зараз немає публічних друків.','No public prints right now.'],
+tl_h:['Həftənin timelapse-ləri','Таймлапсы недели','Таймлапси тижня','Timelapses of the week'],
+tl_p:['Bitmiş açıq çaplar. ▶ basın — bütün çap bir neçə saniyəyə.','Завершённые публичные печати. Нажмите ▶ — вся печать за несколько секунд.','Завершені публічні друки. Натисніть ▶ — увесь друк за кілька секунд.','Finished public prints. Press ▶ to see the whole print in seconds.'],
+waiting_start:['çapa başlamağı gözləyir','ждёт старта печати','чекає старту друку','waiting to start'],
+display_label:['Printer ekranı','Дисплей у принтера','Дисплей біля принтера','Printer display'],
+pcs:['əd.','шт.','шт.','pcs'],
+h:['saat','ч','год','h'], min:['dəq','мин','хв','min'],
+cat_stand:['Telefon altlığı','Подставка для телефона','Підставка для телефона','Phone stand'],
+cat_hooks:['Divar qarmaqları, 6 əd.','Настенные крючки, 6 шт.','Настінні гачки, 6 шт.','Wall hooks, set of 6'],
+cat_pot:['Altlıqlı saksı','Кашпо с поддоном','Кашпо з піддоном','Planter with tray'],
+cat_esp:['ESP32 korpusu','Корпус для ESP32','Корпус для ESP32','ESP32 enclosure'],
+cat_mdb:['MDB-snifferin korpusu','Корпус MDB-сниффера','Корпус MDB-сніфера','MDB sniffer enclosure'],
+cat_head:['Qulaqlıq dayağı','Подставка для наушников','Підставка для навушників','Headphone stand'],
+col_black:['Qara','Чёрный','Чорний','Black'], col_white:['Ağ','Белый','Білий','White'], col_grey:['Boz','Серый','Сірий','Grey'],
+col_orange:['Narıncı','Оранжевый','Помаранчевий','Orange'], col_blue:['Göy','Синий','Синій','Blue'], col_green:['Yaşıl','Зелёный','Зелений','Green'], col_red:['Qırmızı','Красный','Червоний','Red']
+};
+let lang = 'ru';
+const t = (k, v={}) => { const row = T[k]; let s = row ? (row[LANGS.indexOf(lang)] ?? row[1]) : k; for (const [a,b] of Object.entries(v)) s = s.split('{'+a+'}').join(b); return s; };
+
+/* ---------- constants ---------- */
+const COLORS = [['col_black','#2A2D31'],['col_white','#ECECE6'],['col_grey','#8C9198'],['col_orange','#E2702F'],['col_blue','#2F5FD0'],['col_green','#3E9B5A'],['col_red','#C8372D']];
+const MATS = ['PLA','PETG','ABS','TPU'];
+const K_MAT = {PLA:1, PETG:1.2, ABS:1.4, TPU:1.8};
+const DENS = {PLA:1.24, PETG:1.27, ABS:1.05, TPU:1.21};
+const FILL = {15:.42, 30:.55, 60:.75};
+const QTIME = {draft:.75, std:1, fine:1.45};
+const PRINTER_DEF = [
+  {id:'P01', name:'Printer 01', model:'Creality K2 Plus', type:'K2', max:350, mats:['PLA','PETG','ABS','TPU'], util:72},
+  {id:'P02', name:'Printer 02', model:'Bambu Lab A1', type:'A1', max:256, mats:['PLA','PETG','TPU'], util:81},
+  {id:'P03', name:'Printer 03', model:'Bambu Lab A1', type:'A1', max:256, mats:['PLA','PETG','TPU'], util:64},
+  {id:'P04', name:'Printer 04', model:'Creality Ender 3 V3', type:'E3', max:220, mats:['PLA','PETG','TPU'], util:22}
+];
+const CATALOG = [
+  {k:'cat_stand', price:12, mat:'PLA', color:3, grams:62, hours:3.1, z:110, shape:'stand'},
+  {k:'cat_hooks', price:10, mat:'PETG', color:0, grams:48, hours:2.4, z:40, shape:'hooks'},
+  {k:'cat_pot', price:22, mat:'PETG', color:5, grams:140, hours:6.5, z:120, shape:'pot'},
+  {k:'cat_esp', price:14, mat:'PLA', color:2, grams:44, hours:2.2, z:30, shape:'box', ch:true},
+  {k:'cat_mdb', price:16, mat:'PETG', color:0, grams:52, hours:2.6, z:34, shape:'box', ch:true},
+  {k:'cat_head', price:18, mat:'PLA', color:0, grams:118, hours:5.5, z:240, shape:'head'}
+];
+const STAGES = ['review','pay','queue','printing','post','ready'];
+const stageIdx = s => ({review:0, pay:1, paycheck:1, queue:2, printing:3, post:4, ready:5, done:6})[s] ?? -1;
+const PILL = {review:'warn', pay:'acc', paycheck:'warn', queue:'info', printing:'good', post:'info', ready:'good', done:'mut', rejected:'bad'};
+
+/* ---------- state ---------- */
+const KEY = 'qat-demo-v5';
+function seed(){
+  const now = Date.now(), nf = (k, v, ago) => ({at: now - ago, k, v});
+  return {
+    seq:1031,
+    settings:{cg:.05, a1:2, k2:3, setup:3, min:10, dep:50, cour:5, student:15, loyal:10, lube:100, nozzle:300},
+    history:{revenue:1840, orders:71, repeat:34},
+    stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
+    printers:[
+      {id:'P01', status:'printing', order:'QT-1021', spool:{mat:'ABS', color:0, g:640}, motor:812, lube:88, nozzle:140},
+      {id:'P02', status:'printing', order:'QT-1027', spool:{mat:'PETG', color:0, g:420}, motor:1240, lube:40, nozzle:292},
+      {id:'P03', status:'ready', spool:{mat:'PLA', color:3, g:780}, motor:960, lube:104, nozzle:50},
+      {id:'P04', status:'maintenance', spool:{mat:'PLA', color:1, g:150}, motor:430, lube:20, nozzle:10}
+    ],
+    alerts:[],
+    orders:[
+      {id:'QT-1021', name:'Корпус дрона, верх', client:'Elvin', contact:'+994 51 000 00 01', ch:'tg', tgLinked:true, mat:'ABS', color:0, qty:1, grams:210, hours:9.2, layers:620, price:58, paid:true, status:'printing', printer:'P01', progress:.68, speed:1/400, deliv:0, pub:true, copy:false, shape:'box', viewers:9, react:{fire:12,clap:4,wow:7}, created:now-864e5, notifs:[]},
+      {id:'QT-1027', name:'Держатель для велофары', client:'Samir', contact:'+994 50 000 00 00', ch:'tg', tgLinked:true, mat:'PETG', color:0, qty:1, grams:64, hours:2.9, layers:724, price:22, paid:true, status:'printing', printer:'P02', progress:.43, speed:1/300, deliv:0, mine:true, pub:true, copy:true, viewers:14, react:{fire:5,clap:2,wow:1}, created:now-5*36e5,
+        notifs:[nf('n_received',{c:'Samir',id:'QT-1027'},5*36e5), nf('n_confirmed',{id:'QT-1027',p:'22 AZN',d:'11 AZN'},4.6*36e5), nf('n_paid',{id:'QT-1027'},4*36e5), nf('n_started',{id:'QT-1027',link:'qat3d.az/#track-QT-1027'},2*36e5)]},
+      {id:'QT-1025', name:'Шестерня для миксера', client:'Leyla', contact:'+994 55 000 00 02', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:30, hours:1.6, layers:180, price:14, paid:true, status:'ready', photos:true, progress:1, deliv:1, pub:true, copy:true, shape:'clip', react:{fire:3,clap:6,wow:0}, created:now-2*864e5, notifs:[]},
+      {id:'QT-1018', name:'Кронштейн для камеры', client:'Murad', contact:'+994 70 000 00 03', ch:'email', email:'murad@mail.az', mat:'PLA', color:3, qty:1, grams:55, hours:2.7, layers:300, price:15, paid:true, status:'done', photos:true, accept:'ok', progress:1, deliv:0, pub:true, copy:true, video:true, shape:'stand', react:{fire:21,clap:9,wow:5}, created:now-4*864e5, notifs:[]},
+      {id:'QT-1029', name:'Корпус для ESP32-C3', client:'Rauf', contact:'+994 50 000 00 04', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:58, hours:3.4, layers:410, lo:19, hi:25, status:'review', progress:0, check:'2 детали, крышка на защёлках', deliv:0, student:true, created:now-40*6e4, notifs:[]},
+      {id:'QT-1030', name:'Насадка для пылесоса', client:'Nigar', contact:'+994 55 000 00 05', ch:'email', email:'nigar@mail.az', mat:'PLA', color:2, qty:1, grams:72, hours:3.6, layers:520, price:18, status:'paycheck', progress:0, receipt:'receipt_1030.jpg', deliv:1, created:now-3*36e5, notifs:[]}
+    ]
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch(e){ S = seed(); }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} };
+const P = id => PRINTER_DEF.find(p => p.id === id);
+const PS = id => S.printers.find(p => p.id === id);
+const O = id => S.orders.find(o => o.id === id);
+const form = {kind:'file', color:0, quality:'std', infill:'30', urgent:'0', deliv:'0', vis:'private', notify:'tg', model:null, photos:[]};
+
+/* ---------- helpers ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const azn = n => `${Math.round(n)} AZN`;
+const fmtH = h => { const m = Math.max(0, Math.round(h*60)); return `${Math.floor(m/60)} ${t('h')} ${String(m%60).padStart(2,'0')} ${t('min')}`; };
+let tt; function toast(m){ const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 3400); }
+function copyText(txt){ const ok = () => toast(t('copied') + ': ' + txt); try { navigator.clipboard.writeText(txt).then(ok, () => toast(txt)); } catch(e){ toast(txt); } }
+const codeOf = id => [...id].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0, 11).toString(36).slice(0,4);
+const MY_REF = 'QAT-' + codeOf('qat-me').toUpperCase().padEnd(4,'X');
+const linkOf = o => `qat3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
+const colorName = i => t(COLORS[i][0]);
+function notify(o, k, v){ (o.notifs = o.notifs || []).push({at:Date.now(), k, v}); }
+const clientNotif = (o, k, v) => notify(o, k, Object.assign({id:o.id, c:o.client, link:linkOf(o), ref:MY_REF}, v));
+const LOCALE = {az:'az-Latn-AZ', ru:'ru-RU', uk:'uk-UA', en:'en-GB'};
+const timeStr = ms => { try { return new Date(ms).toLocaleString(LOCALE[lang], {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}); } catch(e){ return new Date(ms).toISOString().slice(5,16).replace('T',' '); } };
+
+/* ---------- stock / spools ---------- */
+const spoolOk = (pr, o) => pr.spool && pr.spool.mat === o.mat && pr.spool.color === o.color && pr.spool.g >= o.grams + 20;
+function available(mat, color){ return S.stock[mat][color] >= 300 || S.printers.some(p => p.spool && p.spool.mat === mat && p.spool.color === color && p.spool.g >= 150); }
+function candidates(o){
+  return PRINTER_DEF.filter(p => PS(p.id).status === 'ready' && p.mats.includes(o.mat) && (!o.z || o.z <= p.max)).map(p => {
+    const s = PS(p.id), match = spoolOk(s, o), canSwap = S.stock[o.mat][o.color] >= 1000;
+    let score = (match ? 10 : canSwap ? 2 : -100) + (p.type === 'A1' ? 2 : p.type === 'E3' ? 1 : 0) - (s.lube >= S.settings.lube ? 1 : 0);
+    return {p, s, match, canSwap, score};
+  }).filter(c => c.score > -50).sort((a,b) => b.score - a.score);
+}
+
+/* ---------- i18n ---------- */
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i]').forEach(el => el.textContent = t(el.dataset.i));
+  document.querySelectorAll('[data-ip]').forEach(el => el.placeholder = t(el.dataset.ip));
+  document.querySelectorAll('#langs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
+  renderSwatches(); visNote(); promoCheck(); renderCatalog(); renderQuote(); full();
+}
+document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('qat-lang', lang); } catch(e){} applyLang(); });
+try { lang = localStorage.getItem('qat-lang') || ({az:'az', ru:'ru', uk:'uk', en:'en'})[(navigator.language||'ru').slice(0,2)] || 'ru'; } catch(e){}
+
+/* ---------- discounts ---------- */
+function promoPct(){
+  const c = $('f-promo').value.trim().toUpperCase();
+  if (!c) return {pct:0};
+  if (c === 'QAT10') return {pct:10, code:c};
+  if (c === 'MRGADGET') return {pct:15, code:c};
+  if (c === MY_REF) return {pct:0, own:true};
+  if (/^QAT-[A-Z0-9]{4}$/.test(c)) return {pct:10, code:c};
+  return {pct:0, bad:true};
+}
+function promoCheck(){
+  const r = promoPct(), el = $('promo-msg');
+  el.className = r.pct ? 'ok' : (r.bad || r.own) ? 'err' : 'note';
+  el.textContent = r.pct ? t('promo_ok',{p:r.pct}) : r.own ? t('promo_own') : r.bad ? t('promo_bad') : '';
+}
+const myCount = () => S.orders.filter(o => o.mine && o.status !== 'rejected').length;
+const loyaltyNext = () => (myCount() + 1) % 5 === 0;
+function discounts(){
+  const list = [], pr = promoPct();
+  if (pr.pct) list.push([t('d_promo',{c:pr.code}), pr.pct]);
+  if ($('f-student').checked) list.push([t('d_student'), S.settings.student]);
+  if (loyaltyNext()) list.push([t('d_loyal'), S.settings.loyal]);
+  return {list, total: Math.min(30, list.reduce((a,b) => a + b[1], 0))};
+}
+
+/* ---------- pricing ---------- */
+function compute(m){
+  const st = S.settings, mat = $('f-mat').value, qty = Math.max(1, Math.min(50, Math.round(+$('f-qty').value || 1)));
+  const max = Math.max(m.x, m.y, m.z), base = Math.min(m.x, m.y);
+  const type = (max <= 256 && mat !== 'ABS') ? 'A1' : 'K2';
+  const grams = m.volCm3 * DENS[mat] * FILL[form.infill];
+  const hours = Math.max(.3, grams / (type === 'K2' ? 14 : 11)) * QTIME[form.quality];
+  const urg = form.urgent === '1' ? 1.5 : 1, d = discounts();
+  const raw = (grams * st.cg * K_MAT[mat] + hours * (type === 'K2' ? st.k2 : st.a1)) * qty + st.setup;
+  const p = Math.max(st.min, raw * urg * (1 - d.total/100)) + (form.deliv === '1' ? st.cour : 0);
+  const reasons = [];
+  if (qty > 3) reasons.push('r_qty');
+  if (mat === 'TPU') reasons.push('r_tpu');
+  if (m.z > 4 * base && m.z > 60) reasons.push('r_tall');
+  if (m.volCm3 < .5) reasons.push('r_tiny');
+  if (m.tris > 400000) reasons.push('r_dense');
+  if (!available(mat, form.color)) reasons.push('r_nostock');
+  return {mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
+}
+const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(([n,p]) => `<div><span>${esc(n)}</span><span class="mono">−${p}%</span></div>`).join('')}</div>` : '';
+const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>`;
+
+function renderQuote(){
+  const out = $('quote-out'), m = form.model;
+  if (form.kind === 'photo'){
+    out.innerHTML = `<p class="label">${t('quote_label')}</p><div class="price mono">20+ <small>AZN</small></div><span class="pill warn wrap">${t('r_model')}</span><p>${t('model_quote')}</p>${discHtml(discounts())}${placeHtml()}`;
+    bindPlace(null); return;
+  }
+  if (!m){
+    out.innerHTML = `<p class="label">${t('quote_label')}</p><div class="price muted">— <small>AZN</small></div><p class="note">${t('quote_empty')}</p>
+      <div class="formula">P = max(min, (g × ${S.settings.cg} × k + h × rate) × qty + ${S.settings.setup}) × urgency × (1 − discount)</div>`;
+    return;
+  }
+  if (m.manual){
+    out.innerHTML = `<p class="label">${t('quote_label')}</p><span class="pill warn">${t('chk_rev')}</span>
+      <dl class="specs"><dt>${t('sp_file')}</dt><dd>${esc(m.file)}</dd></dl><p>${t('manual_quote')}</p>${discHtml(discounts())}${placeHtml()}`;
+    bindPlace(null); return;
+  }
+  const q = compute(m);
+  if (q.tooBig){ out.innerHTML = `<p class="label">${t('quote_label')}</p><span class="pill bad">${q.max.toFixed(0)} mm</span><p>${t('too_big',{n:q.max.toFixed(0)})}</p>`; return; }
+  const rv = q.reasons.length > 0;
+  out.innerHTML = `<p class="label">${t('quote_label')}</p>
+    <div class="price mono">${q.lo}–${q.hi} <small>AZN</small></div>
+    ${rv ? `<span class="pill warn wrap">${t('chk_rev')}: ${q.reasons.map(r=>t(r)).join(', ')}</span>` : `<span class="pill good wrap">${t('chk_ok')}</span>`}
+    <dl class="specs">
+      <dt>${t('sp_file')}</dt><dd>${esc(m.file)}</dd>
+      <dt>${t('sp_size')}</dt><dd>${m.x.toFixed(0)} × ${m.y.toFixed(0)} × ${m.z.toFixed(0)} mm</dd>
+      <dt>${t('sp_mass')}</dt><dd>≈ ${q.grams.toFixed(0)} g</dd>
+      <dt>${t('sp_time')}</dt><dd>≈ ${fmtH(q.hours)}</dd>
+      <dt>${t('o_printer')}</dt><dd>${q.type === 'K2' ? 'Creality K2 Plus' : 'Bambu Lab A1'}</dd>
+      <dt>${t('sp_ready')}</dt><dd>${form.urgent === '1' ? t('ready_f') : t('ready_n')}</dd>
+    </dl>${discHtml(q.d)}${placeHtml()}
+    <div class="formula">(${(q.grams*q.qty).toFixed(0)} g × ${S.settings.cg} × ${K_MAT[q.mat]} + ${(q.hours*q.qty).toFixed(1)} h × ${q.type==='K2'?S.settings.k2:S.settings.a1} + ${S.settings.setup})${q.urg>1?' × 1.5':''}${q.d.total?` × ${(1-q.d.total/100).toFixed(2)}`:''}${form.deliv==='1'?' + '+S.settings.cour:''} ≈ ${q.p.toFixed(1)} AZN</div>`;
+  bindPlace(q);
+}
+const contactOk = v => v.replace(/\D/g,'').length >= 7;
+const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+function bindPlace(q){
+  $('place').onclick = () => {
+    const err = $('place-err'), fail = (k, el) => { err.textContent = t(k); err.hidden = false; el.focus(); };
+    if (form.kind === 'photo' && !form.photos.length) return fail('need_photos', $('photos'));
+    if (!$('f-cname').value.trim()) return fail('need_name', $('f-cname'));
+    if (!contactOk($('f-phone').value)) return fail('need_contact', $('f-phone'));
+    if (form.notify === 'email' && !emailOk($('f-email').value)) return fail('need_email', $('f-email'));
+    if (form.kind === 'file' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
+    const m = form.model || {}, id = 'QT-' + (S.seq++), d = discounts();
+    const gift = $('f-gift').checked && $('f-gift-to').value.trim() ? {to:$('f-gift-to').value.trim().slice(0,16)} : null;
+    const o = {
+      id, name: $('f-name').value.trim() || (m.file ? m.file.replace(/\.[^.]+$/,'') : t('r_model')),
+      client: $('f-cname').value.trim().slice(0,16), contact: $('f-phone').value.trim(), ch: form.notify, email: form.notify === 'email' ? $('f-email').value.trim() : undefined,
+      mat: $('f-mat').value, color: form.color, qty: q ? q.qty : Math.max(1, +$('f-qty').value || 1),
+      grams: q ? q.grams*q.qty : 60, hours: q ? q.hours*q.qty : 3, layers: Math.max(60, Math.round((m.z||40)/({draft:.28,std:.2,fine:.12})[form.quality])),
+      lo: q ? q.lo : null, hi: q ? q.hi : null, status:'review', progress:0, deliv:+form.deliv, mine:true,
+      pub: form.vis === 'public', copy: form.vis === 'public' && $('f-copy').checked, gift, urgent: form.urgent === '1',
+      student: $('f-student').checked, disc: d.total, kind: form.kind,
+      check: form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
+      comment: $('f-comment').value.trim(), file: m.file, z: m.z, shape: m.lathe ? 'pot' : undefined, created: Date.now(), notifs: [], react:{fire:0,clap:0,wow:0}
+    };
+    S.orders.unshift(o); clientNotif(o, 'n_received');
+    if (gift) clientNotif(o, 'n_gift', {to:gift.to});
+    save(); toast(t('t_sent',{id})); location.hash = 'track-' + id;
+  };
+}
+
+/* ---------- STL parsing ---------- */
+function parseSTL(buf){
+  const dv = new DataView(buf), n = buf.byteLength >= 84 ? dv.getUint32(80, true) : 0;
+  const isBin = n > 0 && buf.byteLength === 84 + n*50;
+  let vol = 0, tris = 0; const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9], pos = [];
+  const add = (a,b,c) => {
+    vol += (a[0]*(b[1]*c[2]-b[2]*c[1]) - a[1]*(b[0]*c[2]-b[2]*c[0]) + a[2]*(b[0]*c[1]-b[1]*c[0])) / 6;
+    for (const v of [a,b,c]){ for (let k=0;k<3;k++){ if (v[k]<mn[k]) mn[k]=v[k]; if (v[k]>mx[k]) mx[k]=v[k]; } pos.push(v[0],v[1],v[2]); }
+    tris++;
+  };
+  if (isBin){
+    for (let i=0;i<n;i++){ const o = 84 + i*50 + 12, r = j => [dv.getFloat32(o+j*12,true), dv.getFloat32(o+j*12+4,true), dv.getFloat32(o+j*12+8,true)]; add(r(0), r(1), r(2)); }
+  } else {
+    const txt = new TextDecoder().decode(buf), re = /vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g; let mm, vs = [];
+    while ((mm = re.exec(txt))){ vs.push([+mm[1],+mm[2],+mm[3]]); if (vs.length === 3){ add(...vs); vs = []; } }
+  }
+  if (!tris) throw new Error('empty');
+  return {x:mx[0]-mn[0], y:mx[1]-mn[1], z:mx[2]-mn[2], volCm3:Math.abs(vol)/1000, tris, pos:new Float32Array(pos), zUp:true};
+}
+function loadFile(f){
+  if (!f) return;
+  if (!/\.stl$/i.test(f.name)){
+    form.model = {file:f.name, manual:true}; $('drop-title').textContent = f.name; $('drop-sub').textContent = t('manual_quote');
+    $('viewer').hidden = true; renderQuote(); return;
+  }
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const m = parseSTL(r.result); m.file = f.name; form.model = m;
+      $('drop-title').textContent = f.name; $('drop-sub').textContent = `${m.tris.toLocaleString()} △ · ${m.volCm3.toFixed(1)} cm³`;
+      if (!$('f-name').value) $('f-name').value = f.name.replace(/\.stl$/i,'');
+      showModel(m); renderQuote();
+    } catch(e){ toast(t('t_bad_file')); }
+  };
+  r.readAsArrayBuffer(f);
+}
+
+/* ---------- 3D viewer ---------- */
+let V = null;
+function initViewer(){
+  if (V || !window.THREE) return V;
+  const renderer = new THREE.WebGLRenderer({canvas:$('v-canvas'), antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 1.6, 1, 5000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, .9));
+  const dl = new THREE.DirectionalLight(0xffffff, .8); dl.position.set(200, 400, 300); scene.add(dl);
+  const grid = new THREE.GridHelper(256, 16, 0x9a8f7a, 0x9aa19b); grid.material.opacity = .35; grid.material.transparent = true; scene.add(grid);
+  const holder = new THREE.Group(); scene.add(holder);
+  const mat = new THREE.MeshStandardMaterial({color:0x2a2d31, roughness:.55, metalness:.05});
+  V = {renderer, scene, cam, holder, mat, mesh:null, rot:.6, drag:false, lastX:0, idle:0, dist:300, h:50};
+  const vw = $('viewer');
+  vw.addEventListener('pointerdown', e => { V.drag = true; V.lastX = e.clientX; vw.setPointerCapture(e.pointerId); vw.style.cursor = 'grabbing'; });
+  vw.addEventListener('pointermove', e => { if (!V.drag) return; V.rot += (e.clientX - V.lastX) * .01; V.lastX = e.clientX; V.idle = performance.now(); });
+  vw.addEventListener('pointerup', () => { V.drag = false; vw.style.cursor = 'grab'; });
+  return V;
+}
+function showModel(m){
+  $('viewer').hidden = false;
+  if (!initViewer()){ $('viewer').hidden = true; return; }
+  let geo;
+  if (m.lathe){
+    const pts = [new THREE.Vector2(0,0)]; for (let i=0;i<=40;i++){ const k = i/40; pts.push(new THREE.Vector2(m.x/2*profile(k,'pot')/.5, k*m.z)); }
+    geo = new THREE.LatheGeometry(pts, 72);
+  } else {
+    geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
+    if (m.zUp) geo.rotateX(-Math.PI/2);
+    geo.computeBoundingBox(); const b = geo.boundingBox; geo.translate(-(b.min.x+b.max.x)/2, -b.min.y, -(b.min.z+b.max.z)/2);
+  }
+  geo.computeVertexNormals();
+  if (V.mesh){ V.holder.remove(V.mesh); V.mesh.geometry.dispose(); }
+  V.mesh = new THREE.Mesh(geo, V.mat); V.holder.add(V.mesh);
+  geo.computeBoundingSphere();
+  V.h = Math.max(m.z, 20); V.dist = Math.max(160, geo.boundingSphere.radius * 3.2);
+  V.mat.color.set(COLORS[form.color][1]);
+}
+function drawViewer(now){
+  if (!V || $('viewer').hidden || form.kind !== 'file') return;
+  const cv = $('v-canvas'), w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
+  if (cv.width !== Math.round(w*V.renderer.getPixelRatio())){ V.renderer.setSize(w, h, false); V.cam.aspect = w/h; V.cam.updateProjectionMatrix(); }
+  if (!V.drag && now - V.idle > 1500 && !reduce) V.rot += .006;
+  V.holder.rotation.y = V.rot;
+  V.cam.position.set(0, V.h*.55 + V.dist*.35, V.dist); V.cam.lookAt(0, V.h*.4, 0);
+  V.renderer.render(V.scene, V.cam);
+}
+
+/* ---------- form wiring ---------- */
+function renderSwatches(){
+  const mat = $('f-mat').value;
+  $('swatches').innerHTML = '';
+  COLORS.forEach(([k,c],i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = c;
+    b.title = colorName(i); b.setAttribute('aria-label', colorName(i)); b.setAttribute('aria-pressed', i === form.color);
+    b.disabled = !available(mat, i);
+    b.onclick = () => { form.color = i; renderSwatches(); if (V) V.mat.color.set(c); renderQuote(); };
+    $('swatches').appendChild(b);
+  });
+  $('color-name').textContent = colorName(form.color) + (available(mat, form.color) ? '' : ' · ' + t('r_nostock'));
+}
+function seg(id, key, cb){
+  const el = $(id), set = v => { form[key] = v; el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v)); cb && cb(v); renderQuote(); };
+  el.querySelectorAll('button').forEach(b => b.onclick = () => set(b.dataset.v)); set(form[key]);
+}
+function visNote(){ $('vis-note').textContent = t(form.vis === 'public' ? 'vis_pub_n' : 'vis_priv_n'); $('copy-row').hidden = form.vis !== 'public'; }
+seg('seg-k','kind', v => { $('file-block').hidden = v !== 'file'; $('photo-block').hidden = v !== 'photo'; $('q-field').hidden = v !== 'file'; $('i-field').hidden = v !== 'file'; $('rights-row').hidden = v !== 'file'; });
+seg('seg-q','quality'); seg('seg-i','infill'); seg('seg-u','urgent'); seg('seg-d','deliv');
+seg('seg-v','vis', visNote);
+seg('seg-n','notify', v => { $('email-f').hidden = v !== 'email'; $('tg-note').hidden = v !== 'tg'; });
+$('f-gift').addEventListener('change', e => { $('gift-block').hidden = !e.target.checked; });
+$('f-promo').addEventListener('input', () => { promoCheck(); renderQuote(); });
+$('f-student').addEventListener('change', renderQuote);
+$('f-mat').addEventListener('input', () => { renderSwatches(); renderQuote(); });
+$('f-qty').addEventListener('input', renderQuote);
+$('file').addEventListener('change', e => loadFile(e.target.files[0]));
+$('photos').addEventListener('change', e => {
+  form.photos = [...e.target.files].slice(0,5); $('ph-thumbs').innerHTML = '';
+  form.photos.forEach(f => { const r = new FileReader(); r.onload = () => { const im = document.createElement('img'); im.src = r.result; im.alt = f.name; $('ph-thumbs').appendChild(im); }; r.readAsDataURL(f); });
+});
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+$('sample-btn').onclick = () => {
+  const m = {file:'desk-planter.stl', x:96, y:96, z:110, volCm3:96, tris:18432, lathe:true};
+  form.model = m; $('f-name').value = t('cat_pot');
+  $('drop-title').textContent = 'desk-planter.stl'; $('drop-sub').textContent = '18 432 △ · 96 cm³';
+  showModel(m); renderQuote();
+};
+$('order-form').addEventListener('submit', e => e.preventDefault());
+$('go-model').addEventListener('click', () => { setTimeout(() => $('seg-k').querySelector('[data-v="photo"]').click(), 0); });
+
+/* ---------- drawing ---------- */
+function profile(k, shape){
+  switch(shape){
+    case 'pot': return .38 + .12*k + .02*Math.sin(k*30);
+    case 'stand': return k < .2 ? .5 : k < .3 ? .2 : .2 + .25*Math.max(0, Math.sin((k-.3)*3));
+    case 'hooks': return k < .55 ? .12 : .12 + .3*Math.sin((k-.55)*3.4);
+    case 'box': return k < .9 ? .48 : .5;
+    case 'clip': return .22 + .18*Math.abs(Math.sin(k*Math.PI*2));
+    case 'head': return k < .1 ? .42 : k < .85 ? .07 : .07 + .35*Math.sin((k-.85)*10);
+    default: return .34 + .16*Math.sin(k*Math.PI*1.15 + .3) + .05*Math.sin(k*Math.PI*5);
+  }
+}
+function sizeCanvas(cv){
+  const dpr = devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return null;
+  if (cv.width !== Math.round(w*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); return {g, w, h};
+}
+function drawPrint(cv, progress, layers, color, nozzleT, shape, fault){
+  const c = sizeCanvas(cv); if (!c) return; const {g, w, h} = c;
+  g.fillStyle = '#121417'; g.fillRect(0,0,w,h);
+  const rg = g.createRadialGradient(w*.5,h*.35,10,w*.5,h*.5,w*.7); rg.addColorStop(0,'rgba(255,214,150,.10)'); rg.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(0,0,w,h);
+  const bedY = h*.8, cx = w/2, bw = w*.78;
+  g.fillStyle = '#3B3326'; g.beginPath(); g.moveTo(cx-bw/2,bedY); g.lineTo(cx+bw/2,bedY); g.lineTo(cx+bw/2+w*.05,h*.93); g.lineTo(cx-bw/2-w*.05,h*.93); g.fill();
+  g.fillStyle = '#8A6A33'; g.fillRect(cx-bw/2, bedY-2, bw, 3);
+  const L = Math.min(layers, 260), maxH = h*.58, lh = maxH/L, done = Math.floor(progress*L), objW = w*.42;
+  for (let i=0;i<done;i++){
+    const half = profile(i/L, shape)*objW, y = bedY - (i+1)*lh;
+    g.fillStyle = color; g.fillRect(cx-half, y, half*2, lh+.6);
+    if (i%2===0){ g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(cx-half, y, half*2, Math.max(.4, lh*.35)); }
+  }
+  const sh = g.createLinearGradient(cx-objW*.6,0,cx+objW*.6,0);
+  sh.addColorStop(0,'rgba(0,0,0,.35)'); sh.addColorStop(.45,'rgba(255,255,255,.1)'); sh.addColorStop(1,'rgba(0,0,0,.45)');
+  g.globalCompositeOperation = 'source-atop'; g.fillStyle = sh; g.fillRect(cx-objW, bedY-maxH-2, objW*2, maxH+2); g.globalCompositeOperation = 'source-over';
+  const half = profile(done/L, shape)*objW, ny = bedY - done*lh - lh;
+  if (fault){
+    g.strokeStyle = color; g.lineWidth = 1.4;
+    for (let i=0;i<26;i++){ g.beginPath(); g.moveTo(cx + Math.sin(i*1.7)*half, ny); g.bezierCurveTo(cx + Math.sin(i*2.3)*half*1.6, ny-30-(i%5)*6, cx + Math.cos(i*1.1)*half*1.4, ny-50, cx + Math.sin(i*0.7)*half*.8, ny-24); g.stroke(); }
+  }
+  if (progress < 1 && nozzleT !== null){
+    const nx = cx + Math.sin(nozzleT)*half*.95;
+    if (!fault){ g.fillStyle = '#FFB060'; g.fillRect(cx-half, ny, nx-(cx-half), lh+.6); }
+    g.fillStyle = '#6F7570'; g.fillRect(0, ny-30, w, 4);
+    g.fillStyle = '#D5D8D4'; g.fillRect(nx-14, ny-34, 28, 24);
+    g.fillStyle = '#A8ACA7'; g.beginPath(); g.moveTo(nx-6,ny-10); g.lineTo(nx+6,ny-10); g.lineTo(nx,ny-1); g.fill();
+  }
+}
+function drawThumb(cv, shape, color, label){
+  const c = sizeCanvas(cv); if (!c) return; const {g, w, h} = c, css = getComputedStyle(document.documentElement);
+  g.clearRect(0,0,w,h);
+  const L = 70, bedY = h*.84, maxH = h*.66, lh = maxH/L, objW = w*.36, cx = w/2;
+  for (let i=0;i<L;i++){ const half = profile(i/L, shape)*objW; g.fillStyle = COLORS[color][1]; g.fillRect(cx-half, bedY-(i+1)*lh, half*2, lh+.5); if (i%2){ g.fillStyle='rgba(0,0,0,.12)'; g.fillRect(cx-half, bedY-(i+1)*lh, half*2, lh*.4); } }
+  g.strokeStyle = css.getPropertyValue('--muted').trim(); g.beginPath(); g.moveTo(w*.08, bedY+.5); g.lineTo(w*.92, bedY+.5); g.stroke();
+  if (label){ g.fillStyle = css.getPropertyValue('--muted').trim(); g.font = '11px "JetBrains Mono", monospace'; g.fillText(label, w*.08, h*.95); }
+}
+function drawPhoto(cv, o, i){
+  const c = sizeCanvas(cv); if (!c) return; const {g, w, h} = c;
+  const bg = g.createLinearGradient(0,0,0,h); bg.addColorStop(0, ['#E9E6DF','#DDE3E6','#E6E1EA'][i]); bg.addColorStop(1, '#C9C6BF'); g.fillStyle = bg; g.fillRect(0,0,w,h);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(w/2, h*.84, w*.3, h*.04, 0, 0, Math.PI*2); g.fill();
+  const L = 90, bedY = h*.84, maxH = h*.62, lh = maxH/L, objW = w*(.3 + i*.04), cx = w/2 + (i-1)*w*.04;
+  for (let k=0;k<L;k++){ const half = profile(k/L, o.shape)*objW*(i===2 ? .8 : 1); g.fillStyle = COLORS[o.color][1]; g.fillRect(cx-half, bedY-(k+1)*lh, half*2, lh+.5); if (k%2){ g.fillStyle='rgba(0,0,0,.1)'; g.fillRect(cx-half, bedY-(k+1)*lh, half*2, lh*.4); } }
+  g.fillStyle = 'rgba(0,0,0,.5)'; g.font = '10px "JetBrains Mono", monospace'; g.fillText(`${o.id} · ${i+1}/3`, 8, h-8);
+}
+
+/* ---------- OLED ---------- */
+const QR = (() => { let s = ''; for (let i=0;i<81;i++){ const x = i%9, y = Math.floor(i/9); const fin = (x<3&&y<3)||(x>5&&y<3)||(x<3&&y>5); const on = fin ? !(x%3===1 && y%3===1) : ((x*7+y*13+x*y)%3===0); s += `<i class="${on?'':'o'}"></i>`; } return `<div class="qr" aria-hidden="true">${s}</div>`; })();
+function oledHtml(o, pid, inline){
+  const pr = P(pid), tag = pr.name.replace('Printer ','P');
+  if (!o) return `<div class="oled${inline?' inline':''}" role="img" aria-label="${t('display_label')}"><div class="orow"><span>QAT ${tag}</span><span>READY</span></div><div class="orow" style="align-items:end"><b style="font-size:18px">qat</b>${QR}</div></div>`;
+  const pct = Math.floor(o.progress*100), layer = Math.floor(o.progress*o.layers), err = PS(pid).status === 'error';
+  const who = o.gift ? `<span>FOR</span><b>${esc(o.gift.to)}</b><span>FROM ${esc(o.client)}</span>` : `<span>PRINTING FOR</span><b>${esc(o.client)}</b>`;
+  return `<div class="oled${inline?' inline':''}" role="img" aria-label="${t('display_label')}: ${esc(o.client)}">
+    <div class="orow"><span>QAT ${tag}</span><span>${err ? 'PAUSED' : o.id}</span></div>${who}
+    <div class="ob"><i style="width:${pct}%"></i></div><div class="orow"><span>${pct}%</span><span>L${layer}/${o.layers}</span></div></div>`;
+}
+
+/* ---------- catalog ---------- */
+function catCard(item, i){
+  return `<div class="item"><canvas data-thumb="${i}" aria-hidden="true"></canvas><div class="body">
+    <div style="display:grid;gap:4px">${item.ch?`<span><span class="badge-ch">${t('ch_model')}</span></span>`:''}<h3>${t(item.k)}</h3><p class="note">${item.mat} · ${colorName(item.color)} · ${fmtH(item.hours)}</p></div>
+    <div class="meta"><span class="cost mono">${item.price} AZN</span><button type="button" class="btn-sm btn-primary" data-buy="${i}">${t('buy')}</button></div></div></div>`;
+}
+function renderCatalog(){
+  $('cat-full').innerHTML = CATALOG.map(catCard).join('');
+  $('cat-teaser').innerHTML = CATALOG.slice(0,3).map(catCard).join('');
+  document.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => openModal('buy', CATALOG[+b.dataset.buy]));
+  drawThumbs();
+}
+const drawThumbs = () => requestAnimationFrame(() => document.querySelectorAll('[data-thumb]').forEach(cv => { const it = CATALOG[+cv.dataset.thumb]; drawThumb(cv, it.shape, it.color, `${it.z} mm · ${it.mat}`); }));
+
+/* ---------- modal: buy / repeat / copy ---------- */
+let M = null;
+function openModal(mode, src){
+  M = {mode, src, color: src.color};
+  $('m-h').textContent = mode === 'buy' ? t(src.k) : mode === 'repeat' ? `${t('repeat_h')} · ${src.id}` : t('copy_h');
+  $('m-sub').textContent = mode === 'buy' ? `${src.price} AZN · ${src.mat}` : mode === 'repeat' ? `${src.name} · ${src.mat}` : `${src.name} · ${t('copy_note')}`;
+  $('m-ok').textContent = t(mode === 'repeat' ? 'repeat' : 'buy');
+  $('m-color-f').hidden = mode === 'buy'; $('m-qty-f').hidden = mode === 'buy';
+  $('m-qty').value = mode === 'repeat' ? src.qty : 1;
+  const last = S.orders.find(o => o.mine && o.client);
+  if (last){ $('m-name').value = last.client; $('m-phone').value = last.contact; M.ch = last.ch; M.email = last.email; M.tgLinked = last.tgLinked; }
+  mSwatches(); $('m-err').hidden = true; $('m').hidden = false; $('m-name').focus();
+}
+function mSwatches(){
+  $('m-swatches').innerHTML = '';
+  COLORS.forEach(([k,c],i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = c; b.setAttribute('aria-label', colorName(i)); b.title = colorName(i);
+    b.setAttribute('aria-pressed', i === M.color); b.disabled = !available(M.src.mat, i);
+    b.onclick = () => { M.color = i; mSwatches(); }; $('m-swatches').appendChild(b);
+  });
+}
+$('m-cancel').onclick = () => { $('m').hidden = true; };
+$('m').addEventListener('keydown', e => { if (e.key === 'Escape') $('m').hidden = true; });
+$('m-ok').onclick = () => {
+  const nm = $('m-name').value.trim(), ph = $('m-phone').value.trim(), err = $('m-err');
+  if (!nm){ err.textContent = t('need_name'); err.hidden = false; $('m-name').focus(); return; }
+  if (!contactOk(ph)){ err.textContent = t('need_contact'); err.hidden = false; $('m-phone').focus(); return; }
+  $('m').hidden = true;
+  const id = 'QT-' + (S.seq++), s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
+  const o = {id, client:nm.slice(0,16), contact:ph, ch:M.ch || 'tg', email:M.email, tgLinked:M.tgLinked, mine:true, progress:0, deliv:0, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}};
+  if (M.mode === 'buy') Object.assign(o, {name:t(s.k), mat:s.mat, color:s.color, qty:1, grams:s.grams, hours:s.hours, layers:Math.round(s.z/.2), z:s.z, price:Math.round(s.price*loy), status:'pay', shape:s.shape, catalog:true});
+  else {
+    const ratio = qty / (s.qty || 1), unit = s.price ? s.price / (s.qty || 1) : null;
+    Object.assign(o, {name:s.name, mat:s.mat, color:M.color, qty, grams:s.grams*ratio, hours:s.hours*ratio, layers:s.layers, z:s.z, shape:s.shape, file:s.file});
+    if (M.mode === 'repeat' && unit){ o.price = Math.max(S.settings.min, Math.round(unit*qty*loy)); o.status = 'pay'; o.check = 'repeat ' + s.id; }
+    else { const p = (s.price || s.hi || 20) * ratio; o.lo = Math.floor(p*.9); o.hi = Math.ceil(p*1.15); o.status = 'review'; o.check = (M.mode === 'copy' ? '= ' : 'repeat ') + s.id; }
+  }
+  S.orders.unshift(o); clientNotif(o, 'n_received');
+  if (o.status === 'pay') clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*S.settings.dep/100))});
+  save(); location.hash = 'track-' + id;
+};
+
+/* ---------- live ---------- */
+const tlMap = {};
+const reactLine = o => `🔥 ${o.react?.fire||0} · 👏 ${o.react?.clap||0} · 😮 ${o.react?.wow||0}`;
+const liveCard = (o, finished) => `<div class="lcard"><div class="screen"><a href="#track-${o.id}" aria-label="${esc(o.name)}"><canvas data-live="${o.id}" aria-hidden="true"></canvas></a>
+  <span class="ov"><span>${o.status==='printing'?'<span class="live">LIVE</span>':''}</span><span>${o.status==='printing'?'👁 <span data-viewers="'+o.id+'"></span>':''}</span></span>
+  ${o.status==='printing'?`<span data-oled="${o.id}"></span>`:''}
+  ${finished?`<button type="button" class="btn-sm play" data-play="${o.id}">▶ ${t('timelapse')}</button>`:''}</div>
+  <div class="body"><div class="meta"><a href="#track-${o.id}"><b>${esc(o.name)}</b></a><span class="mono">${o.status==='printing'?'<span data-pct="'+o.id+'"></span>':o.status==='queue'?t('waiting_start'):''}</span></div>
+  <div class="meta"><span class="note" data-rl="${o.id}">${reactLine(o)}</span>${o.video?`<span class="badge-ch">Mr Gadget Lab</span>`:''}</div></div></div>`;
+function renderLive(){
+  const now = S.orders.filter(o => o.pub && ['printing','queue'].includes(o.status));
+  const done = S.orders.filter(o => o.pub && ['post','ready','done'].includes(o.status));
+  const empty = `<div class="panel empty" style="grid-column:1/-1">${t('live_empty')}</div>`;
+  $('live-full').innerHTML = now.length ? now.map(o => liveCard(o)).join('') : empty;
+  $('live-done').innerHTML = done.length ? done.map(o => liveCard(o, true)).join('') : empty;
+  $('live-teaser').innerHTML = now.length ? now.slice(0,3).map(o => liveCard(o)).join('') : empty;
+  document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => { tlMap[b.dataset.play] = performance.now(); });
+}
+
+/* ---------- my orders ---------- */
+function renderOrders(){
+  const mine = S.orders.filter(o => o.mine), n = myCount(), inCycle = n % 5, next = n + 1;
+  $('loyal').innerHTML = [0,1,2,3,4].map(i => `<i class="${i < inCycle ? 'on' : ''}"></i>`).join('') + `<span class="mono note">${inCycle}/5</span>`;
+  $('loyal-note').textContent = loyaltyNext() ? t('loy_now') : t('loy_next', {k: Math.ceil(next/5)*5 - next});
+  $('ref-code').textContent = MY_REF;
+  $('olist').innerHTML = mine.length ? mine.map(o => `<div class="ocard">
+      <a class="t" href="#track-${o.id}"><b>${esc(o.name)}</b><div class="sub mono">${o.id} · ${o.mat} · ${colorName(o.color)} · ${o.qty} ${t('pcs')}</div></a>
+      <div style="display:grid;justify-items:end;gap:6px"><span class="pill ${PILL[o.status]}">${t('st_'+o.status)}${o.status==='printing'?' · <span data-pct="'+o.id+'"></span>':''}</span>
+      <div class="row" style="gap:8px"><span class="mono note">${o.price === 0 ? '0 AZN' : o.price ? azn(o.price) : (o.lo ? o.lo+'–'+o.hi+' AZN' : '—')}</span>${['ready','done'].includes(o.status)?`<button type="button" class="btn-sm" data-rep="${o.id}">${t('repeat')}</button>`:''}</div></div></div>`).join('')
+    : `<div class="panel empty">${t('ord_empty')}</div>`;
+  document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => openModal('repeat', O(b.dataset.rep)));
+}
+$('ref-copy').onclick = () => copyText(MY_REF);
+
+/* ---------- track ---------- */
+let trackId = null, trackCode = '', tlStart = 0, adminSeen = false;
+function renderTrack(){
+  const o = O(trackId);
+  if (!o){ $('t-title').textContent = '—'; $('t-body').hidden = true; $('track').innerHTML = ''; return; }
+  const owner = !!o.mine, allowed = owner || o.pub || adminSeen || trackCode === codeOf(o.id);
+  $('t-locked').hidden = allowed; $('t-body').hidden = !allowed; $('t-copy').hidden = !allowed;
+  if (!allowed){ $('t-sub').textContent = o.id; $('t-title').textContent = '🔒'; $('track').innerHTML = ''; $('t-badges').innerHTML = ''; $('t-locked').textContent = t('locked'); return; }
+  const si = stageIdx(o.status), pr = o.printer ? P(o.printer) : null, dep = S.settings.dep/100, paused = o.status === 'printing' && PS(o.printer)?.status === 'error';
+  $('t-sub').textContent = owner ? `${o.id} · ${o.qty} ${t('pcs')}${o.urgent?' · 24 h':''}` : t('nav_live');
+  $('t-title').textContent = o.name;
+  $('t-badges').innerHTML = [o.gift ? `<span class="pill acc">${t('gift_badge',{to:esc(o.gift.to)})}</span>` : '', o.video ? `<span class="badge-ch">${t('ch_badge')}</span>` : '', owner && o.student ? `<span class="pill info">${t('student_tag')}</span>` : '', owner && o.kind === 'photo' ? `<span class="pill warn">${t('model_tag')}</span>` : ''].join('');
+  $('track').hidden = !owner; $('t-specs').hidden = !owner;
+  $('track').innerHTML = STAGES.map((s,i) => `<div class="${o.status==='rejected'?'':(i<si||o.status==='done')?'done':i===si?'now':''}">${t('st_'+s)}</div>`).join('');
+  $('cam-printer').textContent = !owner ? '' : pr ? `${pr.name} · ${pr.model}` : t('cam_off');
+  $('cam-live').hidden = o.status !== 'printing' || paused;
+  $('t-oled').innerHTML = o.status === 'printing' && o.printer ? `<span data-oled="${o.id}"></span>` : '';
+  $('cam-viewers').innerHTML = o.status === 'printing' && o.pub ? `👁 <span data-viewers="${o.id}"></span>` : '';
+  $('t-printer').textContent = pr ? pr.model : t('assign_later');
+  $('t-mat').textContent = `${o.mat} · ${colorName(o.color)}`;
+  $('t-price').textContent = o.price === 0 ? '0 AZN' : o.price ? azn(o.price) + (o.paid ? ` · ${Math.round(dep*100)}% ${t('o_paid')}` : '') : (o.lo ? t('pending_price',{lo:o.lo, hi:o.hi}) : t('manual_price'));
+  $('t-deliv').textContent = o.deliv ? t('d_cour') : t('d_pick');
+  const rest = o.price ? azn(o.price - Math.round(o.price*dep)) : '0 AZN';
+  const msgs = {review:t('m_review'), pay:t('m_pay',{p:azn(o.price||0), d:azn(Math.round((o.price||0)*dep))}), paycheck:t('m_paycheck'), queue:t('m_queue'),
+    printing:paused ? t('m_paused') : t('m_printing'), post:t('m_post'), ready:t('m_ready',{r:rest}), done:t('m_done'), rejected:t('m_rejected',{w:esc(o.reason ? t(o.reason) : '')})};
+  $('t-state').innerHTML = `<div class="row" style="gap:6px"><span class="pill ${paused?'warn':PILL[o.status]}">${paused ? t('st_paused') : t('st_'+o.status)}</span>${owner?`<span class="pill mut">${t(o.pub?'vis_pub':'vis_priv')}</span>`:`<span class="pill info">${t('viewer_mode')}</span>`}</div>${owner ? `<p class="msg ${o.status==='rejected'?'bad':''}" style="margin-top:12px">${msgs[o.status]}</p>` : ''}`;
+  // reactions
+  $('t-reacts').innerHTML = o.pub && ['printing','post','ready','done'].includes(o.status) ? ['fire','clap','wow'].map((k,i) => `<button type="button" data-react="${k}" aria-label="${['🔥','👏','😮'][i]}">${['🔥','👏','😮'][i]} <span class="mono" data-rc="${o.id}:${k}">${o.react?.[k]||0}</span></button>`).join('') : '';
+  $('t-reacts').querySelectorAll('[data-react]').forEach(b => b.onclick = () => { o.react = o.react || {}; o.react[b.dataset.react] = (o.react[b.dataset.react]||0) + 1; save(); live(); });
+  // photos + acceptance
+  const ph = $('t-photos');
+  if (o.photos && owner){
+    ph.innerHTML = `<div class="cardbox"><span class="label">${t('photos_h')}</span><div class="photos"><canvas data-photo="0"></canvas><canvas data-photo="1"></canvas><canvas data-photo="2"></canvas></div>
+      ${o.accept === 'ok' ? `<span class="ok">${t('accepted')}</span>` : o.accept === 'issue' ? `<span class="note">${t('issue_sent')}: “${esc(o.issueText)}”</span>` : o.accept === 'reprint' ? `<span class="note">${t('reprint_q')}</span>` :
+      o.status === 'ready' ? `<div class="row"><button type="button" class="btn-primary btn-sm" id="acc-ok">${t('accept')}</button><button type="button" class="btn-sm" id="acc-q">${t('question')}</button></div>
+        <div class="field" id="acc-box" hidden><textarea id="acc-text" placeholder="${t('q_ph')}"></textarea><button type="button" class="btn-sm" id="acc-send">${t('send')}</button></div>` : ''}</div>`;
+    requestAnimationFrame(() => ph.querySelectorAll('[data-photo]').forEach(cv => drawPhoto(cv, o, +cv.dataset.photo)));
+    if ($('acc-ok')){
+      $('acc-ok').onclick = () => { o.accept = 'ok'; save(); full(); };
+      $('acc-q').onclick = () => { $('acc-box').hidden = false; $('acc-text').focus(); };
+      $('acc-send').onclick = () => { const v = $('acc-text').value.trim(); if (!v) return; o.accept = 'issue'; o.issueText = v; save(); toast(t('issue_sent')); full(); badges(); };
+    }
+  } else ph.innerHTML = '';
+  // payment
+  const pay = $('t-pay');
+  if (owner && (o.status === 'pay' || o.status === 'paycheck')){
+    pay.innerHTML = `<div class="cardbox"><p class="label">${t('card_t')}</p>
+      <div class="cardnum">4169 •••• •••• 0000 <button type="button" class="btn-sm" id="copy-card">${t('copy')}</button></div>
+      <dl class="specs"><dt>${t('card_holder')}</dt><dd>QAT 3D (${t('sample_word')})</dd><dt>${t('card_amount')}</dt><dd>${azn(Math.round((o.price||0)*dep))}</dd><dt>${t('col_order')}</dt><dd>${o.id}</dd></dl>
+      <p class="note">${t('card_note')}</p>
+      ${o.status === 'pay' ? `<div class="field"><label for="receipt">${t('receipt')}</label><input type="file" id="receipt" accept="image/*,.pdf"></div><button type="button" class="btn-primary" id="paid">${t('paid_btn')}</button>` : `<span class="pill warn">${t('st_paycheck')}${o.receipt ? ' · '+esc(o.receipt) : ''}</span>`}
+    </div>`;
+    $('copy-card').onclick = () => copyText('4169 0000 0000 0000');
+    if ($('paid')) $('paid').onclick = () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null; o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };
+  } else pay.innerHTML = '';
+  // notifications feed
+  const tg = o.ch === 'tg';
+  const tgCard = owner && tg && !o.tgLinked ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
+    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/qat3d_bot?start=${o.id}" target="_blank" rel="noopener">${t('tg_open')}</a><button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button></div></div>` : '';
+  const shown = tg && !o.tgLinked ? [] : (o.notifs || []);
+  $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @qat3d_bot' : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
+  if ($('tg-demo')) $('tg-demo').onclick = () => { o.tgLinked = true; clientNotif(o, 'n_tg_linked'); save(); full(); };
+  // actions
+  const acts = $('t-actions'); acts.innerHTML = '';
+  const add = (txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-sm ' + cls; b.textContent = txt; b.onclick = fn; acts.append(b); };
+  if (o.status === 'printing' && !paused) add(t('speed_btn'), '', () => { o.speed = Math.max(o.speed||0, 1/20); save(); });
+  if (['post','ready','done'].includes(o.status)) add('▶ ' + t('timelapse'), 'btn-primary', () => { tlStart = performance.now(); });
+  if (!owner && o.copy && ['printing','post','ready','done'].includes(o.status)) add(t('copy_h'), 'btn-primary', () => openModal('copy', o));
+  if (owner && ['ready','done'].includes(o.status)) add(t('repeat'), '', () => openModal('repeat', o));
+  if (owner && !['done','rejected'].includes(o.status)) add(t(o.pub ? 'make_priv' : 'make_pub'), 'btn-ghost', () => { o.pub = !o.pub; save(); toast(t(o.pub ? 't_pub' : 't_priv')); full(); badges(); });
+}
+$('t-copy').onclick = () => { const o = O(trackId); if (o) copyText('https://' + linkOf(o)); };
+
+/* ---------- admin ---------- */
+let admTab = 'active';
+const ORDER_RANK = {review:0, paycheck:1, pay:2, queue:3, printing:4, post:5, ready:6, done:7, rejected:8};
+function renderAdmin(){
+  const cnt = s => S.orders.filter(o => s.includes(o.status)).length;
+  $('alerts').innerHTML = S.alerts.map((a,i) => [a,i]).slice(-3).reverse().map(([a,i]) => `<div class="alert"><span><b>⚠</b> ${esc(t('alert_op',a))}</span><button type="button" class="btn-sm" data-dis="${i}">${t('dismiss')}</button></div>`).join('');
+  $('alerts').querySelectorAll('[data-dis]').forEach(b => b.onclick = () => { S.alerts.splice(+b.dataset.dis, 1); save(); full(); badges(); });
+  $('counters').innerHTML = [[cnt(['review']),'c_review'],[cnt(['pay','paycheck']),'c_pay'],[cnt(['queue']),'c_queue'],[cnt(['ready']),'c_ready']]
+    .map(([n,k],i) => `<div class="counter ${i===0&&n?'hot':''}"><b class="mono">${n}</b><span class="muted">${t(k)}</span></div>`).join('');
+  renderPrinters();
+  document.querySelectorAll('#adm-tabs button').forEach(b => b.className = 'btn-sm ' + (b.dataset.t === admTab ? 'btn-primary' : ''));
+  const list = S.orders.filter(o => admTab === 'all' || !['done','rejected'].includes(o.status)).sort((a,b) => ORDER_RANK[a.status]-ORDER_RANK[b.status] || b.created-a.created);
+  $('adm-rows').innerHTML = list.length ? list.map(rowHtml).join('') : `<tr><td colspan="6" class="empty">—</td></tr>`;
+  $('adm-rows').querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id));
+  renderStock(); renderStats(); renderSettings();
+}
+function rowHtml(o){
+  let price = o.price === 0 ? '0' : o.price ? azn(o.price) : (o.lo ? `${o.lo}–${o.hi}` : '?');
+  let a = `<a class="btn btn-sm btn-ghost" href="#track-${o.id}">${t('a_open')}</a>`;
+  const extra = [];
+  if (o.status === 'review'){
+    price = `<input type="number" id="pr-${o.id}" value="${o.lo ? Math.round((o.lo+o.hi)/2) : ''}" min="1" aria-label="${t('col_price')} ${o.id}">`;
+    a = `<button type="button" class="btn-sm btn-primary" data-a="confirm" data-id="${o.id}">${t('a_confirm')}</button>
+      <select id="rj-${o.id}" aria-label="${t('a_reject')}"><option value="rj_geo">${t('rj_geo')}</option><option value="rj_size">${t('rj_size')}</option><option value="rj_rights">${t('rj_rights')}</option></select>
+      <button type="button" class="btn-sm" data-a="reject" data-id="${o.id}">${t('a_reject')}</button>`;
+  } else if (o.status === 'pay' || o.status === 'paycheck'){
+    a = `${o.status==='paycheck'?`<span class="note">${t('client_paid')}${o.receipt?' · '+esc(o.receipt):''}</span>`:''}<button type="button" class="btn-sm btn-primary" data-a="paid" data-id="${o.id}">${t('a_paid')}</button>`;
+  } else if (o.status === 'queue'){
+    const cs = candidates(o);
+    a = cs.length ? `<select id="pp-${o.id}" aria-label="${t('o_printer')}">${cs.map((c,i) => `<option value="${c.p.id}">${c.p.name} · ${c.p.type}${i===0?' ★ '+t('best'):''}${c.match?'':' · '+t('swap')}</option>`).join('')}</select><button type="button" class="btn-sm btn-primary" data-a="start" data-id="${o.id}">${t('a_start')}</button>`
+      : `<span class="note">${S.stock[o.mat][o.color] < 1000 && !S.printers.some(p => spoolOk(p,o)) ? t('no_stock',{m:o.mat, c:colorName(o.color)}) : t('no_printer')}</span>`;
+  } else if (o.status === 'printing'){
+    a = `<span class="mono">${P(o.printer).name} · <span data-pct="${o.id}"></span></span>`;
+  } else if (o.status === 'post'){
+    a = `<button type="button" class="btn-sm btn-primary" data-a="ready" data-id="${o.id}">${t('a_photo')}</button>`;
+  } else if (o.status === 'ready'){
+    const acc = o.accept === 'ok' ? `<span class="pill good">${t('acc_ok')}</span>` : o.accept === 'issue' ? `<span class="pill bad wrap">${t('acc_issue')}: “${esc(o.issueText)}”</span>` : o.accept === 'reprint' ? `<span class="pill info">${t('acc_reprint')}</span>` : `<span class="pill mut">${t('acc_wait')}</span>`;
+    a = `${acc}<button type="button" class="btn-sm btn-primary" data-a="issue" data-id="${o.id}">${t('a_issue')}</button>${o.accept === 'issue' ? `<button type="button" class="btn-sm" data-a="reprint" data-id="${o.id}">${t('reprint')}</button>` : ''}`;
+  }
+  if (['ready','done'].includes(o.status) && o.pub) a += `<button type="button" class="btn-sm ${o.video?'btn-primary':''}" data-a="video" data-id="${o.id}">🎬 ${t('mark_video')}</button>`;
+  if (o.urgent) extra.push(`<span class="pill bad">24h</span>`);
+  if (o.student) extra.push(`<span class="pill info">${t('student_tag')}</span>`);
+  if (o.kind === 'photo') extra.push(`<span class="pill warn">${t('model_tag')}</span>`);
+  if (o.gift) extra.push(`<span class="pill acc">🎁 ${esc(o.gift.to)}</span>`);
+  return `<tr><td class="mono">${o.id}<div class="note">${t(o.pub?'vis_pub':'vis_priv')}</div>${extra.length?`<div class="row" style="gap:4px;margin-top:4px">${extra.join('')}</div>`:''}</td>
+    <td><b>${esc(o.name)}</b><div class="note">${o.mat} · ${colorName(o.color)} · ${o.qty} ${t('pcs')}${o.grams?` · ${Math.round(o.grams)} g · ${fmtH(o.hours)}`:''}${o.check?` · ${esc(o.check)}`:''}${o.disc?` · −${o.disc}%`:''}</div>${o.comment?`<div class="note">“${esc(o.comment)}”</div>`:''}</td>
+    <td>${esc(o.client)}<div class="note mono">${esc(o.contact)}</div><div class="note">${o.ch === 'tg' ? 'Telegram' + (o.tgLinked ? ' ✓' : ' · ' + t('tg_wait')) : 'Email · ' + esc(o.email || '')}</div></td>
+    <td><span class="pill ${PILL[o.status]}">${t('st_'+o.status)}</span></td>
+    <td class="mono">${price}</td><td><div class="act">${a}</div></td></tr>`;
+}
+function renderPrinters(){
+  $('printers').innerHTML = PRINTER_DEF.map(p => {
+    const s = PS(p.id), o = s.order ? O(s.order) : null, st = S.settings;
+    const pill = {printing:`<span class="pill good">${t('p_printing')}</span>`, ready:`<span class="pill warn">${t('p_ready')}</span>`, maintenance:`<span class="pill mut">${t('p_maint')}</span>`, error:`<span class="pill bad">${t('p_error')}</span>`}[s.status];
+    const sp = s.spool ? `<div class="spool"><span class="mat-dot" style="background:${COLORS[s.spool.color][1]}"></span><span>${t('spool')}: ${s.spool.mat} ${colorName(s.spool.color)} · <span class="mono">${Math.round(s.spool.g)} g</span></span>${s.spool.g < 200 ? `<span class="pill warn">${t('spool_low')}</span>`:''}</div>` : '';
+    const lubeLeft = Math.round(st.lube - s.lube), nozLeft = Math.round(st.nozzle - s.nozzle);
+    const left = [lubeLeft > 0 ? t('lube_in',{h:lubeLeft}) : '', nozLeft > 0 ? t('nozzle_in',{h:nozLeft}) : ''].filter(Boolean).join(' · ');
+    const maint = `<div class="note"><span class="mono">${t('motor')}: ${Math.round(s.motor)}</span>${left ? ' · ' + left : ''}</div>
+      ${lubeLeft <= 0 ? `<div class="row" style="gap:6px"><span class="pill warn">${t('lube_due')}</span><button type="button" class="btn-sm" data-mt="lube" data-p="${p.id}">${t('done_lube')}</button></div>` : ''}
+      ${nozLeft <= 0 ? `<div class="row" style="gap:6px"><span class="pill warn">${t('nozzle_due')}</span><button type="button" class="btn-sm" data-mt="nozzle" data-p="${p.id}">${t('done_nozzle')}</button></div>` : ''}`;
+    let body;
+    if ((s.status === 'printing' || s.status === 'error') && o){
+      body = `<div class="mono" style="display:flex;justify-content:space-between;gap:8px"><a href="#track-${o.id}">${o.id}</a><span data-pct="${o.id}"></span></div><div class="bar-line sm"><i data-bar="${o.id}"></i></div>
+        <span class="note">${o.mat} · ${t('o_left')}: <span data-left="${o.id}"></span></span><span data-oled-p="${p.id}"></span>
+        ${s.status === 'error' ? `<span class="err">${t('spaghetti')}</span><div class="row" style="gap:6px"><button type="button" class="btn-sm btn-primary" data-pa="resume" data-p="${p.id}">${t('p_resume')}</button><button type="button" class="btn-sm" data-pa="restart" data-p="${p.id}">${t('p_restart')}</button></div>`
+          : `<button type="button" class="btn-sm btn-ghost" data-pa="fail" data-p="${p.id}">${t('p_fail')}</button>`}`;
+    } else {
+      body = `<p class="note">${t('p_can',{m:p.mats.join(', ')})} · ≤ ${p.max} mm</p>${s.status === 'ready' ? `<span data-oled-p="${p.id}"></span>` : ''}<button type="button" class="btn-sm" data-pm="${p.id}">${s.status==='ready'?t('p_to_maint'):t('p_back')}</button>`;
+    }
+    return `<div class="printer ${s.status==='error'?'err':''}"><div class="top"><h3>${p.name}</h3>${pill}</div><div class="model">${p.model}</div>${sp}${body}${maint}</div>`;
+  }).join('');
+  document.querySelectorAll('[data-pm]').forEach(b => b.onclick = () => { const s = PS(b.dataset.pm); s.status = s.status === 'ready' ? 'maintenance' : 'ready'; save(); full(); });
+  document.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => { PS(b.dataset.p)[b.dataset.mt] = 0; save(); full(); });
+  document.querySelectorAll('[data-pa]').forEach(b => b.onclick = () => printerAct(b.dataset.pa, b.dataset.p));
+}
+function printerAct(a, pid){
+  const s = PS(pid), o = O(s.order); if (!o) return;
+  if (a === 'fail'){ s.status = 'error'; S.alerts.push({p:P(pid).name, why:t('spaghetti'), id:o.id}); clientNotif(o, 'n_paused'); toast(t('t_fault',{p:P(pid).name})); }
+  if (a === 'resume'){ s.status = 'printing'; }
+  if (a === 'restart'){ s.status = 'printing'; if (s.spool) s.spool.g = Math.max(0, s.spool.g - o.grams*o.progress); o.progress = 0; o.half = false; }
+  save(); full(); badges();
+}
+function act(a, id){
+  const o = O(id), dep = S.settings.dep/100;
+  if (a === 'confirm'){ const v = +$('pr-'+id).value; if (!v){ $('pr-'+id).focus(); return; } o.price = Math.round(v); o.status = 'pay'; clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*dep))}); toast(t('t_confirmed',{id})); }
+  if (a === 'reject'){ o.reason = $('rj-'+id).value; o.status = 'rejected'; clientNotif(o, 'n_rejected', {w:t(o.reason)}); toast(t('t_rejected',{id})); }
+  if (a === 'paid'){ o.paid = true; o.status = 'queue'; clientNotif(o, 'n_paid'); toast(t('t_paid',{id})); }
+  if (a === 'start'){
+    const pid = $('pp-'+id).value, s = PS(pid);
+    if (!spoolOk(s, o)){
+      if (S.stock[o.mat][o.color] < 1000){ toast(t('no_stock',{m:o.mat, c:colorName(o.color)})); return; }
+      if (s.spool && s.spool.g > 0) S.stock[s.spool.mat][s.spool.color] += Math.round(s.spool.g);
+      S.stock[o.mat][o.color] -= 1000; s.spool = {mat:o.mat, color:o.color, g:1000}; toast(t('t_swapped',{p:P(pid).name, m:`${o.mat} ${colorName(o.color)}`}));
+    }
+    o.printer = pid; o.status = 'printing'; o.progress = 0; o.half = false; o.speed = 1/45; s.status = 'printing'; s.order = id; o.viewers = o.pub ? 3 : 1;
+    clientNotif(o, 'n_started'); setTimeout(() => toast(t('t_started',{id, p:P(pid).name})), 1500);
+  }
+  if (a === 'ready'){ o.status = 'ready'; o.photos = true; clientNotif(o, 'n_ready'); toast(t('t_ready',{id})); }
+  if (a === 'issue'){ o.status = 'done'; clientNotif(o, 'n_done'); toast(t('t_done',{id})); }
+  if (a === 'video'){ o.video = !o.video; }
+  if (a === 'reprint'){
+    const nid = 'QT-' + (S.seq++);
+    S.orders.unshift({id:nid, name:o.name, client:o.client, contact:o.contact, ch:o.ch, mat:o.mat, color:o.color, qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, z:o.z, shape:o.shape, price:0, paid:true, status:'queue', progress:0, deliv:o.deliv, mine:o.mine, pub:o.pub, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}, check:'reprint ' + o.id});
+    o.accept = 'reprint'; clientNotif(O(nid), 'n_reprint'); toast(t('t_reprint',{id:nid}));
+  }
+  save(); full(); badges();
+}
+document.querySelectorAll('#adm-tabs button').forEach(b => b.onclick = () => { admTab = b.dataset.t; full(); });
+function renderStock(){
+  $('stock-head').innerHTML = `<tr><th></th>${COLORS.map((c,i) => `<th><span class="mat-dot" style="background:${c[1]}"></span>${colorName(i)}</th>`).join('')}</tr>`;
+  $('stock-rows').innerHTML = MATS.map(m => `<tr><th>${m}</th>${COLORS.map((c,i) => { const g = S.stock[m][i]; return `<td class="${g === 0 ? 'out' : g < 1000 ? 'low' : ''}"><input type="number" step="100" min="0" value="${g}" data-st="${m}:${i}" aria-label="${m} ${colorName(i)}"></td>`; }).join('')}</tr>`).join('');
+  $('stock-rows').querySelectorAll('[data-st]').forEach(inp => inp.addEventListener('change', () => { const [m,i] = inp.dataset.st.split(':'); S.stock[m][+i] = Math.max(0, +inp.value || 0); save(); renderSwatches(); full(); }));
+}
+function renderStats(){
+  const paid = S.orders.filter(o => o.paid && o.price);
+  const rev = S.history.revenue + paid.reduce((a,o) => a + o.price, 0), n = S.history.orders + S.orders.length;
+  $('stats').innerHTML = [[azn(rev),'s_rev'],[n,'s_orders'],[azn(rev / Math.max(1, S.history.orders + paid.length)),'s_avg'],[S.history.repeat + '%','s_repeat']]
+    .map(([v,k]) => `<div class="counter"><b class="mono" style="font-size:22px">${v}</b><span class="muted">${t(k)}</span></div>`).join('');
+  $('util').innerHTML = PRINTER_DEF.map(p => `<div class="hbar"><span>${p.name}</span><div class="bar-line"><i style="width:${p.util}%"></i></div><span class="mono">${p.util}%</span></div>`).join('');
+  const g = {}; S.orders.forEach(o => g[o.mat] = (g[o.mat]||0) + (o.grams||0)); const mx = Math.max(1, ...Object.values(g));
+  $('matshare').innerHTML = MATS.map(m => `<div class="hbar"><span>${m}</span><div class="bar-line"><i style="width:${(g[m]||0)/mx*100}%"></i></div><span class="mono">${Math.round(g[m]||0)}</span></div>`).join('');
+}
+const SET_KEYS = [['cg','set_cg',.01],['a1','set_a1',.5],['k2','set_k2',.5],['setup','set_setup',1],['min','set_min',1],['dep','set_dep',5],['cour','set_cour',1],['student','set_student',1],['loyal','set_loyal',1],['lube','set_lube',10],['nozzle','set_nozzle',10]];
+function renderSettings(){
+  $('settings').innerHTML = SET_KEYS.map(([k,l,st]) => `<div class="field"><label for="set-${k}">${t(l)}</label><input type="number" id="set-${k}" step="${st}" min="0" value="${S.settings[k]}"></div>`).join('');
+  SET_KEYS.forEach(([k]) => $('set-'+k).addEventListener('change', e => { const v = +e.target.value; if (v >= 0){ S.settings[k] = v; save(); renderQuote(); } }));
+}
+$('reset').onclick = () => { S = seed(); save(); toast(t('t_reset')); renderSwatches(); full(); badges(); };
+
+/* ---------- render orchestration ---------- */
+const ROUTES = ['home','new','catalog','live','orders','track','admin'];
+function route(){
+  const h = location.hash.slice(1);
+  if (h.startsWith('track-')){ const parts = h.slice(6).split('-'); trackId = parts.slice(0,2).join('-').toUpperCase(); trackCode = (parts[2] || '').toLowerCase(); return 'track'; }
+  return ROUTES.includes(h) ? h : 'home';
+}
+function sig(){
+  return lang + '|' + S.orders.map(o => [o.id,o.status,o.pub,o.accept,o.photos,o.video,o.copy,o.printer,o.tgLinked].join(':')).join(',') + '|' + S.printers.map(p => p.status + (S.settings.lube > p.lube) + (S.settings.nozzle > p.nozzle) + (p.spool ? p.spool.mat + p.spool.color + (p.spool.g < 200) : '')).join(',') + '|' + S.alerts.length + '|' + admTab + '|' + trackId;
+}
+let lastSig = '';
+function full(){
+  const r = route();
+  if (r === 'orders') renderOrders();
+  if (r === 'track') renderTrack();
+  if (r === 'admin'){ adminSeen = true; renderAdmin(); }
+  if (r === 'live' || r === 'home') renderLive();
+  lastSig = sig(); live();
+}
+function live(){
+  document.querySelectorAll('[data-pct]').forEach(el => { const o = O(el.dataset.pct); if (o) el.textContent = Math.floor(o.progress*100) + '%'; });
+  document.querySelectorAll('[data-bar]').forEach(el => { const o = O(el.dataset.bar); if (o) el.style.width = (o.progress*100) + '%'; });
+  document.querySelectorAll('[data-left]').forEach(el => { const o = O(el.dataset.left); if (o) el.textContent = fmtH((1-o.progress)*o.hours); });
+  document.querySelectorAll('[data-viewers]').forEach(el => { const o = O(el.dataset.viewers); if (o) el.textContent = t('viewers',{n:o.viewers||1}); });
+  document.querySelectorAll('[data-rc]').forEach(el => { const [id,k] = el.dataset.rc.split(':'); const o = O(id); if (o) el.textContent = o.react?.[k]||0; });
+  document.querySelectorAll('[data-rl]').forEach(el => { const o = O(el.dataset.rl); if (o) el.textContent = reactLine(o); });
+  document.querySelectorAll('[data-oled]').forEach(el => { const o = O(el.dataset.oled); if (o && o.printer) el.innerHTML = oledHtml(o, o.printer); });
+  document.querySelectorAll('[data-oled-p]').forEach(el => { const s = PS(el.dataset.oledP), o = s.order ? O(s.order) : null; el.innerHTML = oledHtml(s.status === 'ready' ? null : o, s.id, true); });
+  if (route() === 'track'){
+    const o = O(trackId); if (!o) return;
+    const fin = ['post','ready','done'].includes(o.status), pct = fin ? 1 : o.progress;
+    $('t-pct').textContent = Math.floor(pct*100) + '%'; $('t-bar').style.width = (pct*100) + '%';
+    $('t-layer').textContent = o.status === 'printing' ? `${Math.floor(o.progress*o.layers)} / ${o.layers}` : fin ? `${o.layers} / ${o.layers}` : '—';
+    $('t-left').textContent = o.status === 'printing' ? fmtH((1-o.progress)*o.hours) : '—';
+  }
+}
+function show(){
+  const r = route();
+  ROUTES.forEach(v => $('view-'+v).hidden = v !== r);
+  document.querySelectorAll('nav a').forEach(a => (a.dataset.route === r || (r === 'track' && a.dataset.route === 'orders')) ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
+  full(); window.scrollTo(0,0);
+  if (r === 'catalog' || r === 'home') drawThumbs();
+}
+
+/* ---------- simulation ---------- */
+function tick(){
+  let changed = false;
+  for (const o of S.orders){
+    if (o.status !== 'printing') continue;
+    const s = PS(o.printer);
+    if (o.pub){ o.viewers = Math.max(2, Math.min(60, (o.viewers||3) + Math.round(Math.random()*2 - .8))); if (Math.random() < .15){ o.react = o.react || {}; const k = ['fire','clap','wow'][Math.floor(Math.random()*3)]; o.react[k] = (o.react[k]||0) + 1; } }
+    if (!s || s.status === 'error') continue;
+    const d = Math.min(1 - o.progress, o.speed || 1/45);
+    o.progress += d; const hrs = d * o.hours; s.motor += hrs; s.lube += hrs; s.nozzle += hrs;
+    if (!o.half && o.progress >= .5){ o.half = true; clientNotif(o, 'n_half'); }
+    if (o.progress >= .9999){
+      o.progress = 1; o.status = 'post'; if (s.spool) s.spool.g = Math.max(0, s.spool.g - o.grams); s.status = 'ready'; s.order = null;
+      clientNotif(o, 'n_printed'); toast(t('t_print_done',{id:o.id}));
+    }
+    changed = true;
+  }
+  if (changed) save();
+  const busy = document.activeElement && document.activeElement.closest && document.activeElement.closest('#adm-rows,#settings,#stock-rows,#t-photos,#t-pay,#m');
+  if (sig() !== lastSig && !busy) full(); else live();
+  badges();
+}
+function badges(){
+  const n = S.orders.filter(o => ['review','paycheck'].includes(o.status) || (o.status === 'ready' && o.accept === 'issue')).length + S.alerts.length;
+  $('adm-cnt').hidden = !n; $('adm-cnt').textContent = n;
+  const m = S.orders.filter(o => o.mine && !['done','rejected'].includes(o.status)).length;
+  $('my-cnt').hidden = !m; $('my-cnt').textContent = m;
+  const l = S.orders.filter(o => o.pub && o.status === 'printing').length;
+  $('live-cnt').hidden = !l; $('live-cnt').textContent = l;
+}
+
+/* ---------- animation ---------- */
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let heroP = .2; const t0 = performance.now();
+function frame(now){
+  const tm = (now - t0)/1000, r = route();
+  if (r === 'home'){
+    heroP = reduce ? .62 : (heroP + .0011) % 1.15; const p = Math.min(1, heroP);
+    drawPrint($('hero-canvas'), p, 240, '#E2702F', tm*3.2);
+    $('hero-hud').textContent = `Bambu A1 · ${t('o_layer')} ${Math.floor(p*240)}/240`;
+  }
+  if (r === 'new') drawViewer(now);
+  if (r === 'live' || r === 'home'){
+    document.querySelectorAll('[data-live]').forEach(cv => {
+      if (!cv.offsetParent) return; const o = O(cv.dataset.live); if (!o) return;
+      const fin = ['post','ready','done'].includes(o.status), err = o.status === 'printing' && PS(o.printer)?.status === 'error';
+      let p = fin ? 1 : o.progress, noz = o.status === 'printing' && !err ? tm*3 : null;
+      const st = tlMap[o.id]; if (st){ const k = (now - st)/5000; if (k < 1){ p = k; noz = tm*14; } else delete tlMap[o.id]; }
+      drawPrint(cv, p, o.layers, COLORS[o.color][1], noz, o.shape, err);
+    });
+  }
+  if (r === 'track'){
+    const o = O(trackId);
+    if (o && !$('t-body').hidden){
+      const fin = ['post','ready','done'].includes(o.status), err = o.status === 'printing' && PS(o.printer)?.status === 'error';
+      let p = fin ? 1 : o.progress, noz = o.status === 'printing' && !err ? tm*3 : (err ? 0 : null);
+      if (tlStart && fin){ const k = (now - tlStart)/6000; if (k < 1){ p = k; noz = tm*14; } else tlStart = 0; }
+      drawPrint($('cam-canvas'), p, o.layers, COLORS[o.color][1], noz, o.shape, err);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('hashchange', show);
+applyLang(); show(); badges();
+setInterval(tick, 1000);
+requestAnimationFrame(frame);
+})();
+</script>
