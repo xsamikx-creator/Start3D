@@ -130,6 +130,7 @@ function opText(o) {
     `${esc(d.name || '—')} · ${esc(d.mat || '')} ${esc(d.colorName || '')} · ${d.qty || 1} шт.`,
     d.grams ? `≈ ${Math.round(d.grams)} г · ≈ ${(d.hours || 0).toFixed(1)} ч` : '',
     d.check ? `Проверка: ${esc(d.check)}` : '',
+    d.link ? `🔗 <a href="${esc(d.link).replace(/"/g, '&quot;')}">Модель по ссылке</a> — скачайте, проверьте лицензию (модели с запретом коммерческого использования за деньги печатать нельзя)` : '',
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
     `Клиент: ${esc(o.client)} · ${esc(o.contact || '')}`,
     `Уведомления: ${o.ch === 'email' ? 'email ' + esc(o.email || '') : o.tg_chat_id ? 'Telegram ✓' : 'Telegram (бот ещё не подключён)'}`,
@@ -163,16 +164,21 @@ function opButtons(o) {
     default: return [];
   }
 }
+// Show the model page preview (picture, title) for link orders; no preview otherwise.
+function linkPreview(o) {
+  const link = JSON.parse(o.data || '{}').link;
+  return link ? { url: link, prefer_large_media: true, show_above_text: true } : { is_disabled: true };
+}
 async function postToOperators(env, o) {
   const chat = await kvGet(env, 'operator_chat');
   if (!chat) return;
-  const r = await tg(env, 'sendMessage', { chat_id: Number(chat), text: opText(o), parse_mode: 'HTML', reply_markup: { inline_keyboard: opButtons(o) } });
+  const r = await tg(env, 'sendMessage', { chat_id: Number(chat), text: opText(o), parse_mode: 'HTML', reply_markup: { inline_keyboard: opButtons(o) }, link_preview_options: linkPreview(o) });
   if (r.ok) await env.DB.prepare('UPDATE orders SET op_msg_id=? WHERE id=?').bind(r.result.message_id, o.id).run();
 }
 async function refreshOperatorMsg(env, o) {
   const chat = await kvGet(env, 'operator_chat');
   if (!chat || !o.op_msg_id) return postToOperators(env, o);
-  await tg(env, 'editMessageText', { chat_id: Number(chat), message_id: o.op_msg_id, text: opText(o), parse_mode: 'HTML', reply_markup: { inline_keyboard: opButtons(o) } });
+  await tg(env, 'editMessageText', { chat_id: Number(chat), message_id: o.op_msg_id, text: opText(o), parse_mode: 'HTML', reply_markup: { inline_keyboard: opButtons(o) }, link_preview_options: linkPreview(o) });
 }
 
 /* ---------- API ---------- */
@@ -192,7 +198,8 @@ async function createOrder(env, req, origin) {
     name: clip(b.name, 80), mat: clip(b.mat, 8), colorName: clip(b.colorName, 20), color: Math.max(0, Math.min(6, +b.color || 0)), layers: Math.max(1, Math.min(5000, +b.layers || 200)), qty: Math.max(1, Math.min(50, +b.qty || 1)),
     grams: +b.grams || 0, hours: +b.hours || 0, check: clip(b.check, 200), comment: clip(b.comment, 500),
     pub: !!b.pub, copy: !!b.copy, gift: b.gift ? clip(b.gift, 16) : null, urgent: !!b.urgent, student: !!b.student,
-    deliv: !!b.deliv, kind: b.kind === 'photo' ? 'photo' : 'file', file: clip(b.file, 120),
+    deliv: !!b.deliv, kind: ['photo', 'link'].includes(b.kind) ? b.kind : 'file', file: clip(b.file, 120),
+    link: /^https?:\/\/[^\s"<>]+$/.test(String(b.link || '')) ? clip(b.link, 400) : null,
   };
   await env.DB.prepare(`INSERT INTO orders (id, code, status, client, contact, ch, email, lang, price, lo, hi, data, created_at, updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(

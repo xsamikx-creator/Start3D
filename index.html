@@ -115,7 +115,7 @@ footer{border-top:1px solid var(--line);padding-block:24px;display:flex;justify-
 .form{display:grid;gap:18px}
 .field{display:grid;gap:6px;min-width:0}
 .field>label,.field>.flabel{font-weight:600;font-size:13.5px}
-select,input[type=number],input[type=text],input[type=tel],input[type=email],textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+select,input[type=number],input[type=text],input[type=tel],input[type=email],input[type=url],textarea{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
 textarea{min-height:70px;resize:vertical}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .row>.field{flex:1 1 150px}
@@ -359,7 +359,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   <div class="page-head"><div><h1 data-i="new_h"></h1><p data-i="new_p"></p></div></div>
   <div class="split">
     <form class="panel form" id="order-form" novalidate>
-      <div class="seg" id="seg-k"><button type="button" data-v="file" data-i="k_file"></button><button type="button" data-v="photo" data-i="k_photo"></button></div>
+      <div class="seg" id="seg-k"><button type="button" data-v="file" data-i="k_file"></button><button type="button" data-v="link" data-i="k_link"></button><button type="button" data-v="photo" data-i="k_photo"></button></div>
       <div id="file-block" class="form">
         <label class="drop" id="drop" for="file">
           <input type="file" id="file" accept=".stl,.3mf,.obj,.step,.stp">
@@ -368,6 +368,10 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
         </label>
         <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><span class="vhint" data-i="drag"></span></div>
         <button type="button" class="btn-ghost" id="sample-btn" data-i="sample_btn"></button>
+      </div>
+      <div id="link-block" class="form" hidden>
+        <div class="field"><label for="f-link" data-i="f_link"></label><input type="url" id="f-link" inputmode="url" placeholder="https://makerworld.com/…" autocomplete="off">
+          <span class="note" id="link-note" data-i="link_note"></span></div>
       </div>
       <div id="photo-block" class="form" hidden>
         <label class="drop" for="photos">
@@ -611,6 +615,12 @@ sample_word:['nümunə','пример','приклад','sample'],
 new_h:['Yeni sifariş','Новый заказ','Нове замовлення','New order'],
 new_p:['Modeli yükləyin və ya fotosunu göndərin — qiymət sağda dərhal yenilənir.','Загрузите модель или пришлите фото детали — цена справа обновляется сразу.','Завантажте модель або надішліть фото деталі — ціна праворуч оновлюється одразу.','Upload a model or send photos of the part; the price on the right updates instantly.'],
 k_file:['Modelim var','У меня есть модель','У мене є модель','I have a model'],
+k_link:['Model linki','Ссылка на модель','Посилання на модель','Model link'],
+f_link:['Model linki','Ссылка на модель','Посилання на модель','Link to the model'],
+link_note:['MakerWorld, Printables, Thingiverse, Thangs, Cults3D və s. Operator modeli yükləyib 2 saat ərzində qiyməti deyəcək.','MakerWorld, Printables, Thingiverse, Thangs, Cults3D и другие. Оператор скачает модель и назовёт цену в течение 2 часов.','MakerWorld, Printables, Thingiverse, Thangs, Cults3D та інші. Оператор завантажить модель і назве ціну протягом 2 годин.','MakerWorld, Printables, Thingiverse, Thangs, Cults3D and others. An operator downloads the model and quotes within 2 hours.'],
+link_quote:['Operator modeli saytdan yükləyəcək, lisenziyasını yoxlayacaq və qiyməti 2 saat ərzində göndərəcək.','Оператор скачает модель с сайта, проверит лицензию и пришлёт цену в течение 2 часов.','Оператор завантажить модель із сайту, перевірить ліцензію і надішле ціну протягом 2 годин.','An operator downloads the model, checks its license and sends a price within 2 hours.'],
+need_link:['Modelin linkini daxil edin (https://…)','Вставьте ссылку на модель (https://…)','Вставте посилання на модель (https://…)','Paste a link to the model (https://…)'],
+r_link:['link üzrə model','модель по ссылке','модель за посиланням','model from a link'],
 k_photo:['Foto üzrə modelləşdirin','Смоделируйте по фото','Змоделюйте за фото','Model it from photos'],
 drop_t:['STL faylını bura atın və ya seçmək üçün klikləyin','Перетащите STL сюда или нажмите, чтобы выбрать','Перетягніть STL сюди або натисніть, щоб обрати','Drop an STL here or click to choose'],
 drop_s:['Ölçü və həcm brauzerdə hesablanır. 3MF, OBJ, STEP-i operator hesablayacaq.','Размеры и объём считаются в браузере. 3MF, OBJ, STEP посчитает оператор.','Розміри й об’єм рахуються в браузері. 3MF, OBJ, STEP порахує оператор.','Size and volume are measured in your browser. 3MF, OBJ and STEP are priced by an operator.'],
@@ -1007,7 +1017,7 @@ async function detectServer(){
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
   qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
-  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, deliv:o.deliv, kind:o.kind, file:o.file, lang}, extra || {});
+  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
 async function pushOrder(o, extra){
   if (!SERVER) return true;
   try {
@@ -1119,8 +1129,15 @@ function compute(m){
 const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(([n,p]) => `<div><span>${esc(n)}</span><span class="mono">−${p}%</span></div>`).join('')}</div>` : '';
 const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>`;
 
+const SITES = {'makerworld.com':'MakerWorld','printables.com':'Printables','thingiverse.com':'Thingiverse','thangs.com':'Thangs','cults3d.com':'Cults3D','myminifactory.com':'MyMiniFactory','grabcad.com':'GrabCAD','sketchfab.com':'Sketchfab'};
+function linkInfo(v){ try { const u = new URL(v.trim()); if (!/^https?:$/.test(u.protocol)) return null; const h = u.hostname.replace(/^www\./,''); const k = Object.keys(SITES).find(d => h === d || h.endsWith('.' + d)); return {url:u.href, site:k ? SITES[k] : h}; } catch(e){ return null; } }
 function renderQuote(){
   const out = $('quote-out'), m = form.model;
+  if (form.kind === 'link'){
+    const li = linkInfo($('f-link').value);
+    out.innerHTML = `<p class="label">${t('quote_label')}</p><div class="price muted">— <small>AZN</small></div>${li ? `<span class="pill info wrap">${esc(li.site)}</span>` : ''}<p>${t('link_quote')}</p>${discHtml(discounts())}${placeHtml()}`;
+    bindPlace(null); return;
+  }
   if (form.kind === 'photo'){
     out.innerHTML = `<p class="label">${t('quote_label')}</p><div class="price mono">20+ <small>AZN</small></div><span class="pill warn wrap">${t('r_model')}</span><p>${t('model_quote')}</p>${discHtml(discounts())}${placeHtml()}`;
     bindPlace(null); return;
@@ -1158,21 +1175,23 @@ function bindPlace(q){
   $('place').onclick = async () => {
     const err = $('place-err'), fail = (k, el) => { err.textContent = t(k); err.hidden = false; el.focus(); };
     if (form.kind === 'photo' && !form.photos.length) return fail('need_photos', $('photos'));
+    const li = form.kind === 'link' ? linkInfo($('f-link').value) : null;
+    if (form.kind === 'link' && !li) return fail('need_link', $('f-link'));
     if (!$('f-cname').value.trim()) return fail('need_name', $('f-cname'));
     if (!contactOk($('f-phone').value)) return fail('need_contact', $('f-phone'));
     if (form.notify === 'email' && !emailOk($('f-email').value)) return fail('need_email', $('f-email'));
-    if (form.kind === 'file' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
+    if (form.kind !== 'photo' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
     const m = form.model || {}, id = 'S3D-' + S.seq, d = discounts();
     const gift = $('f-gift').checked && $('f-gift-to').value.trim() ? {to:$('f-gift-to').value.trim().slice(0,16)} : null;
     const o = {
-      id, name: $('f-name').value.trim() || (m.file ? m.file.replace(/\.[^.]+$/,'') : t('r_model')),
+      id, name: $('f-name').value.trim() || (li ? `${li.site}: ${t('r_link')}` : m.file ? m.file.replace(/\.[^.]+$/,'') : t('r_model')), link: li ? li.url : undefined,
       client: $('f-cname').value.trim().slice(0,16), contact: $('f-phone').value.trim(), ch: form.notify, email: form.notify === 'email' ? $('f-email').value.trim() : undefined,
       mat: $('f-mat').value, color: form.color, qty: q ? q.qty : Math.max(1, +$('f-qty').value || 1),
       grams: q ? q.grams*q.qty : 60, hours: q ? q.hours*q.qty : 3, layers: Math.max(60, Math.round((m.z||40)/({draft:.28,std:.2,fine:.12})[form.quality])),
       lo: q ? q.lo : null, hi: q ? q.hi : null, status:'review', progress:0, deliv:+form.deliv, mine:true,
       pub: form.vis === 'public', copy: form.vis === 'public' && $('f-copy').checked, gift, urgent: form.urgent === '1',
       student: $('f-student').checked, disc: d.total, kind: form.kind,
-      check: form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
+      check: li ? `${t('r_link')} · ${li.site}` : form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
       comment: $('f-comment').value.trim(), file: m.file, z: m.z, shape: m.lathe ? 'pot' : undefined, created: Date.now(), notifs: [], react:{fire:0,clap:0,wow:0}
     };
     $('place').disabled = true;
@@ -1287,7 +1306,7 @@ function seg(id, key, cb){
   el.querySelectorAll('button').forEach(b => b.onclick = () => set(b.dataset.v)); set(form[key]);
 }
 function visNote(){ $('vis-note').textContent = t(form.vis === 'public' ? 'vis_pub_n' : 'vis_priv_n'); $('copy-row').hidden = form.vis !== 'public'; }
-seg('seg-k','kind', v => { $('file-block').hidden = v !== 'file'; $('photo-block').hidden = v !== 'photo'; $('q-field').hidden = v !== 'file'; $('i-field').hidden = v !== 'file'; $('rights-row').hidden = v !== 'file'; });
+seg('seg-k','kind', v => { $('file-block').hidden = v !== 'file'; $('link-block').hidden = v !== 'link'; $('photo-block').hidden = v !== 'photo'; $('q-field').hidden = v !== 'file'; $('i-field').hidden = v !== 'file'; $('rights-row').hidden = v === 'photo'; });
 seg('seg-q','quality'); seg('seg-i','infill'); seg('seg-u','urgent'); seg('seg-d','deliv');
 seg('seg-v','vis', visNote);
 seg('seg-n','notify', v => { $('email-f').hidden = v !== 'email'; $('tg-note').hidden = v !== 'tg'; });
@@ -1296,6 +1315,8 @@ $('f-promo').addEventListener('input', () => { promoCheck(); renderQuote(); });
 $('f-student').addEventListener('change', renderQuote);
 $('f-mat').addEventListener('input', () => { renderSwatches(); renderQuote(); });
 $('f-qty').addEventListener('input', renderQuote);
+$('f-link').addEventListener('input', () => { if (form.kind === 'link') renderQuote(); });
+$('f-link').addEventListener('paste', () => setTimeout(() => { if (form.kind === 'link') renderQuote(); }, 0));
 $('file').addEventListener('change', e => loadFile(e.target.files[0]));
 $('photos').addEventListener('change', e => {
   form.photos = [...e.target.files].slice(0,5); $('ph-thumbs').innerHTML = '';
