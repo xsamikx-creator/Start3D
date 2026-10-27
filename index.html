@@ -515,7 +515,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 <footer>
   <span data-i="foot"></span>
-  <span class="mono">Telegram @start3d_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
+  <span class="mono">Telegram @start3d_baku_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
 </footer>
 
 <div class="modal" id="m" hidden>
@@ -634,7 +634,7 @@ f_cname:['Adınız (printer ekranı üçün)','Ваше имя (для дисп�
 cname_note:['Çap zamanı bu ad printerin yanındakı kiçik ekranda görünəcək. 16 simvola qədər.','Во время печати это имя будет на мини-дисплее у принтера. До 16 символов.','Під час друку це ім’я буде на мінідисплеї біля принтера. До 16 символів.','During printing this name is shown on the mini display next to the printer. Up to 16 characters.'],
 f_phone:['Əlaqə telefonu','Телефон для связи','Телефон для зв’язку','Contact phone'],
 f_email:['E-poçt','Email','Email','Email'],
-tg_note:['Sifarişdən sonra @start3d_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @start3d_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @start3d_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @start3d_bot and press Start; updates will arrive there.'],
+tg_note:['Sifarişdən sonra @start3d_baku_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @start3d_baku_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @start3d_baku_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @start3d_baku_bot and press Start; updates will arrive there.'],
 f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
 f_deliv:['Təhvil','Получение','Отримання','Delivery'],
 d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
@@ -691,6 +691,7 @@ need_contact:['Əlaqə telefonunu yazın','Укажите телефон для 
 need_email:['Düzgün e-poçt ünvanı yazın','Укажите корректный email','Вкажіть коректний email','Enter a valid email address'],
 need_rights:['Modeli çap etmək hüququnu təsdiqləyin','Подтвердите право печатать модель','Підтвердьте право друкувати модель','Confirm you have the right to print the model'],
 need_photos:['Ən azı bir foto əlavə edin','Добавьте хотя бы одно фото','Додайте хоча б одне фото','Add at least one photo'],
+server_err:['Server cavab vermir, bir az sonra yenidən cəhd edin','Сервер не отвечает, попробуйте ещё раз через минуту','Сервер не відповідає, спробуйте ще раз за хвилину','The server is not responding; try again in a minute'],
 cancel:['Ləğv et','Отмена','Скасувати','Cancel'],
 ord_h:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
 ord_p:['Bu brauzerdən verilmiş sifarişlər.','Заказы, оформленные в этом браузере.','Замовлення, оформлені в цьому браузері.','Orders placed from this browser.'],
@@ -768,7 +769,7 @@ issue_sent:['Sualınız operatora göndərildi','Ваш вопрос отпра�
 reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная перепечатка поставлена в очередь','Безкоштовний передрук поставлено в чергу','A free reprint has been queued'],
 tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
 tg_p:['Botu açın və Start basın — bütün statuslar ora gələcək. Bunu etməsəniz, bot sizə yaza bilməz.','Откройте бота и нажмите Start — все статусы будут приходить туда. Без этого бот не сможет вам написать.','Відкрийте бота й натисніть Start — усі статуси надходитимуть туди. Без цього бот не зможе вам написати.','Open the bot and press Start; every update will arrive there. Until then the bot can’t message you.'],
-tg_open:['@start3d_bot-u aç','Открыть @start3d_bot','Відкрити @start3d_bot','Open @start3d_bot'],
+tg_open:['@start3d_baku_bot-u aç','Открыть @start3d_baku_bot','Відкрити @start3d_baku_bot','Open @start3d_baku_bot'],
 tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
 tg_wait:['bot qoşulmayıb','бот не подключён','бот не підключений','bot not connected'],
 n_tg_linked:['Bot {id} sifarişinə qoşuldu. Statuslar bura gələcək.','Бот подключён к заказу {id}. Статусы будут приходить сюда.','Бот підключено до замовлення {id}. Статуси надходитимуть сюди.','The bot is linked to order {id}. Updates will arrive here.'],
@@ -972,7 +973,52 @@ let tt; function toast(m){ const el = $('toast'); el.textContent = m; el.hidden 
 function copyText(txt){ const ok = () => toast(t('copied') + ': ' + txt); try { navigator.clipboard.writeText(txt).then(ok, () => toast(txt)); } catch(e){ toast(txt); } }
 const codeOf = id => [...id].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0, 11).toString(36).slice(0,4);
 const MY_REF = 'START-' + codeOf('s3d-me').toUpperCase().padEnd(4,'X');
-const linkOf = o => `start3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
+let SERVER = null; // {bot} when the Start3D server answers on this origin
+const BOT = () => (SERVER && SERVER.bot) || 'start3d_baku_bot';
+const linkOf = o => o.code ? `${location.host}/#track-${o.id}-${o.code}` : `start3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
+async function api(path, body){
+  const r = await fetch(path, body ? {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)} : {cache:'no-store'});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error || 'http_' + r.status), {code:j.error});
+  return j;
+}
+async function detectServer(){
+  if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
+  try { const j = await api('/api/health'); if (j.ok) { SERVER = j; document.body.classList.add('online'); full(); } } catch(e){}
+}
+const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
+  qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
+  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, deliv:o.deliv, kind:o.kind, file:o.file, lang}, extra || {});
+async function pushOrder(o, extra){
+  if (!SERVER) return true;
+  try {
+    const r = await api('/api/orders', serverBody(o, extra));
+    o.id = r.id; o.code = r.code; o.status = r.status; o.server = true; o.notifs = [];
+    return true;
+  } catch(e){ toast(t(e.code && T[e.code] ? e.code : 'server_err')); return false; }
+}
+async function syncOrder(o){
+  if (!SERVER || !o.server || !o.code) return;
+  try {
+    const r = await api(`/api/orders/${o.id}?code=${o.code}`);
+    let ch = false;
+    for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
+    if (r.status === 'printing' && !o.speed) o.speed = 1/120;
+    if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = true; }
+    if (r.status === 'post') o.progress = 1;
+    if (ch){ save(); full(); badges(); }
+  } catch(e){}
+}
+async function adoptOrder(id, code){
+  if (!SERVER || O(id)) return;
+  try {
+    const r = await api(`/api/orders/${id}?code=${code}`);
+    S.orders.unshift({id, code, server:true, mine:true, name:r.name || id, client:r.client, mat:r.mat || 'PLA', color:r.color || 0, qty:r.qty || 1,
+      grams:r.grams || 0, hours:r.hours || 3, layers:r.layers || 200, status:r.status, price:r.price, lo:r.lo, hi:r.hi, tgLinked:r.tgLinked, pub:r.pub,
+      ch:r.ch, progress:['post','ready','done'].includes(r.status) ? 1 : 0, created:r.created || Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}});
+    save(); full(); badges();
+  } catch(e){}
+}
 const colorName = i => t(COLORS[i][0]);
 function notify(o, k, v){ (o.notifs = o.notifs || []).push({at:Date.now(), k, v}); }
 const clientNotif = (o, k, v) => notify(o, k, Object.assign({id:o.id, c:o.client, link:linkOf(o), ref:MY_REF}, v));
@@ -1084,14 +1130,14 @@ function renderQuote(){
 const contactOk = v => v.replace(/\D/g,'').length >= 7;
 const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 function bindPlace(q){
-  $('place').onclick = () => {
+  $('place').onclick = async () => {
     const err = $('place-err'), fail = (k, el) => { err.textContent = t(k); err.hidden = false; el.focus(); };
     if (form.kind === 'photo' && !form.photos.length) return fail('need_photos', $('photos'));
     if (!$('f-cname').value.trim()) return fail('need_name', $('f-cname'));
     if (!contactOk($('f-phone').value)) return fail('need_contact', $('f-phone'));
     if (form.notify === 'email' && !emailOk($('f-email').value)) return fail('need_email', $('f-email'));
     if (form.kind === 'file' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
-    const m = form.model || {}, id = 'S3D-' + (S.seq++), d = discounts();
+    const m = form.model || {}, id = 'S3D-' + S.seq, d = discounts();
     const gift = $('f-gift').checked && $('f-gift-to').value.trim() ? {to:$('f-gift-to').value.trim().slice(0,16)} : null;
     const o = {
       id, name: $('f-name').value.trim() || (m.file ? m.file.replace(/\.[^.]+$/,'') : t('r_model')),
@@ -1104,9 +1150,12 @@ function bindPlace(q){
       check: form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
       comment: $('f-comment').value.trim(), file: m.file, z: m.z, shape: m.lathe ? 'pot' : undefined, created: Date.now(), notifs: [], react:{fire:0,clap:0,wow:0}
     };
-    S.orders.unshift(o); clientNotif(o, 'n_received');
-    if (gift) clientNotif(o, 'n_gift', {to:gift.to});
-    save(); toast(t('t_sent',{id})); location.hash = 'track-' + id;
+    $('place').disabled = true;
+    const ok = await pushOrder(o);
+    $('place').disabled = false;
+    if (!ok) return;
+    S.orders.unshift(o); if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (gift) clientNotif(o, 'n_gift', {to:gift.to}); }
+    save(); toast(t('t_sent',{id:o.id})); location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
   };
 }
 
@@ -1353,12 +1402,12 @@ function mSwatches(){
 }
 $('m-cancel').onclick = () => { $('m').hidden = true; };
 $('m').addEventListener('keydown', e => { if (e.key === 'Escape') $('m').hidden = true; });
-$('m-ok').onclick = () => {
+$('m-ok').onclick = async () => {
   const nm = $('m-name').value.trim(), ph = $('m-phone').value.trim(), err = $('m-err');
   if (!nm){ err.textContent = t('need_name'); err.hidden = false; $('m-name').focus(); return; }
   if (!contactOk(ph)){ err.textContent = t('need_contact'); err.hidden = false; $('m-phone').focus(); return; }
   $('m').hidden = true;
-  const id = 'S3D-' + (S.seq++), s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
+  const id = 'S3D-' + S.seq, s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
   const o = {id, client:nm.slice(0,16), contact:ph, ch:M.ch || 'tg', email:M.email, tgLinked:M.tgLinked, mine:true, progress:0, deliv:0, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}};
   if (M.mode === 'buy') Object.assign(o, {name:t(s.k), mat:s.mat, color:s.color, qty:1, grams:s.grams, hours:s.hours, layers:Math.round(s.z/.2), z:s.z, price:Math.round(s.price*loy), status:'pay', shape:s.shape, catalog:true});
   else {
@@ -1367,9 +1416,10 @@ $('m-ok').onclick = () => {
     if (M.mode === 'repeat' && unit){ o.price = Math.max(S.settings.min, Math.round(unit*qty*loy)); o.status = 'pay'; o.check = 'repeat ' + s.id; }
     else { const p = (s.price || s.hi || 20) * ratio; o.lo = Math.floor(p*.9); o.hi = Math.ceil(p*1.15); o.status = 'review'; o.check = (M.mode === 'copy' ? '= ' : 'repeat ') + s.id; }
   }
-  S.orders.unshift(o); clientNotif(o, 'n_received');
-  if (o.status === 'pay') clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*S.settings.dep/100))});
-  save(); location.hash = 'track-' + id;
+  if (!(await pushOrder(o, o.status === 'pay' ? {catalog:true, price:o.price} : null))) return;
+  S.orders.unshift(o);
+  if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (o.status === 'pay') clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*S.settings.dep/100))}); }
+  save(); location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
 };
 
 /* ---------- live ---------- */
@@ -1411,7 +1461,7 @@ let trackId = null, trackCode = '', tlStart = 0, adminSeen = false;
 function renderTrack(){
   const o = O(trackId);
   if (!o){ $('t-title').textContent = '—'; $('t-body').hidden = true; $('track').innerHTML = ''; return; }
-  const owner = !!o.mine, allowed = owner || o.pub || adminSeen || trackCode === codeOf(o.id);
+  const owner = !!o.mine || (!!o.code && trackCode === o.code), allowed = owner || o.pub || adminSeen || trackCode === codeOf(o.id);
   $('t-locked').hidden = allowed; $('t-body').hidden = !allowed; $('t-copy').hidden = !allowed;
   if (!allowed){ $('t-sub').textContent = o.id; $('t-title').textContent = '🔒'; $('track').innerHTML = ''; $('t-badges').innerHTML = ''; $('t-locked').textContent = t('locked'); return; }
   const si = stageIdx(o.status), pr = o.printer ? P(o.printer) : null, dep = S.settings.dep/100, paused = o.status === 'printing' && PS(o.printer)?.status === 'error';
@@ -1459,14 +1509,16 @@ function renderTrack(){
       ${o.status === 'pay' ? `<div class="field"><label for="receipt">${t('receipt')}</label><input type="file" id="receipt" accept="image/*,.pdf"></div><button type="button" class="btn-primary" id="paid">${t('paid_btn')}</button>` : `<span class="pill warn">${t('st_paycheck')}${o.receipt ? ' · '+esc(o.receipt) : ''}</span>`}
     </div>`;
     $('copy-card').onclick = () => copyText('4169 0000 0000 0000');
-    if ($('paid')) $('paid').onclick = () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null; o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };
+    if ($('paid')) $('paid').onclick = async () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null;
+      if (o.server){ try { await api(`/api/orders/${o.id}/paid?code=${o.code}`, {}); } catch(e){ toast(t('server_err')); return; } }
+      o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };
   } else pay.innerHTML = '';
   // notifications feed
   const tg = o.ch === 'tg';
   const tgCard = owner && tg && !o.tgLinked ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
-    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/start3d_bot?start=${o.id}" target="_blank" rel="noopener">${t('tg_open')}</a><button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button></div></div>` : '';
+    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/${BOT()}?start=${o.id}${o.code ? '_' + o.code : ''}" target="_blank" rel="noopener">${t('tg_open')}</a>${o.server ? '' : `<button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button>`}</div></div>` : '';
   const shown = tg && !o.tgLinked ? [] : (o.notifs || []);
-  $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @start3d_bot' : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
+  $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @' + BOT() : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
   if ($('tg-demo')) $('tg-demo').onclick = () => { o.tgLinked = true; clientNotif(o, 'n_tg_linked'); save(); full(); };
   // actions
   const acts = $('t-actions'); acts.innerHTML = '';
@@ -1622,7 +1674,7 @@ let lastSig = '';
 function full(){
   const r = route();
   if (r === 'orders') renderOrders();
-  if (r === 'track') renderTrack();
+  if (r === 'track'){ if (!O(trackId) && trackCode) adoptOrder(trackId, trackCode); renderTrack(); }
   if (r === 'admin'){ adminSeen = true; renderAdmin(); }
   if (r === 'live' || r === 'home') renderLive();
   lastSig = sig(); live();
@@ -1657,12 +1709,14 @@ function tick(){
   let changed = false;
   for (const o of S.orders){
     if (o.status !== 'printing') continue;
+    if (o.server && !o.printer){ o.progress = Math.min(.98, o.progress + (o.speed || 1/120)); changed = true; continue; }
     const s = PS(o.printer);
     if (o.pub){ o.viewers = Math.max(2, Math.min(60, (o.viewers||3) + Math.round(Math.random()*2 - .8))); if (Math.random() < .15){ o.react = o.react || {}; const k = ['fire','clap','wow'][Math.floor(Math.random()*3)]; o.react[k] = (o.react[k]||0) + 1; } }
     if (!s || s.status === 'error') continue;
     const d = Math.min(1 - o.progress, o.speed || 1/45);
     o.progress += d; const hrs = d * o.hours; s.motor += hrs; s.lube += hrs; s.nozzle += hrs;
     if (!o.half && o.progress >= .5){ o.half = true; clientNotif(o, 'n_half'); }
+    if (o.server && o.progress >= .98){ o.progress = .98; continue; }
     if (o.progress >= .9999){
       o.progress = 1; o.status = 'post'; if (s.spool) s.spool.g = Math.max(0, s.spool.g - o.grams); s.status = 'ready'; s.order = null;
       clientNotif(o, 'n_printed'); toast(t('t_print_done',{id:o.id}));
@@ -1717,6 +1771,8 @@ function frame(now){
 
 window.addEventListener('hashchange', show);
 applyLang(); show(); badges();
+detectServer();
+setInterval(() => { if (route() === 'track'){ const o = O(trackId); if (o) syncOrder(o); } else if (route() === 'orders') S.orders.filter(o => o.server && !['done','rejected'].includes(o.status)).slice(0,5).forEach(syncOrder); }, 4000);
 setInterval(tick, 1000);
 requestAnimationFrame(frame);
 })();
