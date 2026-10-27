@@ -770,6 +770,7 @@ reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная пе�
 tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
 tg_p:['Botu açın və Start basın — bütün statuslar ora gələcək. Bunu etməsəniz, bot sizə yaza bilməz.','Откройте бота и нажмите Start — все статусы будут приходить туда. Без этого бот не сможет вам написать.','Відкрийте бота й натисніть Start — усі статуси надходитимуть туди. Без цього бот не зможе вам написати.','Open the bot and press Start; every update will arrive there. Until then the bot can’t message you.'],
 tg_open:['@start3d_baku_bot-u aç','Открыть @start3d_baku_bot','Відкрити @start3d_baku_bot','Open @start3d_baku_bot'],
+tg_code:['Bot sifariş nömrəsi olmadan cavab versə, ona bu kodu göndərin:','Если бот ответил без номера заказа — отправьте ему этот код:','Якщо бот відповів без номера замовлення — надішліть йому цей код:','If the bot replied without your order number, send it this code:'],
 tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
 tg_wait:['bot qoşulmayıb','бот не подключён','бот не підключений','bot not connected'],
 n_tg_linked:['Bot {id} sifarişinə qoşuldu. Statuslar bura gələcək.','Бот подключён к заказу {id}. Статусы будут приходить сюда.','Бот підключено до замовлення {id}. Статуси надходитимуть сюди.','The bot is linked to order {id}. Updates will arrive here.'],
@@ -1002,9 +1003,10 @@ async function syncOrder(o){
   try {
     const r = await api(`/api/orders/${o.id}?code=${o.code}`);
     let ch = false;
+    if (r.photos !== undefined && r.photos !== o.srvPhotos){ o.srvPhotos = r.photos; ch = true; }
     for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
     if (r.status === 'printing' && !o.speed) o.speed = 1/120;
-    if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = true; }
+    if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = !!o.srvPhotos; }
     if (r.status === 'post') o.progress = 1;
     if (ch){ save(); full(); badges(); }
   } catch(e){}
@@ -1487,8 +1489,10 @@ function renderTrack(){
   $('t-reacts').querySelectorAll('[data-react]').forEach(b => b.onclick = () => { o.react = o.react || {}; o.react[b.dataset.react] = (o.react[b.dataset.react]||0) + 1; save(); live(); });
   // photos + acceptance
   const ph = $('t-photos');
-  if (o.photos && owner){
-    ph.innerHTML = `<div class="cardbox"><span class="label">${t('photos_h')}</span><div class="photos"><canvas data-photo="0"></canvas><canvas data-photo="1"></canvas><canvas data-photo="2"></canvas></div>
+  if ((o.server ? o.srvPhotos > 0 : o.photos) && owner){
+    const pics = o.server ? [...Array(Math.min(3, o.srvPhotos)).keys()].map(i => `<a href="/api/orders/${o.id}/photo/${i}?code=${o.code}" target="_blank" rel="noopener"><img src="/api/orders/${o.id}/photo/${i}?code=${o.code}" alt="${esc(o.name)} ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block"></a>`).join('')
+      : '<canvas data-photo="0"></canvas><canvas data-photo="1"></canvas><canvas data-photo="2"></canvas>';
+    ph.innerHTML = `<div class="cardbox"><span class="label">${t('photos_h')}</span><div class="photos">${pics}</div>
       ${o.accept === 'ok' ? `<span class="ok">${t('accepted')}</span>` : o.accept === 'issue' ? `<span class="note">${t('issue_sent')}: “${esc(o.issueText)}”</span>` : o.accept === 'reprint' ? `<span class="note">${t('reprint_q')}</span>` :
       o.status === 'ready' ? `<div class="row"><button type="button" class="btn-primary btn-sm" id="acc-ok">${t('accept')}</button><button type="button" class="btn-sm" id="acc-q">${t('question')}</button></div>
         <div class="field" id="acc-box" hidden><textarea id="acc-text" placeholder="${t('q_ph')}"></textarea><button type="button" class="btn-sm" id="acc-send">${t('send')}</button></div>` : ''}</div>`;
@@ -1516,9 +1520,11 @@ function renderTrack(){
   // notifications feed
   const tg = o.ch === 'tg';
   const tgCard = owner && tg && !o.tgLinked ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
-    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/${BOT()}?start=${o.id}${o.code ? '_' + o.code : ''}" target="_blank" rel="noopener">${t('tg_open')}</a>${o.server ? '' : `<button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button>`}</div></div>` : '';
+    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/${BOT()}?start=${o.id}${o.code ? '_' + o.code : ''}" target="_blank" rel="noopener">${t('tg_open')}</a>${o.server ? '' : `<button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button>`}</div>
+    ${o.server && o.code ? `<p class="note">${t('tg_code')}</p><div class="row"><span class="cardnum" style="font-size:16px">${o.id} ${o.code}</span><button type="button" class="btn-sm" id="tg-code">${t('copy')}</button></div>` : ''}</div>` : '';
   const shown = tg && !o.tgLinked ? [] : (o.notifs || []);
   $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @' + BOT() : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
+  if ($('tg-code')) $('tg-code').onclick = () => copyText(`${o.id} ${o.code}`);
   if ($('tg-demo')) $('tg-demo').onclick = () => { o.tgLinked = true; clientNotif(o, 'n_tg_linked'); save(); full(); };
   // actions
   const acts = $('t-actions'); acts.innerHTML = '';

@@ -48,6 +48,8 @@ const TX = {
   ready: ['📦 {id} hazırdır! Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Остаток при получении: {r} AZN.', '📦 {id} готове! Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Balance on collection: {r} AZN.'],
   done: ['🙏 {id} təhvil verildi. Təşəkkür edirik!', '🙏 {id} выдан. Спасибо!', '🙏 {id} видано. Дякуємо!', '🙏 {id} collected. Thank you!'],
   rejected: ['❌ {id} rədd edildi: {w}.', '❌ {id} отклонён: {w}.', '❌ {id} відхилено: {w}.', '❌ {id} rejected: {w}.'],
+  hello_hint: ['Sifarişi qoşmaq üçün sifariş səhifəsindəki düyməni basın və ya mənə sifariş kodunu göndərin, məsələn: S3D-1032 abc123', 'Чтобы подключить заказ, нажмите кнопку на странице заказа или пришлите мне код заказа, например: S3D-1032 abc123', 'Щоб підключити замовлення, натисніть кнопку на сторінці замовлення або надішліть мені код, наприклад: S3D-1032 abc123', 'To link an order, press the button on the order page or send me the order code, e.g. S3D-1032 abc123'],
+  ready_photo: ['📦 {id} hazırdır! Budur hazır detal. Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Вот ваша деталь. Остаток при получении: {r} AZN.', '📦 {id} готове! Ось ваша деталь. Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Here is your part. Balance on collection: {r} AZN.'],
   none: ['Hələ sifarişiniz yoxdur.', 'Заказов пока нет.', 'Замовлень поки немає.', 'No orders yet.'],
   open: ['Sifarişi aç', 'Открыть заказ', 'Відкрити замовлення', 'Open order'],
   st_review: ['yoxlamada', 'на проверке', 'на перевірці', 'in review'],
@@ -128,7 +130,8 @@ function opButtons(o) {
     case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('❌ Отклонить', 'r')]];
     case 'pay': case 'paycheck': return [[b('💰 Оплата получена', 'p')]];
     case 'queue': return [[b('🖨 Печать началась', 's')]];
-    case 'printing': case 'post': return [[b('📦 Готово', 'd')]];
+    case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
+    case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')]];
     case 'ready': return [[b('🙏 Выдан', 'g')]];
     default: return [];
   }
@@ -180,7 +183,7 @@ function publicOrder(env, o) {
     id: o.id, status: o.status, price: o.price, lo: o.lo, hi: o.hi, reason: o.reason,
     deposit: o.price ? deposit(env, o.price) : null, tgLinked: !!o.tg_chat_id, ch: o.ch, updated: o.updated_at,
     name: d.name, mat: d.mat, color: d.color ?? 0, qty: d.qty, layers: d.layers, hours: d.hours, grams: d.grams,
-    pub: !!d.pub, client: o.client, created: o.created_at,
+    pub: !!d.pub, client: o.client, created: o.created_at, photos: (d.photos || []).length,
   };
 }
 async function readOrder(env, id, code) {
@@ -188,6 +191,17 @@ async function readOrder(env, id, code) {
   if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
   return json(publicOrder(env, o));
 }
+async function orderPhoto(env, id, code, n) {
+  const o = await getOrder(env, id);
+  if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
+  const fileId = (JSON.parse(o.data || '{}').photos || [])[n];
+  if (!fileId) return json({ error: 'not_found' }, 404);
+  const f = await tg(env, 'getFile', { file_id: fileId });
+  if (!f.ok) return json({ error: 'not_found' }, 404);
+  const img = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${f.result.file_path}`);
+  return new Response(img.body, { headers: { 'content-type': img.headers.get('content-type') || 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
+}
+
 async function clientPaid(env, id, code) {
   const o = await getOrder(env, id);
   if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
@@ -218,19 +232,34 @@ async function onUpdate(env, u, origin) {
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
   if (/^\/id(@\w+)?$/.test(text)) return say(`Telegram ID: ${from.id}\nChat ID: ${chat.id}`);
-  if (chat.type !== 'private') return;
+  if (chat.type !== 'private') {
+    const opChat = await kvGet(env, 'operator_chat');
+    if (String(chat.id) !== String(opChat) || !m.photo) return;
+    let id = m.reply_to_message ? await kvGet(env, 'photo_wait:' + m.reply_to_message.message_id) : null;
+    if (!id) { const c = (m.caption || '').match(/S3D-\d+/i); id = c ? c[0].toUpperCase() : null; }
+    if (!id) return;
+    return operatorPhoto(env, origin, id, m.photo[m.photo.length - 1].file_id, say);
+  }
 
-  const start = text.match(/^\/start(?:\s+(S3D-\d+)_([a-z0-9]+))?$/i);
-  if (start) {
-    if (!start[1]) return say(tx('hello', lang, { id: from.id }));
-    const o = await getOrder(env, start[1].toUpperCase());
-    if (!o || o.code !== start[2]) return say(tx('bad_link', lang));
+  if (text.startsWith('/start')) console.log('start', JSON.stringify(text));
+  // An order code in any form: "/start S3D-1032_abc123", "S3D-1032 abc123", "S3D-1032-abc123".
+  const code = text.match(/(S3D-\d+)[\s_-]+([a-z0-9]{6})\b/i);
+  if (code) {
+    const o = await getOrder(env, code[1].toUpperCase());
+    if (!o || o.code !== code[2].toLowerCase()) return say(tx('bad_link', lang));
     const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
     await refreshOperatorMsg(env, n);
-    return say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }),
+    await say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }),
       { reply_markup: { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } });
+    if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
+    if (n.status === 'printing') await notifyClient(env, origin, n, 'printing');
+    return;
   }
-  if (/^\/orders/.test(text)) {
+  if (/^\/start/.test(text)) {
+    const has = await env.DB.prepare('SELECT COUNT(*) AS c FROM orders WHERE tg_chat_id=?').bind(chat.id).first();
+    if (!has.c) return say(tx('hello', lang, { id: from.id }) + '\n\n' + tx('hello_hint', lang));
+  }
+  if (/^\/(orders|start)/.test(text)) {
     const rs = await env.DB.prepare('SELECT * FROM orders WHERE tg_chat_id=? ORDER BY created_at DESC LIMIT 10').bind(chat.id).all();
     if (!rs.results.length) return say(tx('none', lang));
     return say(rs.results.map((o) => `${o.id} · ${JSON.parse(o.data || '{}').name || ''} — ${tx('st_' + o.status, o.lang)}${o.price ? ` · ${o.price} AZN` : ''}`).join('\n'));
@@ -248,6 +277,25 @@ async function onUpdate(env, u, origin) {
     return say(tx('receipt_ok', n.lang));
   }
   return say(tx('hello', lang, { id: from.id }));
+}
+
+async function operatorPhoto(env, origin, id, fileId, say) {
+  const o = await getOrder(env, id);
+  if (!o) return say('Заказ не найден');
+  const d = JSON.parse(o.data || '{}');
+  d.photos = (d.photos || []).concat(fileId).slice(-5);
+  const first = o.status !== 'ready' && o.status !== 'done';
+  const n = await setStatus(env, id, first ? { data: JSON.stringify(d), status: 'ready' } : { data: JSON.stringify(d) });
+  if (n.tg_chat_id) {
+    const rest = n.price ? n.price - deposit(env, n.price) : 0;
+    await tg(env, 'sendPhoto', {
+      chat_id: n.tg_chat_id, photo: fileId,
+      caption: first ? tx('ready_photo', n.lang, { id: n.id, r: rest }) : n.id,
+      reply_markup: first ? { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } : undefined,
+    });
+  }
+  await refreshOperatorMsg(env, n);
+  return say(`✅ Фото ${d.photos.length} добавлено к ${n.id}` + (n.tg_chat_id ? ' и отправлено клиенту' : ' (клиент ещё не подключил бота, фото будет видно на сайте)'));
 }
 
 async function onCallback(env, q, origin) {
@@ -271,7 +319,15 @@ async function onCallback(env, q, origin) {
   else if (act === 'r' && o.status === 'review') { n = await setStatus(env, id, { status: 'rejected', reason: TX.rj_geo[1] }); await notifyClient(env, origin, n, 'rejected', { w: tx('rj_geo', n.lang) }); note = 'Отклонён'; }
   else if (act === 'p' && ['pay', 'paycheck'].includes(o.status)) { n = await setStatus(env, id, { status: 'queue' }); await notifyClient(env, origin, n, 'paid'); note = 'Оплата отмечена'; }
   else if (act === 's' && o.status === 'queue') { n = await setStatus(env, id, { status: 'printing' }); await notifyClient(env, origin, n, 'printing'); note = 'Печать началась'; }
-  else if (act === 'd' && ['printing', 'post'].includes(o.status)) { n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
+  else if (act === 'd' && ['printing', 'post'].includes(o.status)) {
+    n = await setStatus(env, id, { status: 'post' });
+    const r = await tg(env, 'sendMessage', { chat_id: q.message.chat.id,
+      text: `📸 ${id}: пришлите 1–3 фото готовой детали ОТВЕТОМ на это сообщение (свайп влево по сообщению → фото). Первое фото сразу уйдёт клиенту.`,
+      reply_markup: { inline_keyboard: [[{ text: 'Готово без фото', callback_data: `dn:${id}` }]] } });
+    if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, id);
+    note = 'Жду фото';
+  }
+  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
   else if (act === 'g' && o.status === 'ready') { n = await setStatus(env, id, { status: 'done' }); await notifyClient(env, origin, n, 'done'); note = 'Выдан'; }
   else return answer('Статус уже изменился');
   await refreshOperatorMsg(env, n);
@@ -322,6 +378,8 @@ export default {
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
+      m = p.match(/^\/api\/orders\/(S3D-\d+)\/photo\/(\d)$/);
+      if (m) return orderPhoto(env, m[1], url.searchParams.get('code'), +m[2]);
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/paid$/);
       if (m && req.method === 'POST') return clientPaid(env, m[1], url.searchParams.get('code'));
       if (p === '/tg/setup') {
