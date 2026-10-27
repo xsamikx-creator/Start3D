@@ -97,7 +97,7 @@ async function notifyClient(env, origin, o, key, extra = {}) {
   const rest = o.price ? o.price - deposit(env, o.price) : 0;
   const text = tx(key, o.lang, {
     id: o.id, p: o.price ?? '', d: o.price ? deposit(env, o.price) : '', r: rest,
-    card: env.CARD_TEXT || '—', link: orderUrl(origin, o), ...extra,
+    card: env.CARD_TEXT || '(реквизиты уточнит оператор)', link: orderUrl(origin, o), ...extra,
   });
   await tg(env, 'sendMessage', {
     chat_id: o.tg_chat_id, text,
@@ -184,6 +184,7 @@ function publicOrder(env, o) {
     deposit: o.price ? deposit(env, o.price) : null, tgLinked: !!o.tg_chat_id, ch: o.ch, updated: o.updated_at,
     name: d.name, mat: d.mat, color: d.color ?? 0, qty: d.qty, layers: d.layers, hours: d.hours, grams: d.grams,
     pub: !!d.pub, client: o.client, created: o.created_at, photos: (d.photos || []).length,
+    card: ['pay', 'paycheck'].includes(o.status) ? (env.CARD_TEXT || null) : null,
   };
 }
 async function readOrder(env, id, code) {

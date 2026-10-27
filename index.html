@@ -730,6 +730,8 @@ card_t:['Köçürmə üçün kart','Карта для перевода','Кар�
 card_holder:['Alıcı','Получатель','Отримувач','Recipient'],
 card_amount:['Məbləğ','Сумма','Сума','Amount'],
 card_note:['Nümunə rekvizitlər, real kart qoşulmayıb. Təyinatda sifariş nömrəsini yazın.','Реквизиты-пример, настоящая карта не подключена. В назначении укажите номер заказа.','Реквізити-приклад, справжню картку не підключено. У призначенні вкажіть номер замовлення.','Sample details, no real card is connected. Put the order number in the transfer note.'],
+card_wait:['Rekvizitlər yüklənir…','Реквизиты загружаются…','Реквізити завантажуються…','Loading payment details…'],
+card_note_live:['Təyinatda sifariş nömrəsini yazın. Ödənişdən sonra «Ödədim» basın və ya çekin şəklini bota göndərin.','В назначении укажите номер заказа. После перевода нажмите «Я оплатил» или пришлите фото чека боту.','У призначенні вкажіть номер замовлення. Після переказу натисніть «Я оплатив» або надішліть фото чека боту.','Put the order number in the transfer note. After paying, press “I’ve paid” or send a photo of the receipt to the bot.'],
 receipt:['Çeki əlavə edin (istəyə görə)','Приложите чек (необязательно)','Додайте чек (необов’язково)','Attach the receipt (optional)'],
 paid_btn:['Ödədim','Я оплатил','Я оплатив','I’ve paid'],
 copy:['Kopyala','Копировать','Копіювати','Copy'],
@@ -1004,6 +1006,7 @@ async function syncOrder(o){
     const r = await api(`/api/orders/${o.id}?code=${o.code}`);
     let ch = false;
     if (r.photos !== undefined && r.photos !== o.srvPhotos){ o.srvPhotos = r.photos; ch = true; }
+    if ((r.card || null) !== (o.card || null)){ o.card = r.card || null; ch = true; }
     for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
     if (r.status === 'printing' && !o.speed) o.speed = 1/120;
     if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = !!o.srvPhotos; }
@@ -1507,12 +1510,12 @@ function renderTrack(){
   const pay = $('t-pay');
   if (owner && (o.status === 'pay' || o.status === 'paycheck')){
     pay.innerHTML = `<div class="cardbox"><p class="label">${t('card_t')}</p>
-      <div class="cardnum">4169 •••• •••• 0000 <button type="button" class="btn-sm" id="copy-card">${t('copy')}</button></div>
-      <dl class="specs"><dt>${t('card_holder')}</dt><dd>START3D (${t('sample_word')})</dd><dt>${t('card_amount')}</dt><dd>${azn(Math.round((o.price||0)*dep))}</dd><dt>${t('col_order')}</dt><dd>${o.id}</dd></dl>
-      <p class="note">${t('card_note')}</p>
+      <div class="cardnum" style="white-space:pre-line">${o.server ? esc(o.card || t('card_wait')) : '4169 •••• •••• 0000'} ${o.server && !o.card ? '' : `<button type="button" class="btn-sm" id="copy-card">${t('copy')}</button>`}</div>
+      <dl class="specs">${o.server ? '' : `<dt>${t('card_holder')}</dt><dd>START3D (${t('sample_word')})</dd>`}<dt>${t('card_amount')}</dt><dd>${azn(Math.round((o.price||0)*dep))}</dd><dt>${t('col_order')}</dt><dd>${o.id}</dd></dl>
+      <p class="note">${o.server ? t('card_note_live') : t('card_note')}</p>
       ${o.status === 'pay' ? `<div class="field"><label for="receipt">${t('receipt')}</label><input type="file" id="receipt" accept="image/*,.pdf"></div><button type="button" class="btn-primary" id="paid">${t('paid_btn')}</button>` : `<span class="pill warn">${t('st_paycheck')}${o.receipt ? ' · '+esc(o.receipt) : ''}</span>`}
     </div>`;
-    $('copy-card').onclick = () => copyText('4169 0000 0000 0000');
+    if ($('copy-card')) $('copy-card').onclick = () => copyText(o.server ? ((o.card || '').match(/\d[\d ]{12,}\d/) || [o.card])[0] : '4169 0000 0000 0000');
     if ($('paid')) $('paid').onclick = async () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null;
       if (o.server){ try { await api(`/api/orders/${o.id}/paid?code=${o.code}`, {}); } catch(e){ toast(t('server_err')); return; } }
       o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };

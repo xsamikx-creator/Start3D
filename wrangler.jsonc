@@ -13,11 +13,12 @@
     { "binding": "DB", "database_name": "start3d" }
   ],
   "observability": { "enabled": true },
+  // Keep variables added in the dashboard (CARD_TEXT with payment details lives only there).
+  "keep_vars": true,
   "vars": {
     "BOT_USERNAME": "start3d_baku_bot",
     "ADMIN_TG_ID": "",
-    "CARD_TEXT": "4169 •••• •••• 0000 (пример, замените)",
     "DEPOSIT_PCT": "50"
   }
-  // Secrets are set in the dashboard, never here: BOT_TOKEN, WEBHOOK_SECRET.
+  // Set in the dashboard, never here: BOT_TOKEN, WEBHOOK_SECRET (secrets), CARD_TEXT (payment details).
 }
