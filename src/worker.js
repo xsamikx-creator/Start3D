@@ -81,6 +81,7 @@ const TX = {
   st_rejected: ['rədd edildi', 'отклонён', 'відхилено', 'rejected'],
   free_ok: ['🎁 Pulsuz çap üçün müraciətiniz №{n} qəbul edildi. Qalibi bu gün saat 20:00-da seçirik — nəticə bura gələcək.', '🎁 Заявка №{n} на бесплатную печать принята. Победителя выбираем сегодня в 20:00 — результат придёт сюда.', '🎁 Заявку №{n} на безкоштовний друк прийнято. Переможця обираємо сьогодні о 20:00 — результат надійде сюди.', '🎁 Free print application #{n} received. We draw the winner today at 20:00 Baku time — the result will arrive here.'],
   free_won: ['🎉 Təbrik edirik! Bu günün pulsuz çapını siz qazandınız. Sifariş {id} növbəyə əlavə olundu — çapa canlı baxa bilərsiniz.', '🎉 Поздравляем! Бесплатная печать дня — ваша. Заказ {id} уже в очереди, печать можно будет смотреть вживую.', '🎉 Вітаємо! Безкоштовний друк дня — ваш. Замовлення {id} уже в черзі, друк можна буде дивитися наживо.', '🎉 Congratulations! Today\'s free print is yours. Order {id} is queued — you can watch it print live.'],
+  free_approved: ['✅ Müraciətiniz №{n} təsdiqləndi və {d} saat 20:00 seçiminə daxil edildi. Qalibi seçən kimi cavab bura gələcək. Uğurlar! 🍀', '✅ Ваша заявка №{n} одобрена и участвует в розыгрыше {d} в 20:00. Как только выберем победителя — вы получите ответ сюда. Желаем удачи! 🍀', '✅ Вашу заявку №{n} схвалено, вона бере участь у розіграші {d} о 20:00. Щойно оберемо переможця — ви отримаєте відповідь сюди. Бажаємо удачі! 🍀', '✅ Your application #{n} is approved and is in the {d} draw at 20:00. As soon as we pick the winner, you\'ll get an answer here. Good luck! 🍀'],
   free_lost: ['Bu gün qalib başqası oldu. Sabah yenidən müraciət edin — hər gün yeni qalib! Məsləhət: kiçik, maraqlı model şansı artırır.', 'Сегодня повезло другому. Подайте заявку завтра — каждый день новый победитель! Совет: небольшая интересная модель повышает шансы.', 'Сьогодні пощастило іншому. Подайте заявку завтра — щодня новий переможець! Порада: невелика цікава модель підвищує шанси.', 'Someone else won today. Apply again tomorrow — a new winner every day! Tip: a small, interesting model improves your chances.'],
   free_no: ['Bu günün müraciəti qaydalara uyğun gəlmədi (ölçü, çəki və ya məzmun). Sabah başqa modellə cəhd edin.', 'Сегодняшняя заявка не подошла под правила (размер, вес или содержание). Попробуйте завтра с другой моделью.', 'Сьогоднішня заявка не підійшла під правила (розмір, вага чи зміст). Спробуйте завтра з іншою моделлю.', 'Today\'s application didn\'t fit the rules (size, weight or content). Try again tomorrow with another model.'],
   rj_geo: ['model çapa yararsızdır', 'модель непригодна для печати', 'модель непридатна для друку', 'model is not printable'],
@@ -140,7 +141,7 @@ function opText(o) {
     d.check ? `Проверка: ${esc(d.check)}` : '',
     d.link ? `🔗 <a href="${esc(d.link).replace(/"/g, '&quot;')}">Модель по ссылке</a> — скачайте, проверьте лицензию (модели с запретом коммерческого использования за деньги печатать нельзя)` : '',
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
-    d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 50 г / 4 ч, PLA' : '',
+    d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 105 г / 4 ч, PLA' : '',
     d.disc ? `Скидка на сайте: −${d.discPct || 0}% (${esc(d.disc)})` : '',
     d.nth ? (d.nth % 5 === 0 ? `🎉 <b>${d.nth}-й заказ клиента</b> — положена скидка −30%` : `Заказ клиента №${d.nth} по этому номеру`) : '',
     d.kids ? '🧸 Детская игрушка (−15%)' : '',
@@ -422,7 +423,9 @@ async function onUpdate(env, u, origin) {
     await env.DB.prepare('INSERT INTO phones(phone, chat_id, name, updated_at) VALUES(?,?,?,?) ON CONFLICT(phone) DO UPDATE SET chat_id=excluded.chat_id, name=excluded.name, updated_at=excluded.updated_at')
       .bind(phone, chat.id, clip(m.contact.first_name, 40), now()).run();
     await say(tx('phone_ok', lang, { n: phone.length === 9 ? `+994 ${phone.slice(0, 2)} ${phone.slice(2, 5)} ${phone.slice(5, 7)} ${phone.slice(7)}` : phone }), { reply_markup: { remove_keyboard: true } });
+    const fa = await env.DB.prepare("SELECT * FROM free_apps WHERE phone=? AND tg_chat_id IS NULL AND status IN ('new','ok')").bind(phone).all();
     await env.DB.prepare("UPDATE free_apps SET tg_chat_id=? WHERE phone=? AND tg_chat_id IS NULL").bind(chat.id, phone).run();
+    for (const a of fa.results) await say(a.status === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_ok', a.lang, { n: a.id }));
     const rs = await env.DB.prepare("SELECT * FROM orders WHERE tg_chat_id IS NULL AND ch='tg' AND status NOT IN ('done','rejected') AND created_at > ?").bind(now() - 60 * 864e5).all();
     for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
       const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
@@ -527,7 +530,7 @@ async function onCallback(env, q, origin) {
     await env.DB.prepare('UPDATE free_apps SET status=? WHERE id=?').bind(st, a.id).run();
     const n = { ...a, status: st };
     if (q.message) await tg(env, 'editMessageText', { chat_id: q.message.chat.id, message_id: q.message.message_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(n) }, link_preview_options: n.link ? { url: n.link, prefer_small_media: true } : { is_disabled: true } });
-    if (st === 'no' && a.status !== 'no' && a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: tx('free_no', a.lang) });
+    if (st !== a.status && a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: st === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_no', a.lang) });
     return answer(st === 'ok' ? 'Допущена к розыгрышу' : 'Не подходит');
   }
   if (act === 'ka' || act === 'kq') {
@@ -631,7 +634,7 @@ function freeText(a) {
   return [`🎁 <b>Бесплатная печать дня · заявка №${a.id}</b>`, `Розыгрыш: ${a.day} в 20:00 · ${FREE_STATUS[a.status] || a.status}`,
     `${esc(a.name)} · ${esc(a.contact || '')} · ${a.tg_chat_id ? 'Telegram ✓' : 'бот не подключён'}`,
     a.link ? `🔗 <a href="${esc(a.link).replace(/"/g, '&quot;')}">Модель</a>` : '', a.idea ? `«${esc(a.idea)}»` : '',
-    a.status === 'new' ? 'Проверьте: до 50 г, до 4 ч печати, до 150 мм, PLA, 1 шт., без оружия и 18+.' : '',
+    a.status === 'new' ? 'Проверьте: до 105 г, до 4 ч печати, до 150 мм, PLA, 1 шт., без оружия и 18+.' : '',
     a.order_id ? `Заказ: ${a.order_id}` : ''].filter(Boolean).join('\n');
 }
 const freeButtons = (a) => ['new', 'ok', 'no'].includes(a.status) ? [[{ text: a.status === 'ok' ? '✅ Подходит ✓' : '✅ Подходит', callback_data: `fo:${a.id}` }, { text: a.status === 'no' ? '❌ Не подходит ✓' : '❌ Не подходит', callback_data: `fx:${a.id}` }]] : [];
