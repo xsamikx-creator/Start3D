@@ -634,7 +634,7 @@ f_cname:['Adınız (printer ekranı üçün)','Ваше имя (для дисп�
 cname_note:['Çap zamanı bu ad printerin yanındakı kiçik ekranda görünəcək. 16 simvola qədər.','Во время печати это имя будет на мини-дисплее у принтера. До 16 символов.','Під час друку це ім’я буде на мінідисплеї біля принтера. До 16 символів.','During printing this name is shown on the mini display next to the printer. Up to 16 characters.'],
 f_phone:['Əlaqə telefonu','Телефон для связи','Телефон для зв’язку','Contact phone'],
 f_email:['E-poçt','Email','Email','Email'],
-tg_note:['Sifarişdən sonra @start3d_baku_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @start3d_baku_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @start3d_baku_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @start3d_baku_bot and press Start; updates will arrive there.'],
+tg_note:['Sifarişdən sonra @start3d_baku_bot-a Start basın və nömrənizi paylaşın — bundan sonra bu nömrəyə olan bütün sifarişlər avtomatik gələcək.','После оформления нажмите Start в @start3d_baku_bot и поделитесь номером — дальше все заказы на этот номер будут приходить автоматически.','Після оформлення натисніть Start у @start3d_baku_bot і поділіться номером — далі всі замовлення на цей номер надходитимуть автоматично.','After ordering, press Start in @start3d_baku_bot and share your number; from then on every order with that number arrives automatically.'],
 f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
 f_deliv:['Təhvil','Получение','Отримання','Delivery'],
 d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
@@ -767,10 +767,11 @@ q_ph:['Nə xoşunuza gəlmədi? Operator sizinlə əlaqə saxlayacaq.','Что �
 
 send:['Göndər','Отправить','Надіслати','Send'],
 accepted:['Siz detalı qəbul etdiniz','Вы приняли деталь','Ви прийняли деталь','You accepted the part'],
+op_answer:['Operatorun cavabı','Ответ оператора','Відповідь оператора','Operator’s answer'],
 issue_sent:['Sualınız operatora göndərildi','Ваш вопрос отправлен оператору','Ваше запитання надіслано оператору','Your question was sent to the operator'],
 reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная перепечатка поставлена в очередь','Безкоштовний передрук поставлено в чергу','A free reprint has been queued'],
 tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
-tg_p:['Botu açın və Start basın — bütün statuslar ora gələcək. Bunu etməsəniz, bot sizə yaza bilməz.','Откройте бота и нажмите Start — все статусы будут приходить туда. Без этого бот не сможет вам написать.','Відкрийте бота й натисніть Start — усі статуси надходитимуть туди. Без цього бот не зможе вам написати.','Open the bot and press Start; every update will arrive there. Until then the bot can’t message you.'],
+tg_p:['Botu açın, Start basın və «Nömrəni paylaş» düyməsinə toxunun. Bir dəfə kifayətdir: bu nömrəyə olan bütün sifarişlər özü gələcək.','Откройте бота, нажмите Start и «Поделиться номером». Это нужно один раз: все заказы на ваш номер дальше будут приходить сами.','Відкрийте бота, натисніть Start і «Поділитися номером». Це потрібно один раз: усі замовлення на ваш номер далі надходитимуть самі.','Open the bot, press Start and “Share my number”. You only do this once: every order with your number then arrives by itself.'],
 tg_open:['@start3d_baku_bot-u aç','Открыть @start3d_baku_bot','Відкрити @start3d_baku_bot','Open @start3d_baku_bot'],
 tg_code:['Bot sifariş nömrəsi olmadan cavab versə, ona bu kodu göndərin:','Если бот ответил без номера заказа — отправьте ему этот код:','Якщо бот відповів без номера замовлення — надішліть йому цей код:','If the bot replied without your order number, send it this code:'],
 tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
@@ -996,7 +997,7 @@ async function pushOrder(o, extra){
   if (!SERVER) return true;
   try {
     const r = await api('/api/orders', serverBody(o, extra));
-    o.id = r.id; o.code = r.code; o.status = r.status; o.server = true; o.notifs = [];
+    o.id = r.id; o.code = r.code; o.status = r.status; o.server = true; o.notifs = []; o.tgLinked = !!r.tgLinked;
     return true;
   } catch(e){ toast(t(e.code && T[e.code] ? e.code : 'server_err')); return false; }
 }
@@ -1006,6 +1007,7 @@ async function syncOrder(o){
     const r = await api(`/api/orders/${o.id}?code=${o.code}`);
     let ch = false;
     if (r.photos !== undefined && r.photos !== o.srvPhotos){ o.srvPhotos = r.photos; ch = true; }
+    for (const k of ['accept','issueText','answer']) if ((r[k] || null) !== (o[k] || null)){ o[k] = r[k] || null; ch = true; }
     if ((r.card || null) !== (o.card || null)){ o.card = r.card || null; ch = true; }
     for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
     if (r.status === 'printing' && !o.speed) o.speed = 1/120;
@@ -1496,14 +1498,16 @@ function renderTrack(){
     const pics = o.server ? [...Array(Math.min(3, o.srvPhotos)).keys()].map(i => `<a href="/api/orders/${o.id}/photo/${i}?code=${o.code}" target="_blank" rel="noopener"><img src="/api/orders/${o.id}/photo/${i}?code=${o.code}" alt="${esc(o.name)} ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block"></a>`).join('')
       : '<canvas data-photo="0"></canvas><canvas data-photo="1"></canvas><canvas data-photo="2"></canvas>';
     ph.innerHTML = `<div class="cardbox"><span class="label">${t('photos_h')}</span><div class="photos">${pics}</div>
-      ${o.accept === 'ok' ? `<span class="ok">${t('accepted')}</span>` : o.accept === 'issue' ? `<span class="note">${t('issue_sent')}: “${esc(o.issueText)}”</span>` : o.accept === 'reprint' ? `<span class="note">${t('reprint_q')}</span>` :
-      o.status === 'ready' ? `<div class="row"><button type="button" class="btn-primary btn-sm" id="acc-ok">${t('accept')}</button><button type="button" class="btn-sm" id="acc-q">${t('question')}</button></div>
+      ${o.accept === 'ok' ? `<span class="ok">${t('accepted')}</span>` : o.accept === 'issue' ? `<span class="note">${t('issue_sent')}: “${esc(o.issueText)}”</span>` : o.accept === 'reprint' ? `<span class="note">${t('reprint_q')}</span>` : ''}
+      ${o.answer ? `<p class="msg" style="margin:0"><b>${t('op_answer')}:</b> ${esc(o.answer)}</p>` : ''}
+      ${o.accept ? '' : o.status === 'ready' ? `<div class="row"><button type="button" class="btn-primary btn-sm" id="acc-ok">${t('accept')}</button><button type="button" class="btn-sm" id="acc-q">${t('question')}</button></div>
         <div class="field" id="acc-box" hidden><textarea id="acc-text" placeholder="${t('q_ph')}"></textarea><button type="button" class="btn-sm" id="acc-send">${t('send')}</button></div>` : ''}</div>`;
     requestAnimationFrame(() => ph.querySelectorAll('[data-photo]').forEach(cv => drawPhoto(cv, o, +cv.dataset.photo)));
     if ($('acc-ok')){
-      $('acc-ok').onclick = () => { o.accept = 'ok'; save(); full(); };
+      const send = async (body) => { if (!o.server) return true; try { await api(`/api/orders/${o.id}/feedback?code=${o.code}`, body); return true; } catch(e){ toast(t('server_err')); return false; } };
+      $('acc-ok').onclick = async () => { if (!(await send({accept:true}))) return; o.accept = 'ok'; save(); full(); };
       $('acc-q').onclick = () => { $('acc-box').hidden = false; $('acc-text').focus(); };
-      $('acc-send').onclick = () => { const v = $('acc-text').value.trim(); if (!v) return; o.accept = 'issue'; o.issueText = v; save(); toast(t('issue_sent')); full(); badges(); };
+      $('acc-send').onclick = async () => { const v = $('acc-text').value.trim(); if (!v) return; if (!(await send({question:v}))) return; o.accept = 'issue'; o.issueText = v; save(); toast(t('issue_sent')); full(); badges(); };
     }
   } else ph.innerHTML = '';
   // payment
