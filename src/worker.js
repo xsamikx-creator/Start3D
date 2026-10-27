@@ -19,6 +19,7 @@ const SCHEMA = [
      data TEXT, created_at INTEGER, updated_at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS orders_chat ON orders(tg_chat_id)`,
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`,
+  `CREATE TABLE IF NOT EXISTS phones (phone TEXT PRIMARY KEY, chat_id INTEGER NOT NULL, name TEXT, updated_at INTEGER)`,
 ];
 let ready = false;
 async function init(env) {
@@ -50,6 +51,18 @@ const TX = {
   rejected: ['❌ {id} rədd edildi: {w}.', '❌ {id} отклонён: {w}.', '❌ {id} відхилено: {w}.', '❌ {id} rejected: {w}.'],
   hello_hint: ['Sifarişi qoşmaq üçün sifariş səhifəsindəki düyməni basın və ya mənə sifariş kodunu göndərin, məsələn: S3D-1032 abc123', 'Чтобы подключить заказ, нажмите кнопку на странице заказа или пришлите мне код заказа, например: S3D-1032 abc123', 'Щоб підключити замовлення, натисніть кнопку на сторінці замовлення або надішліть мені код, наприклад: S3D-1032 abc123', 'To link an order, press the button on the order page or send me the order code, e.g. S3D-1032 abc123'],
   ready_photo: ['📦 {id} hazırdır! Budur hazır detal. Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Вот ваша деталь. Остаток при получении: {r} AZN.', '📦 {id} готове! Ось ваша деталь. Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Here is your part. Balance on collection: {r} AZN.'],
+  received: ['📥 {id} sifarişi alındı: {name}. Operator 2 saat ərzində yoxlayacaq.', '📥 Заказ {id} принят: {name}. Оператор проверит его в течение 2 часов.', '📥 Замовлення {id} прийнято: {name}. Оператор перевірить його протягом 2 годин.', '📥 Order {id} received: {name}. An operator will check it within 2 hours.'],
+  ask_phone: ['Nömrənizi paylaşın — bu nömrə ilə bütün sifarişlər avtomatik bura gələcək, linksiz.', 'Поделитесь номером — тогда все заказы на этот номер будут приходить сюда автоматически, без ссылок.', 'Поділіться номером — тоді всі замовлення на цей номер надходитимуть сюди автоматично, без посилань.', 'Share your number and every order with this number will arrive here automatically, no links needed.'],
+  share_btn: ['📱 Nömrəni paylaş', '📱 Поделиться номером', '📱 Поділитися номером', '📱 Share my number'],
+  phone_ok: ['✅ Nömrə yadda saxlanıldı. {n} nömrəsinə olan sifarişlər bura gələcək.', '✅ Номер сохранён. Заказы на номер {n} будут приходить сюда.', '✅ Номер збережено. Замовлення на номер {n} надходитимуть сюди.', '✅ Number saved. Orders with {n} will arrive here.'],
+  phone_own: ['Yalnız öz nömrənizi düymə ilə göndərin.', 'Отправьте свой номер кнопкой ниже.', 'Надішліть свій номер кнопкою нижче.', 'Please send your own number with the button below.'],
+  accept_btn: ['✅ Qəbul edirəm', '✅ Принимаю', '✅ Приймаю', '✅ Accept'],
+  question_btn: ['❓ Sualım var', '❓ Есть вопрос', '❓ Є запитання', '❓ I have a question'],
+  ask_question: ['Nə xoşunuza gəlmədi? Bu mesaja cavab olaraq yazın.', 'Что не так? Напишите ответом на это сообщение.', 'Що не так? Напишіть відповіддю на це повідомлення.', 'What’s wrong? Reply to this message.'],
+  accepted: ['Təşəkkürlər! Qəbul qeyd olundu.', 'Спасибо! Приёмку отметили.', 'Дякуємо! Приймання відмічено.', 'Thanks! Marked as accepted.'],
+  question_sent: ['Sualınız operatora göndərildi, cavab bura gələcək.', 'Вопрос отправлен оператору, ответ придёт сюда.', 'Запитання надіслано оператору, відповідь надійде сюди.', 'Your question was sent; the answer will arrive here.'],
+  op_answer: ['💬 Operator ({id}): {t}', '💬 Оператор ({id}): {t}', '💬 Оператор ({id}): {t}', '💬 Operator ({id}): {t}'],
+  reprint: ['🔁 {id} pulsuz yenidən çap olunacaq, sifariş yenə növbədədir.', '🔁 {id} перепечатаем бесплатно, заказ снова в очереди.', '🔁 {id} передрукуємо безкоштовно, замовлення знову в черзі.', '🔁 We will reprint {id} for free; it is back in the queue.'],
   none: ['Hələ sifarişiniz yoxdur.', 'Заказов пока нет.', 'Замовлень поки немає.', 'No orders yet.'],
   open: ['Sifarişi aç', 'Открыть заказ', 'Відкрити замовлення', 'Open order'],
   st_review: ['yoxlamada', 'на проверке', 'на перевірці', 'in review'],
@@ -68,6 +81,8 @@ const tx = (k, lang, v = {}) => {
   for (const [a, b] of Object.entries(v)) s = s.split('{' + a + '}').join(b);
   return s;
 };
+// Azerbaijani numbers compared by their last 9 digits: +994 50 123 45 67 = 050 123 45 67 = 501234567.
+const normPhone = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('994')) d = d.slice(3); return d.replace(/^0+/, '').slice(-9); };
 const langOf = (code) => (LANGS.includes((code || '').slice(0, 2)) ? code.slice(0, 2) : 'ru');
 
 /* ---------- Telegram API ---------- */
@@ -119,6 +134,8 @@ function opText(o) {
     `Уведомления: ${o.ch === 'email' ? 'email ' + esc(o.email || '') : o.tg_chat_id ? 'Telegram ✓' : 'Telegram (бот ещё не подключён)'}`,
     `Цена: <b>${price}</b>`,
     o.reason ? `Причина отказа: ${esc(o.reason)}` : '',
+    d.accept === 'ok' ? '✅ Клиент принял деталь' : d.accept === 'issue' ? `❓ Вопрос клиента: «${esc(d.issueText)}»` : d.accept === 'reprint' ? `🔁 Перепечатка №${d.reprints || 1}` : '',
+    d.answer ? `💬 Ответ: ${esc(d.answer)}` : '',
   ].filter(Boolean).join('\n');
 }
 const STATUS_RU = { review: 'ждёт проверки', pay: 'ждёт оплаты', paycheck: 'проверить оплату', queue: 'в очереди', printing: 'печатается', post: 'постобработка', ready: 'готов к выдаче', done: 'выдан', rejected: 'отклонён' };
@@ -132,7 +149,7 @@ function opButtons(o) {
     case 'queue': return [[b('🖨 Печать началась', 's')]];
     case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
     case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')]];
-    case 'ready': return [[b('🙏 Выдан', 'g')]];
+    case 'ready': return [[b('🙏 Выдан', 'g'), b('🔁 Перепечатать', 'rp')]];
     default: return [];
   }
 }
@@ -172,9 +189,17 @@ async function createOrder(env, req, origin) {
     id, code, fixed ? 'pay' : 'review', client, contact, ch, email, langOf(b.lang), fixed,
     Number.isFinite(+b.lo) ? Math.round(+b.lo) : null, Number.isFinite(+b.hi) ? Math.round(+b.hi) : null,
     JSON.stringify(data), t, t).run();
+  if (ch === 'tg') {
+    const known = await env.DB.prepare('SELECT chat_id FROM phones WHERE phone=?').bind(normPhone(contact)).first();
+    if (known) await env.DB.prepare('UPDATE orders SET tg_chat_id=? WHERE id=?').bind(known.chat_id, id).run();
+  }
   const o = await getOrder(env, id);
   await postToOperators(env, o);
-  return json({ id, code, status: o.status, bot: env.BOT_USERNAME || null });
+  if (o.tg_chat_id) {
+    await notifyClient(env, origin, o, 'received', { name: data.name || o.id });
+    if (o.status === 'pay') await notifyClient(env, origin, o, 'confirmed');
+  }
+  return json({ id, code, status: o.status, tgLinked: !!o.tg_chat_id, bot: env.BOT_USERNAME || null });
 }
 
 function publicOrder(env, o) {
@@ -185,6 +210,7 @@ function publicOrder(env, o) {
     name: d.name, mat: d.mat, color: d.color ?? 0, qty: d.qty, layers: d.layers, hours: d.hours, grams: d.grams,
     pub: !!d.pub, client: o.client, created: o.created_at, photos: (d.photos || []).length,
     card: ['pay', 'paycheck'].includes(o.status) ? (env.CARD_TEXT || null) : null,
+    accept: d.accept || null, issueText: d.issueText || null, answer: d.answer || null,
   };
 }
 async function readOrder(env, id, code) {
@@ -201,6 +227,34 @@ async function orderPhoto(env, id, code, n) {
   if (!f.ok) return json({ error: 'not_found' }, 404);
   const img = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${f.result.file_path}`);
   return new Response(img.body, { headers: { 'content-type': img.headers.get('content-type') || 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
+}
+
+// Client accepts the finished part or asks a question (from the site or the bot).
+async function feedback(env, origin, o, question) {
+  const d = JSON.parse(o.data || '{}');
+  const opChat = await kvGet(env, 'operator_chat');
+  if (question) { d.accept = 'issue'; d.issueText = clip(question, 500); } else d.accept = 'ok';
+  const n = await setStatus(env, o.id, { data: JSON.stringify(d) });
+  if (opChat) {
+    if (question) {
+      const r = await tg(env, 'sendMessage', { chat_id: Number(opChat),
+        text: `❓ Вопрос по ${n.id} от ${n.client}:\n«${d.issueText}»\n\nОтветьте на это сообщение — ответ уйдёт клиенту.`,
+        reply_markup: { inline_keyboard: [[{ text: '🔁 Перепечатать бесплатно', callback_data: `rp:${n.id}` }]] } });
+      if (r.ok) await kvSet(env, 'reply_wait:' + r.result.message_id, n.id);
+    } else {
+      await tg(env, 'sendMessage', { chat_id: Number(opChat), text: `✅ ${n.client} принял ${n.id}` });
+    }
+  }
+  await refreshOperatorMsg(env, n);
+  return n;
+}
+async function clientFeedback(env, req, origin, id, code) {
+  const o = await getOrder(env, id);
+  if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
+  const b = await req.json().catch(() => ({}));
+  if (!['ready', 'done'].includes(o.status)) return json(publicOrder(env, o));
+  const q = clip(b.question, 500);
+  return json(publicOrder(env, await feedback(env, origin, o, q || null)));
 }
 
 async function clientPaid(env, id, code) {
@@ -235,13 +289,46 @@ async function onUpdate(env, u, origin) {
   if (/^\/id(@\w+)?$/.test(text)) return say(`Telegram ID: ${from.id}\nChat ID: ${chat.id}`);
   if (chat.type !== 'private') {
     const opChat = await kvGet(env, 'operator_chat');
-    if (String(chat.id) !== String(opChat) || !m.photo) return;
+    if (String(chat.id) !== String(opChat)) return;
+    if (!m.photo && text && m.reply_to_message) {
+      const rid = await kvGet(env, 'reply_wait:' + m.reply_to_message.message_id);
+      if (!rid) return;
+      const o = await getOrder(env, rid);
+      if (!o) return;
+      const d = JSON.parse(o.data || '{}'); d.answer = clip(text, 1000);
+      const n = await setStatus(env, rid, { data: JSON.stringify(d) });
+      if (n.tg_chat_id) await notifyClient(env, origin, n, 'op_answer', { t: d.answer });
+      return say(n.tg_chat_id ? `✅ Ответ отправлен клиенту ${n.client}` : `✅ Ответ сохранён — клиент увидит его на странице заказа (бот не подключён)`);
+    }
+    if (!m.photo) return;
     let id = m.reply_to_message ? await kvGet(env, 'photo_wait:' + m.reply_to_message.message_id) : null;
     if (!id) { const c = (m.caption || '').match(/S3D-\d+/i); id = c ? c[0].toUpperCase() : null; }
     if (!id) return;
     return operatorPhoto(env, origin, id, m.photo[m.photo.length - 1].file_id, say);
   }
 
+  if (m.contact) {
+    if (m.contact.user_id !== from.id) return say(tx('phone_own', lang), phoneKeyboard(lang));
+    const phone = normPhone(m.contact.phone_number);
+    await env.DB.prepare('INSERT INTO phones(phone, chat_id, name, updated_at) VALUES(?,?,?,?) ON CONFLICT(phone) DO UPDATE SET chat_id=excluded.chat_id, name=excluded.name, updated_at=excluded.updated_at')
+      .bind(phone, chat.id, clip(m.contact.first_name, 40), now()).run();
+    await say(tx('phone_ok', lang, { n: phone.length === 9 ? `+994 ${phone.slice(0, 2)} ${phone.slice(2, 5)} ${phone.slice(5, 7)} ${phone.slice(7)}` : phone }), { reply_markup: { remove_keyboard: true } });
+    const rs = await env.DB.prepare("SELECT * FROM orders WHERE tg_chat_id IS NULL AND ch='tg' AND status NOT IN ('done','rejected') AND created_at > ?").bind(now() - 60 * 864e5).all();
+    for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
+      const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
+      await refreshOperatorMsg(env, n);
+      await say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }), { reply_markup: { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } });
+      if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
+    }
+    return;
+  }
+  if (text && m.reply_to_message) {
+    const qid = await kvGet(env, 'cq_wait:' + m.reply_to_message.message_id);
+    if (qid) {
+      const o = await getOrder(env, qid);
+      if (o && String(o.tg_chat_id) === String(chat.id)) { await feedback(env, origin, o, text); return say(tx('question_sent', o.lang)); }
+    }
+  }
   if (text.startsWith('/start')) console.log('start', JSON.stringify(text));
   // An order code in any form: "/start S3D-1032_abc123", "S3D-1032 abc123", "S3D-1032-abc123".
   const code = text.match(/(S3D-\d+)[\s_-]+([a-z0-9]{6})\b/i);
@@ -254,11 +341,16 @@ async function onUpdate(env, u, origin) {
       { reply_markup: { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } });
     if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
     if (n.status === 'printing') await notifyClient(env, origin, n, 'printing');
+    if (!(await hasPhone(env, chat.id))) await say(tx('ask_phone', n.lang), phoneKeyboard(n.lang));
     return;
   }
   if (/^\/start/.test(text)) {
     const has = await env.DB.prepare('SELECT COUNT(*) AS c FROM orders WHERE tg_chat_id=?').bind(chat.id).first();
-    if (!has.c) return say(tx('hello', lang, { id: from.id }) + '\n\n' + tx('hello_hint', lang));
+    if (!has.c) {
+      await say(tx('hello', lang, { id: from.id }) + '\n\n' + tx('hello_hint', lang));
+      if (!(await hasPhone(env, chat.id))) await say(tx('ask_phone', lang), phoneKeyboard(lang));
+      return;
+    }
   }
   if (/^\/(orders|start)/.test(text)) {
     const rs = await env.DB.prepare('SELECT * FROM orders WHERE tg_chat_id=? ORDER BY created_at DESC LIMIT 10').bind(chat.id).all();
@@ -280,6 +372,9 @@ async function onUpdate(env, u, origin) {
   return say(tx('hello', lang, { id: from.id }));
 }
 
+const phoneKeyboard = (lang) => ({ reply_markup: { keyboard: [[{ text: tx('share_btn', lang), request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } });
+async function hasPhone(env, chatId) { return !!(await env.DB.prepare('SELECT 1 FROM phones WHERE chat_id=? LIMIT 1').bind(chatId).first()); }
+
 async function operatorPhoto(env, origin, id, fileId, say) {
   const o = await getOrder(env, id);
   if (!o) return say('Заказ не найден');
@@ -292,7 +387,9 @@ async function operatorPhoto(env, origin, id, fileId, say) {
     await tg(env, 'sendPhoto', {
       chat_id: n.tg_chat_id, photo: fileId,
       caption: first ? tx('ready_photo', n.lang, { id: n.id, r: rest }) : n.id,
-      reply_markup: first ? { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } : undefined,
+      reply_markup: first ? { inline_keyboard: [
+        [{ text: tx('accept_btn', n.lang), callback_data: `ka:${n.id}` }, { text: tx('question_btn', n.lang), callback_data: `kq:${n.id}` }],
+        [{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } : undefined,
     });
   }
   await refreshOperatorMsg(env, n);
@@ -304,6 +401,14 @@ async function onCallback(env, q, origin) {
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
+  if (act === 'ka' || act === 'kq') {
+    const o = await getOrder(env, id);
+    if (!o || String(o.tg_chat_id) !== String(q.message?.chat?.id)) return answer('—');
+    if (act === 'ka') { await feedback(env, origin, o, null); return answer(tx('accepted', o.lang)); }
+    const r = await tg(env, 'sendMessage', { chat_id: o.tg_chat_id, text: `${o.id}: ${tx('ask_question', o.lang)}`, reply_markup: { force_reply: true } });
+    if (r.ok) await kvSet(env, 'cq_wait:' + r.result.message_id, o.id);
+    return answer('');
+  }
   if (!allowed) return answer('Нет доступа');
   const o = await getOrder(env, id);
   if (!o) return answer('Заказ не найден');
@@ -329,6 +434,11 @@ async function onCallback(env, q, origin) {
     note = 'Жду фото';
   }
   else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
+  else if (act === 'rp' && ['ready', 'done'].includes(o.status)) {
+    const d = JSON.parse(o.data || '{}'); d.reprints = (d.reprints || 0) + 1; d.accept = 'reprint';
+    n = await setStatus(env, id, { status: 'queue', data: JSON.stringify(d) });
+    await notifyClient(env, origin, n, 'reprint'); note = 'Перепечатка в очереди';
+  }
   else if (act === 'g' && o.status === 'ready') { n = await setStatus(env, id, { status: 'done' }); await notifyClient(env, origin, n, 'done'); note = 'Выдан'; }
   else return answer('Статус уже изменился');
   await refreshOperatorMsg(env, n);
@@ -381,6 +491,8 @@ export default {
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/photo\/(\d)$/);
       if (m) return orderPhoto(env, m[1], url.searchParams.get('code'), +m[2]);
+      m = p.match(/^\/api\/orders\/(S3D-\d+)\/feedback$/);
+      if (m && req.method === 'POST') return clientFeedback(env, req, origin, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/paid$/);
       if (m && req.method === 'POST') return clientPaid(env, m[1], url.searchParams.get('code'));
       if (p === '/tg/setup') {
