@@ -1,3 +1,10 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#B9771A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%231C1F22%27/%3E%3Crect x=%279%27 y=%279%27 width=%2714%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3Crect x=%277%27 y=%2715%27 width=%2718%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3Crect x=%275%27 y=%2721%27 width=%2722%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3C/svg%3E">
 <title>Qat 3D-печать</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,6 +29,11 @@
   --good:#5CC48A; --warn:#E6B640; --bad:#EE7A63; --info:#7EA5F2; --wa:#4CD08A; color-scheme:dark}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+img{max-width:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
@@ -248,6 +260,8 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 @media (prefers-reduced-motion:reduce){.live::before{animation:none}.bar-line i{transition:none}}
 </style>
 
+</head>
+<body>
 <header>
   <div class="bar">
     <a class="logo" href="#home" aria-label="Qat"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><b>qat</b></a>
@@ -1706,3 +1720,6 @@ setInterval(tick, 1000);
 requestAnimationFrame(frame);
 })();
 </script>
+
+</body>
+</html>
