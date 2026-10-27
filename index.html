@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#B9771A">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%231C1F22%27/%3E%3Crect x=%279%27 y=%279%27 width=%2714%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3Crect x=%277%27 y=%2715%27 width=%2718%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3Crect x=%275%27 y=%2721%27 width=%2722%27 height=%274%27 rx=%272%27 fill=%27%23E3A84A%27/%3E%3C/svg%3E">
-<title>Qat 3D-печать</title>
+<title>Start3D</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -59,6 +59,7 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .mark i{display:block;height:4px;border-radius:2px;background:var(--accent)}
 .mark i:nth-child(1){width:60%;margin:0 auto}.mark i:nth-child(2){width:80%;margin:0 auto}.mark i:nth-child(3){width:100%}
 .logo b{font-family:var(--f-display);font-size:20px;font-weight:700}
+.logo b span{color:var(--accent)}
 nav{display:flex;gap:2px;flex-wrap:wrap;margin-left:auto}
 nav a{color:var(--muted);text-decoration:none;padding:7px 10px;border-radius:8px;font-weight:500;font-size:14px}
 nav a[aria-current="page"]{color:var(--ink);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
@@ -264,7 +265,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 <body>
 <header>
   <div class="bar">
-    <a class="logo" href="#home" aria-label="Qat"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><b>qat</b></a>
+    <a class="logo" href="#home" aria-label="Start3D"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><b>start<span>3d</span></b></a>
     <nav aria-label="Menu">
       <a href="#new" data-route="new" data-i="nav_new"></a>
       <a href="#catalog" data-route="catalog" data-i="nav_catalog"></a>
@@ -408,7 +409,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
       <p class="fieldset-h" data-i="f_disc"></p>
       <div class="row" style="align-items:end">
-        <div class="field"><label for="f-promo" data-i="f_promo"></label><input type="text" id="f-promo" placeholder="QAT10" autocomplete="off"></div>
+        <div class="field"><label for="f-promo" data-i="f_promo"></label><input type="text" id="f-promo" placeholder="START10" autocomplete="off"></div>
         <span class="note" id="promo-msg" style="flex:1 1 150px"></span>
       </div>
       <label class="check"><input type="checkbox" id="f-student"><span data-i="f_student"></span></label>
@@ -514,7 +515,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 <footer>
   <span data-i="foot"></span>
-  <span class="mono">Telegram @qat3d_bot · hello@qat3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
+  <span class="mono">Telegram @start3d_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
 </footer>
 
 <div class="modal" id="m" hidden>
@@ -601,7 +602,7 @@ q5:['Endirimlər varmı?','Есть скидки?','Є знижки?','Any disco
 a5:['Hər 5-ci sifariş −10%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Tədris layihələri −15%.','Каждый 5-й заказ −10%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Учебные проекты −15%.','Кожне 5-те замовлення −10%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Навчальні проєкти −15%.','Every 5th order is 10% off. Give a friend your code: 10% off for them and for your next order. Student projects get 15% off.'],
 q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
 a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
-foot:['Qat — Bakıda 3D çap','Qat — 3D-печать в Баку','Qat — 3D-друк у Баку','Qat — 3D printing in Baku'],
+foot:['Start3D — Bakıda 3D çap','Start3D — 3D-печать в Баку','Start3D — 3D-друк у Баку','Start3D — 3D printing in Baku'],
 sample_word:['nümunə','пример','приклад','sample'],
 new_h:['Yeni sifariş','Новый заказ','Нове замовлення','New order'],
 new_p:['Modeli yükləyin və ya fotosunu göndərin — qiymət sağda dərhal yenilənir.','Загрузите модель или пришлите фото детали — цена справа обновляется сразу.','Завантажте модель або надішліть фото деталі — ціна праворуч оновлюється одразу.','Upload a model or send photos of the part; the price on the right updates instantly.'],
@@ -633,7 +634,7 @@ f_cname:['Adınız (printer ekranı üçün)','Ваше имя (для дисп�
 cname_note:['Çap zamanı bu ad printerin yanındakı kiçik ekranda görünəcək. 16 simvola qədər.','Во время печати это имя будет на мини-дисплее у принтера. До 16 символов.','Під час друку це ім’я буде на мінідисплеї біля принтера. До 16 символів.','During printing this name is shown on the mini display next to the printer. Up to 16 characters.'],
 f_phone:['Əlaqə telefonu','Телефон для связи','Телефон для зв’язку','Contact phone'],
 f_email:['E-poçt','Email','Email','Email'],
-tg_note:['Sifarişdən sonra @qat3d_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @qat3d_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @qat3d_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @qat3d_bot and press Start; updates will arrive there.'],
+tg_note:['Sifarişdən sonra @start3d_bot-u açıb Start basın — statuslar ora gələcək.','После оформления откройте @start3d_bot и нажмите Start — статусы будут приходить туда.','Після оформлення відкрийте @start3d_bot і натисніть Start — статуси надходитимуть туди.','After ordering, open @start3d_bot and press Start; updates will arrive there.'],
 f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
 f_deliv:['Təhvil','Получение','Отримання','Delivery'],
 d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
@@ -767,7 +768,7 @@ issue_sent:['Sualınız operatora göndərildi','Ваш вопрос отпра�
 reprint_q:['Pulsuz yenidən çap növbəyə qoyuldu','Бесплатная перепечатка поставлена в очередь','Безкоштовний передрук поставлено в чергу','A free reprint has been queued'],
 tg_h:['Telegram bildirişlərini qoşun','Подключите уведомления в Telegram','Підключіть сповіщення в Telegram','Connect Telegram updates'],
 tg_p:['Botu açın və Start basın — bütün statuslar ora gələcək. Bunu etməsəniz, bot sizə yaza bilməz.','Откройте бота и нажмите Start — все статусы будут приходить туда. Без этого бот не сможет вам написать.','Відкрийте бота й натисніть Start — усі статуси надходитимуть туди. Без цього бот не зможе вам написати.','Open the bot and press Start; every update will arrive there. Until then the bot can’t message you.'],
-tg_open:['@qat3d_bot-u aç','Открыть @qat3d_bot','Відкрити @qat3d_bot','Open @qat3d_bot'],
+tg_open:['@start3d_bot-u aç','Открыть @start3d_bot','Відкрити @start3d_bot','Open @start3d_bot'],
 tg_demo:['Demo: Start basdım','Демо: я нажал Start','Демо: я натиснув Start','Demo: I pressed Start'],
 tg_wait:['bot qoşulmayıb','бот не подключён','бот не підключений','bot not connected'],
 n_tg_linked:['Bot {id} sifarişinə qoşuldu. Statuslar bura gələcək.','Бот подключён к заказу {id}. Статусы будут приходить сюда.','Бот підключено до замовлення {id}. Статуси надходитимуть сюди.','The bot is linked to order {id}. Updates will arrive here.'],
@@ -929,7 +930,7 @@ const stageIdx = s => ({review:0, pay:1, paycheck:1, queue:2, printing:3, post:4
 const PILL = {review:'warn', pay:'acc', paycheck:'warn', queue:'info', printing:'good', post:'info', ready:'good', done:'mut', rejected:'bad'};
 
 /* ---------- state ---------- */
-const KEY = 'qat-demo-v5';
+const KEY = 's3d-demo-v1';
 function seed(){
   const now = Date.now(), nf = (k, v, ago) => ({at: now - ago, k, v});
   return {
@@ -938,20 +939,20 @@ function seed(){
     history:{revenue:1840, orders:71, repeat:34},
     stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
     printers:[
-      {id:'P01', status:'printing', order:'QT-1021', spool:{mat:'ABS', color:0, g:640}, motor:812, lube:88, nozzle:140},
-      {id:'P02', status:'printing', order:'QT-1027', spool:{mat:'PETG', color:0, g:420}, motor:1240, lube:40, nozzle:292},
+      {id:'P01', status:'printing', order:'S3D-1021', spool:{mat:'ABS', color:0, g:640}, motor:812, lube:88, nozzle:140},
+      {id:'P02', status:'printing', order:'S3D-1027', spool:{mat:'PETG', color:0, g:420}, motor:1240, lube:40, nozzle:292},
       {id:'P03', status:'ready', spool:{mat:'PLA', color:3, g:780}, motor:960, lube:104, nozzle:50},
       {id:'P04', status:'maintenance', spool:{mat:'PLA', color:1, g:150}, motor:430, lube:20, nozzle:10}
     ],
     alerts:[],
     orders:[
-      {id:'QT-1021', name:'Корпус дрона, верх', client:'Elvin', contact:'+994 51 000 00 01', ch:'tg', tgLinked:true, mat:'ABS', color:0, qty:1, grams:210, hours:9.2, layers:620, price:58, paid:true, status:'printing', printer:'P01', progress:.68, speed:1/400, deliv:0, pub:true, copy:false, shape:'box', viewers:9, react:{fire:12,clap:4,wow:7}, created:now-864e5, notifs:[]},
-      {id:'QT-1027', name:'Держатель для велофары', client:'Samir', contact:'+994 50 000 00 00', ch:'tg', tgLinked:true, mat:'PETG', color:0, qty:1, grams:64, hours:2.9, layers:724, price:22, paid:true, status:'printing', printer:'P02', progress:.43, speed:1/300, deliv:0, mine:true, pub:true, copy:true, viewers:14, react:{fire:5,clap:2,wow:1}, created:now-5*36e5,
-        notifs:[nf('n_received',{c:'Samir',id:'QT-1027'},5*36e5), nf('n_confirmed',{id:'QT-1027',p:'22 AZN',d:'11 AZN'},4.6*36e5), nf('n_paid',{id:'QT-1027'},4*36e5), nf('n_started',{id:'QT-1027',link:'qat3d.az/#track-QT-1027'},2*36e5)]},
-      {id:'QT-1025', name:'Шестерня для миксера', client:'Leyla', contact:'+994 55 000 00 02', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:30, hours:1.6, layers:180, price:14, paid:true, status:'ready', photos:true, progress:1, deliv:1, pub:true, copy:true, shape:'clip', react:{fire:3,clap:6,wow:0}, created:now-2*864e5, notifs:[]},
-      {id:'QT-1018', name:'Кронштейн для камеры', client:'Murad', contact:'+994 70 000 00 03', ch:'email', email:'murad@mail.az', mat:'PLA', color:3, qty:1, grams:55, hours:2.7, layers:300, price:15, paid:true, status:'done', photos:true, accept:'ok', progress:1, deliv:0, pub:true, copy:true, video:true, shape:'stand', react:{fire:21,clap:9,wow:5}, created:now-4*864e5, notifs:[]},
-      {id:'QT-1029', name:'Корпус для ESP32-C3', client:'Rauf', contact:'+994 50 000 00 04', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:58, hours:3.4, layers:410, lo:19, hi:25, status:'review', progress:0, check:'2 детали, крышка на защёлках', deliv:0, student:true, created:now-40*6e4, notifs:[]},
-      {id:'QT-1030', name:'Насадка для пылесоса', client:'Nigar', contact:'+994 55 000 00 05', ch:'email', email:'nigar@mail.az', mat:'PLA', color:2, qty:1, grams:72, hours:3.6, layers:520, price:18, status:'paycheck', progress:0, receipt:'receipt_1030.jpg', deliv:1, created:now-3*36e5, notifs:[]}
+      {id:'S3D-1021', name:'Корпус дрона, верх', client:'Elvin', contact:'+994 51 000 00 01', ch:'tg', tgLinked:true, mat:'ABS', color:0, qty:1, grams:210, hours:9.2, layers:620, price:58, paid:true, status:'printing', printer:'P01', progress:.68, speed:1/400, deliv:0, pub:true, copy:false, shape:'box', viewers:9, react:{fire:12,clap:4,wow:7}, created:now-864e5, notifs:[]},
+      {id:'S3D-1027', name:'Держатель для велофары', client:'Samir', contact:'+994 50 000 00 00', ch:'tg', tgLinked:true, mat:'PETG', color:0, qty:1, grams:64, hours:2.9, layers:724, price:22, paid:true, status:'printing', printer:'P02', progress:.43, speed:1/300, deliv:0, mine:true, pub:true, copy:true, viewers:14, react:{fire:5,clap:2,wow:1}, created:now-5*36e5,
+        notifs:[nf('n_received',{c:'Samir',id:'S3D-1027'},5*36e5), nf('n_confirmed',{id:'S3D-1027',p:'22 AZN',d:'11 AZN'},4.6*36e5), nf('n_paid',{id:'S3D-1027'},4*36e5), nf('n_started',{id:'S3D-1027',link:'start3d.az/#track-S3D-1027'},2*36e5)]},
+      {id:'S3D-1025', name:'Шестерня для миксера', client:'Leyla', contact:'+994 55 000 00 02', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:30, hours:1.6, layers:180, price:14, paid:true, status:'ready', photos:true, progress:1, deliv:1, pub:true, copy:true, shape:'clip', react:{fire:3,clap:6,wow:0}, created:now-2*864e5, notifs:[]},
+      {id:'S3D-1018', name:'Кронштейн для камеры', client:'Murad', contact:'+994 70 000 00 03', ch:'email', email:'murad@mail.az', mat:'PLA', color:3, qty:1, grams:55, hours:2.7, layers:300, price:15, paid:true, status:'done', photos:true, accept:'ok', progress:1, deliv:0, pub:true, copy:true, video:true, shape:'stand', react:{fire:21,clap:9,wow:5}, created:now-4*864e5, notifs:[]},
+      {id:'S3D-1029', name:'Корпус для ESP32-C3', client:'Rauf', contact:'+994 50 000 00 04', ch:'tg', tgLinked:true, mat:'PETG', color:1, qty:2, grams:58, hours:3.4, layers:410, lo:19, hi:25, status:'review', progress:0, check:'2 детали, крышка на защёлках', deliv:0, student:true, created:now-40*6e4, notifs:[]},
+      {id:'S3D-1030', name:'Насадка для пылесоса', client:'Nigar', contact:'+994 55 000 00 05', ch:'email', email:'nigar@mail.az', mat:'PLA', color:2, qty:1, grams:72, hours:3.6, layers:520, price:18, status:'paycheck', progress:0, receipt:'receipt_1030.jpg', deliv:1, created:now-3*36e5, notifs:[]}
     ]
   };
 }
@@ -970,8 +971,8 @@ const fmtH = h => { const m = Math.max(0, Math.round(h*60)); return `${Math.floo
 let tt; function toast(m){ const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 3400); }
 function copyText(txt){ const ok = () => toast(t('copied') + ': ' + txt); try { navigator.clipboard.writeText(txt).then(ok, () => toast(txt)); } catch(e){ toast(txt); } }
 const codeOf = id => [...id].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0, 11).toString(36).slice(0,4);
-const MY_REF = 'QAT-' + codeOf('qat-me').toUpperCase().padEnd(4,'X');
-const linkOf = o => `qat3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
+const MY_REF = 'START-' + codeOf('s3d-me').toUpperCase().padEnd(4,'X');
+const linkOf = o => `start3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
 const colorName = i => t(COLORS[i][0]);
 function notify(o, k, v){ (o.notifs = o.notifs || []).push({at:Date.now(), k, v}); }
 const clientNotif = (o, k, v) => notify(o, k, Object.assign({id:o.id, c:o.client, link:linkOf(o), ref:MY_REF}, v));
@@ -997,17 +998,17 @@ function applyLang(){
   document.querySelectorAll('#langs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
   renderSwatches(); visNote(); promoCheck(); renderCatalog(); renderQuote(); full();
 }
-document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('qat-lang', lang); } catch(e){} applyLang(); });
-try { lang = localStorage.getItem('qat-lang') || ({az:'az', ru:'ru', uk:'uk', en:'en'})[(navigator.language||'ru').slice(0,2)] || 'ru'; } catch(e){}
+document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('s3d-lang', lang); } catch(e){} applyLang(); });
+try { lang = localStorage.getItem('s3d-lang') || ({az:'az', ru:'ru', uk:'uk', en:'en'})[(navigator.language||'ru').slice(0,2)] || 'ru'; } catch(e){}
 
 /* ---------- discounts ---------- */
 function promoPct(){
   const c = $('f-promo').value.trim().toUpperCase();
   if (!c) return {pct:0};
-  if (c === 'QAT10') return {pct:10, code:c};
+  if (c === 'START10') return {pct:10, code:c};
   if (c === 'MRGADGET') return {pct:15, code:c};
   if (c === MY_REF) return {pct:0, own:true};
-  if (/^QAT-[A-Z0-9]{4}$/.test(c)) return {pct:10, code:c};
+  if (/^START-[A-Z0-9]{4}$/.test(c)) return {pct:10, code:c};
   return {pct:0, bad:true};
 }
 function promoCheck(){
@@ -1090,7 +1091,7 @@ function bindPlace(q){
     if (!contactOk($('f-phone').value)) return fail('need_contact', $('f-phone'));
     if (form.notify === 'email' && !emailOk($('f-email').value)) return fail('need_email', $('f-email'));
     if (form.kind === 'file' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
-    const m = form.model || {}, id = 'QT-' + (S.seq++), d = discounts();
+    const m = form.model || {}, id = 'S3D-' + (S.seq++), d = discounts();
     const gift = $('f-gift').checked && $('f-gift-to').value.trim() ? {to:$('f-gift-to').value.trim().slice(0,16)} : null;
     const o = {
       id, name: $('f-name').value.trim() || (m.file ? m.file.replace(/\.[^.]+$/,'') : t('r_model')),
@@ -1307,11 +1308,11 @@ function drawPhoto(cv, o, i){
 const QR = (() => { let s = ''; for (let i=0;i<81;i++){ const x = i%9, y = Math.floor(i/9); const fin = (x<3&&y<3)||(x>5&&y<3)||(x<3&&y>5); const on = fin ? !(x%3===1 && y%3===1) : ((x*7+y*13+x*y)%3===0); s += `<i class="${on?'':'o'}"></i>`; } return `<div class="qr" aria-hidden="true">${s}</div>`; })();
 function oledHtml(o, pid, inline){
   const pr = P(pid), tag = pr.name.replace('Printer ','P');
-  if (!o) return `<div class="oled${inline?' inline':''}" role="img" aria-label="${t('display_label')}"><div class="orow"><span>QAT ${tag}</span><span>READY</span></div><div class="orow" style="align-items:end"><b style="font-size:18px">qat</b>${QR}</div></div>`;
+  if (!o) return `<div class="oled${inline?' inline':''}" role="img" aria-label="${t('display_label')}"><div class="orow"><span>START3D ${tag}</span><span>READY</span></div><div class="orow" style="align-items:end"><b style="font-size:15px">start3d</b>${QR}</div></div>`;
   const pct = Math.floor(o.progress*100), layer = Math.floor(o.progress*o.layers), err = PS(pid).status === 'error';
   const who = o.gift ? `<span>FOR</span><b>${esc(o.gift.to)}</b><span>FROM ${esc(o.client)}</span>` : `<span>PRINTING FOR</span><b>${esc(o.client)}</b>`;
   return `<div class="oled${inline?' inline':''}" role="img" aria-label="${t('display_label')}: ${esc(o.client)}">
-    <div class="orow"><span>QAT ${tag}</span><span>${err ? 'PAUSED' : o.id}</span></div>${who}
+    <div class="orow"><span>START3D ${tag}</span><span>${err ? 'PAUSED' : o.id}</span></div>${who}
     <div class="ob"><i style="width:${pct}%"></i></div><div class="orow"><span>${pct}%</span><span>L${layer}/${o.layers}</span></div></div>`;
 }
 
@@ -1357,7 +1358,7 @@ $('m-ok').onclick = () => {
   if (!nm){ err.textContent = t('need_name'); err.hidden = false; $('m-name').focus(); return; }
   if (!contactOk(ph)){ err.textContent = t('need_contact'); err.hidden = false; $('m-phone').focus(); return; }
   $('m').hidden = true;
-  const id = 'QT-' + (S.seq++), s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
+  const id = 'S3D-' + (S.seq++), s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
   const o = {id, client:nm.slice(0,16), contact:ph, ch:M.ch || 'tg', email:M.email, tgLinked:M.tgLinked, mine:true, progress:0, deliv:0, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}};
   if (M.mode === 'buy') Object.assign(o, {name:t(s.k), mat:s.mat, color:s.color, qty:1, grams:s.grams, hours:s.hours, layers:Math.round(s.z/.2), z:s.z, price:Math.round(s.price*loy), status:'pay', shape:s.shape, catalog:true});
   else {
@@ -1453,7 +1454,7 @@ function renderTrack(){
   if (owner && (o.status === 'pay' || o.status === 'paycheck')){
     pay.innerHTML = `<div class="cardbox"><p class="label">${t('card_t')}</p>
       <div class="cardnum">4169 •••• •••• 0000 <button type="button" class="btn-sm" id="copy-card">${t('copy')}</button></div>
-      <dl class="specs"><dt>${t('card_holder')}</dt><dd>QAT 3D (${t('sample_word')})</dd><dt>${t('card_amount')}</dt><dd>${azn(Math.round((o.price||0)*dep))}</dd><dt>${t('col_order')}</dt><dd>${o.id}</dd></dl>
+      <dl class="specs"><dt>${t('card_holder')}</dt><dd>START3D (${t('sample_word')})</dd><dt>${t('card_amount')}</dt><dd>${azn(Math.round((o.price||0)*dep))}</dd><dt>${t('col_order')}</dt><dd>${o.id}</dd></dl>
       <p class="note">${t('card_note')}</p>
       ${o.status === 'pay' ? `<div class="field"><label for="receipt">${t('receipt')}</label><input type="file" id="receipt" accept="image/*,.pdf"></div><button type="button" class="btn-primary" id="paid">${t('paid_btn')}</button>` : `<span class="pill warn">${t('st_paycheck')}${o.receipt ? ' · '+esc(o.receipt) : ''}</span>`}
     </div>`;
@@ -1463,9 +1464,9 @@ function renderTrack(){
   // notifications feed
   const tg = o.ch === 'tg';
   const tgCard = owner && tg && !o.tgLinked ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
-    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/qat3d_bot?start=${o.id}" target="_blank" rel="noopener">${t('tg_open')}</a><button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button></div></div>` : '';
+    <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/start3d_bot?start=${o.id}" target="_blank" rel="noopener">${t('tg_open')}</a><button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button></div></div>` : '';
   const shown = tg && !o.tgLinked ? [] : (o.notifs || []);
-  $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @qat3d_bot' : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
+  $('t-feed').innerHTML = tgCard + (owner && shown.length ? `<div class="cardbox" ${tgCard?'style="margin-top:16px"':''}><span class="label">${t('feed_h')} · ${tg ? 'Telegram · @start3d_bot' : 'Email · ' + esc(o.email || '')}</span><div class="feed">${shown.slice().reverse().map(n => `<div><span class="ch ${tg ? 'tg' : ''}">${tg ? 'TG' : '@'}</span><span>${esc(t(n.k, n.v))}</span><time>${timeStr(n.at)}</time></div>`).join('')}</div></div>` : '');
   if ($('tg-demo')) $('tg-demo').onclick = () => { o.tgLinked = true; clientNotif(o, 'n_tg_linked'); save(); full(); };
   // actions
   const acts = $('t-actions'); acts.innerHTML = '';
@@ -1579,7 +1580,7 @@ function act(a, id){
   if (a === 'issue'){ o.status = 'done'; clientNotif(o, 'n_done'); toast(t('t_done',{id})); }
   if (a === 'video'){ o.video = !o.video; }
   if (a === 'reprint'){
-    const nid = 'QT-' + (S.seq++);
+    const nid = 'S3D-' + (S.seq++);
     S.orders.unshift({id:nid, name:o.name, client:o.client, contact:o.contact, ch:o.ch, mat:o.mat, color:o.color, qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, z:o.z, shape:o.shape, price:0, paid:true, status:'queue', progress:0, deliv:o.deliv, mine:o.mine, pub:o.pub, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}, check:'reprint ' + o.id});
     o.accept = 'reprint'; clientNotif(O(nid), 'n_reprint'); toast(t('t_reprint',{id:nid}));
   }
