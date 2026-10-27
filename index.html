@@ -314,6 +314,56 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 [data-skin="b"] .toast{border-radius:0;border:2px solid var(--ink);background:#FFFFFF;color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
 [data-skin="b"] .sw{border-radius:0}
 [data-skin="b"] footer{border-top:2px solid var(--ink)}
+/* ===== Order conveyor (track page): the order is a parcel riding a belt from station to station ===== */
+.conv{display:grid;gap:8px;margin-bottom:22px}
+.conv .belt{position:relative;height:44px}
+.conv .belt::before{content:"";position:absolute;left:0;right:0;bottom:2px;height:12px;border-radius:7px;border:1px solid var(--line);
+  background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--muted) 35%,transparent) 0 2px,transparent 2px 16px),var(--surface);animation:belt .9s linear infinite}
+@keyframes belt{to{background-position:16px 0,0 0}}
+.conv.stop .belt::before{animation:none}
+.conv .pkg{position:absolute;bottom:15px;left:-8%;width:34px;height:26px;transform:translateX(-50%);border-radius:5px;background:var(--accent);
+  transition:left 2.2s cubic-bezier(.5,0,.2,1);box-shadow:0 0 22px color-mix(in srgb,var(--accent) 45%,transparent)}
+.conv .pkg::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:7px;margin-left:-3.5px;background:rgba(0,0,0,.2)}
+.conv .pkg::after{content:"";position:absolute;left:6px;right:6px;top:6px;height:2px;background:rgba(255,255,255,.35);border-radius:1px}
+.conv .pkg.hop{animation:hop .45s ease-out}
+@keyframes hop{40%{transform:translateX(-50%) translateY(-7px)}70%{transform:translateX(-50%) translateY(1px)}}
+.conv .pkg.bad{background:var(--bad);box-shadow:none}
+.conv .st{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.conv .st div{font-size:12.5px;line-height:1.25;color:var(--muted);text-align:center;display:grid;justify-items:center;gap:6px;overflow-wrap:anywhere}
+.conv .st div::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--line)}
+.conv .st .done{color:var(--ink)}
+.conv .st .done::before{background:var(--accent)}
+.conv .st .now{color:var(--ink);font-weight:600}
+.conv .st .now::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);animation:blink 1.4s infinite}
+@media (max-width:520px){.conv .st div{font-size:11px}.conv .pkg{width:28px;height:22px}}
+@media (prefers-reduced-motion:reduce){.conv .belt::before{animation:none}.conv .pkg{transition:none}}
+
+/* ===== Skin C · «Цех»: deep dark workshop, hot-nozzle glow, live factory scene in the hero ===== */
+:root[data-skin="c"]{
+  --bg:#0B0D10; --surface:#14171B; --ink:#EEF0EA; --muted:#8F978F; --line:#262B31;
+  --accent:#FFA53D; --accent-ink:#1A1104; --accent-soft:#3A2810;
+  --good:#5CD08E; --warn:#F2C14E; --bad:#FF7A61; --info:#7FA8FF; --wa:#4CD08A;
+  color-scheme:dark;
+}
+[data-skin="c"] body{background:radial-gradient(1200px 500px at 70% -10%,rgba(255,150,50,.09),transparent 60%),var(--bg) fixed}
+[data-skin="c"] header{background:rgba(11,13,16,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+[data-skin="c"] .hero{grid-template-columns:1fr;gap:22px;padding-block:28px 18px}
+[data-skin="c"] .hero>div:first-child{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px 32px}
+[data-skin="c"] .hero>div:first-child h1{grid-column:1/-1}
+[data-skin="c"] .hero h1{font-size:clamp(32px,6vw,64px)}
+[data-skin="c"] .hero h1 span{display:inline;margin-right:.25em}
+[data-skin="c"] .hero p{margin-top:0}
+[data-skin="c"] .hero-cta{margin-top:0}
+[data-skin="c"] .hero-art{aspect-ratio:auto;height:clamp(250px,36vw,420px);border:1px solid var(--line);border-radius:18px;background:#0A0C0F;cursor:pointer}
+[data-skin="c"] .btn-primary{box-shadow:0 0 0 0 rgba(255,165,61,0);transition:box-shadow .25s,transform .25s}
+[data-skin="c"] .btn-primary:hover{box-shadow:0 6px 26px rgba(255,165,61,.35);transform:translateY(-1px)}
+[data-skin="c"] .svc,[data-skin="c"] .item,[data-skin="c"] .lcard,[data-skin="c"] .panel{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 40%),var(--surface);transition:border-color .25s,transform .25s}
+[data-skin="c"] .svc:hover,[data-skin="c"] .item:hover,[data-skin="c"] .lcard:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));transform:translateY(-2px)}
+[data-skin="c"] .hero-art .hud{top:12px;bottom:auto;left:16px;right:16px}
+[data-skin="c"] .facts b{color:var(--ink)}
+[data-skin="c"] .facts div:first-child b{color:var(--accent)}
+@media (max-width:720px){[data-skin="c"] .hero>div:first-child{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){[data-skin="c"] .svc,[data-skin="c"] .item,[data-skin="c"] .lcard{transition:none;transform:none!important}}
 .skin-switch{display:flex;gap:6px;align-items:center}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -577,7 +627,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 <footer>
   <span data-i="foot"></span>
-  <span class="skin-switch" role="group" aria-label="Оформление"><span data-i="skin_l"></span><button type="button" data-skin="a">A</button><button type="button" data-skin="b">B</button></span>
+  <span class="skin-switch" role="group" aria-label="Оформление"><span data-i="skin_l"></span><button type="button" data-skin="a">A</button><button type="button" data-skin="b">B</button><button type="button" data-skin="c">C</button></span>
   <span class="mono">Telegram @Strt3d_bot · hello@start3d.az · +994 50 000 00 00 · <span data-i="sample_word"></span></span>
 </footer>
 
@@ -666,6 +716,11 @@ a5:['Hər 5-ci sifariş −10%. Dostunuza kodunuzu verin: ona −10%, sizə növ
 q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
 a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
 skin_l:['Dizayn:','Оформление:','Оформлення:','Style:'],
+f_qc:['Yoxlama','Контроль','Контроль','Check'],
+f_photo:['Foto','Фото','Фото','Photo'],
+f_ready:['Hazır','Готово','Готово','Ready'],
+f_today:['bu gün','сегодня','сьогодні','today'],
+f_tap:['Rəngi dəyişmək üçün toxunun','Нажмите, чтобы сменить цвет пластика','Натисніть, щоб змінити колір пластику','Tap to change the filament colour'],
 foot:['Start3D — Bakıda 3D çap','Start3D — 3D-печать в Баку','Start3D — 3D-друк у Баку','Start3D — 3D printing in Baku'],
 sample_word:['nümunə','пример','приклад','sample'],
 new_h:['Yeni sifariş','Новый заказ','Нове замовлення','New order'],
@@ -781,7 +836,7 @@ st_pay:['Ödəniş','Оплата','Оплата','Payment'],
 st_paycheck:['Ödəniş yoxlanır','Проверка оплаты','Перевірка оплати','Checking payment'],
 st_queue:['Növbə','Очередь','Черга','Queue'],
 st_printing:['Çap','Печать','Друк','Printing'],
-st_post:['Emal','Постобработка','Обробка','Finishing'],
+st_post:['Emal','Обработка','Обробка','Finishing'],
 st_ready:['Hazır','Готово','Готово','Ready'],
 st_done:['Təhvil verildi','Выдан','Видано','Collected'],
 st_rejected:['Rədd edildi','Отклонён','Відхилено','Rejected'],
@@ -1137,9 +1192,9 @@ function applyLang(){
 }
 document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('s3d-lang', lang); } catch(e){} applyLang(); });
 /* skin: ?skin=a|b in the link, remembered per browser */
-function setSkin(k){ k = k === 'b' ? 'b' : 'a'; document.documentElement.dataset.skin = k; document.querySelectorAll('.skin-switch button').forEach(b => b.setAttribute('aria-pressed', b.dataset.skin === k)); try { localStorage.setItem('s3d-skin', k); } catch(e){} }
+function setSkin(k){ k = ['a','b','c'].includes(k) ? k : 'c'; document.documentElement.dataset.skin = k; document.querySelectorAll('.skin-switch button').forEach(b => b.setAttribute('aria-pressed', b.dataset.skin === k)); try { localStorage.setItem('s3d-skin2', k); } catch(e){} }
 document.querySelectorAll('.skin-switch button').forEach(b => b.onclick = () => { setSkin(b.dataset.skin); try { drawThumbs(); } catch(e){} });
-try { setSkin(new URLSearchParams(location.search).get('skin') || localStorage.getItem('s3d-skin') || 'a'); } catch(e){ setSkin('a'); }
+try { setSkin(new URLSearchParams(location.search).get('skin') || localStorage.getItem('s3d-skin2') || 'c'); } catch(e){ setSkin('c'); }
 try { lang = localStorage.getItem('s3d-lang') || ({az:'az', ru:'ru', uk:'uk', en:'en'})[(navigator.language||'ru').slice(0,2)] || 'ru'; } catch(e){}
 
 /* ---------- discounts ---------- */
@@ -1259,7 +1314,7 @@ function bindPlace(q){
     $('place').disabled = false;
     if (!ok) return;
     S.orders.unshift(o); if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (gift) clientNotif(o, 'n_gift', {to:gift.to}); }
-    save(); toast(t('t_sent',{id:o.id})); location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
+    save(); toast(t('t_sent',{id:o.id})); justSent = o.id; location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
   };
 }
 
@@ -1525,7 +1580,7 @@ $('m-ok').onclick = async () => {
   if (!(await pushOrder(o, o.status === 'pay' ? {catalog:true, price:o.price} : null))) return;
   S.orders.unshift(o);
   if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (o.status === 'pay') clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*S.settings.dep/100))}); }
-  save(); location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
+  save(); justSent = o.id; location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
 };
 
 /* ---------- live ---------- */
@@ -1570,6 +1625,25 @@ $('ref-copy').onclick = () => copyText(MY_REF);
 
 /* ---------- track ---------- */
 let trackId = null, trackCode = '', tlStart = 0, adminSeen = false;
+/* order conveyor: one parcel per order; it slides to the station of the current status */
+let convFor = '', justSent = '';
+function renderConv(o, si){
+  const el = $('track'), n = STAGES.length, rej = o.status === 'rejected', done = o.status === 'done';
+  const pos = rej ? 0 : Math.min(n - 1, Math.max(0, si)), at = ((pos + .5) / n * 100) + '%';
+  let pk = el.querySelector('.pkg');
+  if (convFor !== o.id || !pk){
+    el.className = 'conv';
+    el.innerHTML = `<div class="belt"><i class="pkg" aria-hidden="true"></i></div><div class="st">${STAGES.map(s => `<div data-st="${s}"></div>`).join('')}</div>`;
+    pk = el.querySelector('.pkg');
+    const fresh = justSent === o.id; justSent = ''; convFor = o.id;
+    pk.style.transition = 'none'; pk.style.left = fresh ? '-8%' : at; void pk.offsetWidth; pk.style.transition = '';
+    pk.addEventListener('transitionend', () => { pk.classList.remove('hop'); void pk.offsetWidth; pk.classList.add('hop'); });
+  }
+  el.classList.toggle('stop', rej || done || o.status === 'ready');
+  el.querySelectorAll('[data-st]').forEach((d,i) => { d.className = rej ? '' : (i < si || done) ? 'done' : i === si ? 'now' : ''; d.textContent = t('st_' + STAGES[i]); });
+  pk.classList.toggle('bad', rej);
+  requestAnimationFrame(() => requestAnimationFrame(() => { if (pk.style.left !== at) pk.style.left = at; }));
+}
 function renderTrack(){
   const o = O(trackId);
   if (!o){ $('t-title').textContent = '—'; $('t-body').hidden = true; $('track').innerHTML = ''; return; }
@@ -1581,7 +1655,7 @@ function renderTrack(){
   $('t-title').textContent = o.name;
   $('t-badges').innerHTML = [o.gift ? `<span class="pill acc">${t('gift_badge',{to:esc(o.gift.to)})}</span>` : '', o.video ? `<span class="badge-ch">${t('ch_badge')}</span>` : '', owner && o.student ? `<span class="pill info">${t('student_tag')}</span>` : '', owner && o.kind === 'photo' ? `<span class="pill warn">${t('model_tag')}</span>` : ''].join('');
   $('track').hidden = !owner; $('t-specs').hidden = !owner;
-  $('track').innerHTML = STAGES.map((s,i) => `<div class="${o.status==='rejected'?'':(i<si||o.status==='done')?'done':i===si?'now':''}">${t('st_'+s)}</div>`).join('');
+  if (owner) renderConv(o, si);
   $('cam-printer').textContent = !owner ? '' : o.printerName ? o.printerName : pr ? `${pr.name} · ${pr.model}` : t('cam_off');
   $('cam-live').hidden = o.status !== 'printing' || paused;
   $('t-oled').innerHTML = o.status === 'printing' && o.printer ? `<span data-oled="${o.id}"></span>` : '';
@@ -1860,12 +1934,165 @@ function badges(){
   $('live-cnt').hidden = !l; $('live-cnt').textContent = l;
 }
 
+/* ---------- hero factory (skin C): the printer builds a part, pushes it onto the belt,
+   the part passes the check gate and the photo booth and drops into the «ready» bin; then the next one starts ---------- */
+const FAC = { p:.35, phase:'print', k:0, shape:0, col:0, items:[], made:37, last:0, flash:0, gate:0, mx:-1, my:-1, id:1043, seeded:false };
+const F_SHAPES = ['vase','pot','stand','box','clip','hooks'], F_COLS = [3,4,5,1,6,0,2];
+const F_NAMES = ['Leyla','Murad','Aysel','Samir','Nigar','Elvin','Kamran','Günay','Rauf','Lala'];
+const F_L = 64, F_PRINT = 7.5;
+function facLayout(w, h){
+  const s = Math.min(1.25, Math.max(.62, h / 330));
+  const pw = Math.min(w * .4, h * 1.02), px = Math.max(14, w * .045), colW = 16 * s;
+  const bedY = h * .74, bedW = (pw - colW) * .86, bcx = px + colW + (pw - colW) / 2 + 4 * s;
+  const binW = Math.max(46, w * .085), binX = w - binW - Math.max(10, w * .02);
+  const b0 = px + pw + 8 * s, b1 = binX + 8 * s, bl = b1 - b0;
+  return { s, pw, px, colW, bedY, bedW, bcx, floor: h * .93, maxH: h * .36, objW: bedW * .34, b0, b1, bl, binX, binW, gateX: b0 + bl * .33, camX: b0 + bl * .68, v: Math.max(48, bl / 5.2) };
+}
+function facObj(g, cx, baseY, shape, color, frac, F){
+  const lh = F.maxH / F_L, n = Math.floor(frac * F_L);
+  for (let i = 0; i < n; i++){
+    const half = profile(i / F_L, shape) * F.objW, y = baseY - (i + 1) * lh;
+    g.fillStyle = color; g.fillRect(cx - half, y, half * 2, lh + .6);
+    if (i % 2 === 0){ g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(cx - half, y, half * 2, Math.max(.4, lh * .35)); }
+  }
+  if (n){ const sh = g.createLinearGradient(cx - F.objW * .6, 0, cx + F.objW * .6, 0);
+    sh.addColorStop(0, 'rgba(0,0,0,.4)'); sh.addColorStop(.42, 'rgba(255,255,255,.12)'); sh.addColorStop(1, 'rgba(0,0,0,.5)');
+    g.save(); g.beginPath(); for (let i = 0; i < n; i++){ const half = profile(i / F_L, shape) * F.objW; g.rect(cx - half, baseY - (i + 1) * lh, half * 2, lh + .6); } g.clip();
+    g.fillStyle = sh; g.fillRect(cx - F.objW, baseY - F.maxH - 2, F.objW * 2, F.maxH + 2); g.restore(); }
+  return baseY - n * lh;
+}
+function facTag(g, x, y, txt, F, ok){
+  g.font = `${Math.round(10.5 * F.s)}px "JetBrains Mono", monospace`;
+  const tw = g.measureText(txt).width + 12 * F.s, th = 18 * F.s;
+  g.fillStyle = ok ? 'rgba(92,208,142,.95)' : 'rgba(238,240,234,.94)'; g.beginPath(); g.roundRect(x - tw / 2, y - th, tw, th, 4 * F.s); g.fill();
+  g.fillStyle = '#0B0D10'; g.fillText(txt, x - tw / 2 + 6 * F.s, y - 5.5 * F.s);
+}
+function drawFactory(cv, now){
+  const c = sizeCanvas(cv); if (!c) return; const {g, w, h} = c, F = facLayout(w, h);
+  let dt = FAC.last ? Math.min(.05, (now - FAC.last) / 1000) : 0; FAC.last = now; if (reduce) dt = 0;
+  const tm = reduce ? 2 : now / 1000, col = COLORS[F_COLS[FAC.col % F_COLS.length]][1], shape = F_SHAPES[FAC.shape % F_SHAPES.length];
+  if (!FAC.seeded){ FAC.seeded = true;
+    FAC.items = [{x: F.b0 + F.bl * .52, shape:'pot', col:COLORS[4][1], id:'S3D-1041', who:'Aysel', qc:true, ph:false, fall:0},
+                 {x: F.b0 + F.bl * .9, shape:'box', col:COLORS[5][1], id:'S3D-1040', who:'Murad', qc:true, ph:true, fall:0}]; }
+
+  /* --- update --- */
+  if (FAC.phase === 'print'){ FAC.p += dt / F_PRINT; if (FAC.p >= 1){ FAC.p = 1; FAC.phase = 'park'; FAC.k = 0; } }
+  else if (FAC.phase === 'park'){ FAC.k += dt / .7; if (FAC.k >= 1){ FAC.phase = 'push'; FAC.k = 0; } }
+  else if (FAC.phase === 'push'){ FAC.k += dt / 1.1;
+    if (FAC.k >= 1){ FAC.items.push({x: F.b0 + F.objW * .7, shape, col, id:'S3D-' + FAC.id, who:F_NAMES[FAC.id % F_NAMES.length], qc:false, ph:false, fall:0});
+      FAC.id++; FAC.shape++; FAC.col++; FAC.p = 0; FAC.phase = 'print'; } }
+  for (const it of FAC.items){
+    if (it.fall){ it.fall += dt; continue; }
+    it.x += F.v * dt;
+    if (!it.qc && it.x >= F.gateX){ it.qc = true; FAC.gate = 1; }
+    if (!it.ph && it.x >= F.camX){ it.ph = true; FAC.flash = 1; }
+    if (it.x >= F.b1 + F.binW * .35) it.fall = .001;
+  }
+  FAC.items = FAC.items.filter(it => { if (it.fall > .55){ FAC.made++; return false; } return true; });
+  FAC.flash = Math.max(0, FAC.flash - dt * 2.2); FAC.gate = Math.max(0, FAC.gate - dt * 1.6);
+
+  /* --- background --- */
+  g.fillStyle = '#0A0C0F'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(255,255,255,.035)'; g.lineWidth = 1; g.beginPath();
+  for (let x = 0; x < w; x += 24){ g.moveTo(x + .5, 0); g.lineTo(x + .5, h); } for (let y = 0; y < h; y += 24){ g.moveTo(0, y + .5); g.lineTo(w, y + .5); } g.stroke();
+  if (FAC.mx >= 0){ const lg = g.createRadialGradient(FAC.mx, FAC.my, 0, FAC.mx, FAC.my, h * .6); lg.addColorStop(0, 'rgba(255,190,120,.08)'); lg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = lg; g.fillRect(0, 0, w, h); }
+  const fl = g.createLinearGradient(0, F.floor, 0, h); fl.addColorStop(0, '#15181C'); fl.addColorStop(1, '#0A0C0F'); g.fillStyle = fl; g.fillRect(0, F.floor, w, h - F.floor);
+  g.fillStyle = '#20252B'; g.fillRect(0, F.floor, w, 1);
+
+  /* --- printer (A1 style: one column on the left, cantilevered arm, sliding bed) --- */
+  const S = F.s, topY = h * .17;
+  g.fillStyle = '#1B1F24'; g.beginPath(); g.roundRect(F.px, F.bedY + 9 * S, F.pw, F.floor - F.bedY - 9 * S, 6 * S); g.fill();
+  g.fillStyle = '#262B31'; g.fillRect(F.px, F.bedY + 9 * S, F.pw, 2);
+  g.fillStyle = '#FFA53D'; g.globalAlpha = .9; g.fillRect(F.px + F.pw * .1, F.floor - 14 * S, 22 * S, 3 * S); g.globalAlpha = 1;
+  g.fillStyle = '#1F2429'; g.beginPath(); g.roundRect(F.px, topY, F.colW, F.floor - topY, 4 * S); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(F.px + 3 * S, topY + 6 * S, 2 * S, F.floor - topY - 12 * S);
+  // bed + part (the part rides off the bed while pushing)
+  const pushK = FAC.phase === 'push' ? FAC.k * FAC.k * (3 - 2 * FAC.k) : 0;
+  g.fillStyle = '#30353C'; g.fillRect(F.bcx - F.bedW / 2, F.bedY + 2 * S, F.bedW, 7 * S);
+  g.fillStyle = '#8A6A33'; g.fillRect(F.bcx - F.bedW / 2, F.bedY, F.bedW, 2.5 * S);
+  const objX = F.bcx + pushK * (F.b0 + F.objW * .7 - F.bcx);
+  const topOfPart = facObj(g, objX, F.bedY, shape, col, FAC.phase === 'print' ? FAC.p : 1, F);
+  // arm + head
+  const doneN = Math.floor((FAC.phase === 'print' ? FAC.p : 1) * F_L), lh = F.maxH / F_L;
+  const layerY = F.bedY - doneN * lh, parkY = topY + 30 * S;
+  const armY = FAC.phase === 'print' ? layerY - 26 * S : FAC.phase === 'park' ? (layerY - 26 * S) + (parkY - (layerY - 26 * S)) * FAC.k : parkY;
+  g.fillStyle = '#2A3036'; g.fillRect(F.px, armY - 4 * S, F.pw * .97, 8 * S); g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(F.px, armY - 4 * S, F.pw * .97, 1.5);
+  const half = profile(doneN / F_L, shape) * F.objW;
+  const hx = FAC.phase === 'print' ? F.bcx + Math.sin(tm * 3.4) * half * .95 : F.bcx + (F.px + F.pw * .8 - F.bcx) * Math.min(1, FAC.phase === 'park' ? FAC.k : 1);
+  if (FAC.phase === 'print'){ // fresh, still-hot trace of the current layer
+    const x0 = F.bcx - half, gl = g.createLinearGradient(x0, 0, hx, 0); gl.addColorStop(0, col); gl.addColorStop(1, '#FFC27A');
+    g.fillStyle = gl; g.fillRect(x0, layerY - lh, Math.max(0, hx - x0), lh + .8);
+    const glow = g.createRadialGradient(hx, layerY, 0, hx, layerY, 60 * S); glow.addColorStop(0, 'rgba(255,170,80,.35)'); glow.addColorStop(1, 'rgba(255,170,80,0)');
+    g.fillStyle = glow; g.fillRect(hx - 60 * S, layerY - 60 * S, 120 * S, 120 * S);
+  }
+  const hw = 30 * S, hh = 30 * S, hy = armY - 8 * S;
+  g.fillStyle = '#D9DCD6'; g.beginPath(); g.roundRect(hx - hw / 2, hy, hw, hh, 4 * S); g.fill();
+  g.fillStyle = '#B9BDB7'; g.fillRect(hx - hw / 2, hy + hh - 6 * S, hw, 6 * S);
+  g.save(); g.translate(hx, hy + hh * .45); g.strokeStyle = '#7E847E'; g.lineWidth = 1.6 * S; g.beginPath(); g.arc(0, 0, 7 * S, 0, Math.PI * 2); g.stroke();
+  const fa = tm * 18; for (let i = 0; i < 4; i++){ const a = fa + i * Math.PI / 2; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 6 * S, Math.sin(a) * 6 * S); g.stroke(); } g.restore();
+  g.fillStyle = '#9EA39D'; g.beginPath(); g.moveTo(hx - 5 * S, hy + hh); g.lineTo(hx + 5 * S, hy + hh); g.lineTo(hx, hy + hh + 7 * S); g.fill();
+  if (FAC.phase === 'print'){ g.fillStyle = '#FFD08A'; g.beginPath(); g.arc(hx, hy + hh + 7 * S, 1.8 * S, 0, Math.PI * 2); g.fill(); }
+  // filament tube from the top of the column to the head
+  g.strokeStyle = 'rgba(220,224,218,.35)'; g.lineWidth = 2 * S; g.beginPath(); g.moveTo(F.px + F.colW / 2, topY); g.bezierCurveTo(F.px + F.pw * .3, topY - 20 * S, hx, hy - 60 * S, hx, hy); g.stroke();
+  g.strokeStyle = col; g.lineWidth = 3 * S; g.beginPath(); g.arc(F.px + F.colW / 2, topY + 4 * S, 9 * S, 0, Math.PI * 2); g.stroke();
+  if (FAC.phase === 'park' || FAC.phase === 'push'){ g.globalAlpha = FAC.phase === 'park' ? FAC.k : 1 - FAC.k; facTag(g, objX, topOfPart - 10 * S, '✓ 100%', F, true); g.globalAlpha = 1; }
+
+  /* --- conveyor --- */
+  const by = F.bedY, bt = 11 * S;
+  for (const lx of [F.b0 + 16 * S, F.b0 + F.bl * .5, F.b1 - 14 * S]){ g.fillStyle = '#1B1F24'; g.fillRect(lx - 3 * S, by + bt, 6 * S, F.floor - by - bt); }
+  g.fillStyle = '#1E2328'; g.beginPath(); g.roundRect(F.b0, by + 1, F.bl, bt, bt / 2); g.fill();
+  g.save(); g.beginPath(); g.roundRect(F.b0, by + 1, F.bl, bt, bt / 2); g.clip();
+  const step = 14 * S, off = (tm * F.v) % step; g.fillStyle = 'rgba(255,255,255,.09)';
+  for (let x = F.b0 - step + off; x < F.b1; x += step) g.fillRect(x, by + 1, 2 * S, bt);
+  g.restore();
+  for (const rx of [F.b0 + bt / 2, F.b1 - bt / 2]){ g.save(); g.translate(rx, by + 1 + bt / 2); g.rotate(tm * F.v / (bt / 2));
+    g.strokeStyle = '#4A5159'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-bt * .35, 0); g.lineTo(bt * .35, 0); g.moveTo(0, -bt * .35); g.lineTo(0, bt * .35); g.stroke(); g.restore(); }
+  const lab = (x, txt) => { g.font = `${Math.round(10 * S)}px "JetBrains Mono", monospace`; g.fillStyle = '#7C847D'; const tw = g.measureText(txt).width; g.fillText(txt, x - tw / 2, F.floor + 14 * S); };
+  // check gate: an arch with a scanning beam that lights green when a part passes
+  const gh = F.maxH + 34 * S, gx = F.gateX, gw = F.objW * 1.5;
+  g.strokeStyle = '#2C3238'; g.lineWidth = 5 * S; g.beginPath(); g.moveTo(gx - gw / 2, by); g.lineTo(gx - gw / 2, by - gh); g.lineTo(gx + gw / 2, by - gh); g.lineTo(gx + gw / 2, by); g.stroke();
+  const scanY = by - gh + 6 * S + (Math.sin(tm * 2.2) * .5 + .5) * (gh - 12 * S);
+  g.fillStyle = FAC.gate > 0 ? `rgba(92,208,142,${.5 + FAC.gate * .5})` : 'rgba(127,168,255,.45)'; g.fillRect(gx - gw / 2 + 3 * S, scanY, gw - 6 * S, 1.6 * S);
+  g.fillStyle = FAC.gate > 0 ? '#5CD08E' : '#3A4149'; g.beginPath(); g.arc(gx, by - gh - 7 * S, 3.2 * S, 0, Math.PI * 2); g.fill();
+  lab(gx, t('f_qc'));
+  // photo booth: camera on a pole with a flash
+  const cx2 = F.camX, ch = F.maxH + 46 * S;
+  g.fillStyle = '#2C3238'; g.fillRect(cx2 + F.objW * .9, by - ch, 4 * S, ch);
+  g.fillRect(cx2 + 4 * S, by - ch, F.objW * .9, 4 * S);
+  g.fillStyle = '#D9DCD6'; g.beginPath(); g.roundRect(cx2 - 9 * S, by - ch - 4 * S, 22 * S, 15 * S, 3 * S); g.fill();
+  g.fillStyle = '#0A0C0F'; g.beginPath(); g.arc(cx2 + 2 * S, by - ch + 3.5 * S, 4.5 * S, 0, Math.PI * 2); g.fill();
+  if (FAC.flash > 0){ const fg = g.createRadialGradient(cx2, by - ch * .5, 0, cx2, by - ch * .5, ch * .9); fg.addColorStop(0, `rgba(255,255,255,${FAC.flash * .55})`); fg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = fg; g.fillRect(cx2 - ch, by - ch * 1.5, ch * 2, ch * 1.6); }
+  lab(cx2, t('f_photo'));
+  // ready bin
+  const bx = F.binX, bw = F.binW, bTop = by + 10 * S;
+  // parts on the belt / falling into the bin
+  for (const it of FAC.items){
+    let x = it.x, base = by, a = 1;
+    if (it.fall){ const k = it.fall / .55; x = it.x + k * 10 * S; base = by + k * k * (F.floor - by - 10 * S); a = 1 - k * .6; }
+    g.globalAlpha = a; const top = facObj(g, x, base, it.shape, it.col, 1, F);
+    if (!it.fall) facTag(g, x, top - 8 * S, it.ph ? `📷 ${it.who}` : it.qc ? `✓ ${it.id}` : it.id, F, it.qc && !it.ph);
+    g.globalAlpha = 1;
+  }
+  g.fillStyle = '#1B1F24'; g.beginPath(); g.moveTo(bx, bTop); g.lineTo(bx + bw, bTop); g.lineTo(bx + bw - 5 * S, F.floor); g.lineTo(bx + 5 * S, F.floor); g.closePath(); g.fill();
+  g.fillStyle = '#FFA53D'; g.fillRect(bx, bTop, bw, 3 * S);
+  g.font = `600 ${Math.round(15 * S)}px "JetBrains Mono", monospace`; g.fillStyle = '#EEF0EA'; const ct = String(FAC.made), cw = g.measureText(ct).width; g.fillText(ct, bx + bw / 2 - cw / 2, bTop + (F.floor - bTop) * .55);
+  lab(bx + bw / 2, t('f_ready'));
+  $('hero-hud').textContent = `A1 #1 · ${t('o_layer')} ${FAC.phase === 'print' ? Math.floor(FAC.p * F_L * 4) : F_L * 4}/${F_L * 4} · ✓ ${FAC.made} ${t('f_today')}`;
+}
+(() => { const cv = $('hero-canvas'), art = cv.parentElement;
+  art.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); FAC.mx = e.clientX - r.left; FAC.my = e.clientY - r.top; });
+  art.addEventListener('pointerleave', () => { FAC.mx = -1; });
+  art.addEventListener('click', () => { if (document.documentElement.dataset.skin === 'c'){ FAC.col++; } });
+  art.title = t('f_tap');
+})();
+
 /* ---------- animation ---------- */
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let heroP = .2; const t0 = performance.now();
 function frame(now){
   const tm = (now - t0)/1000, r = route();
-  if (r === 'home'){
+  if (r === 'home' && document.documentElement.dataset.skin === 'c') drawFactory($('hero-canvas'), now);
+  else if (r === 'home'){
     heroP = reduce ? .62 : (heroP + .0011) % 1.15; const p = Math.min(1, heroP);
     drawPrint($('hero-canvas'), p, 240, '#E2702F', tm*3.2);
     $('hero-hud').textContent = `Bambu A1 · ${t('o_layer')} ${Math.floor(p*240)}/240`;
