@@ -144,6 +144,8 @@ function opText(o) {
     d.check ? `Проверка: ${esc(d.check)}` : '',
     d.link ? `🔗 <a href="${esc(d.link).replace(/"/g, '&quot;')}">Модель по ссылке</a> — скачайте, проверьте лицензию (модели с запретом коммерческого использования за деньги печатать нельзя)` : '',
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
+    d.files?.length ? `📎 Файлы: ${d.files.map((f) => esc(f.name)).join(', ')} (ниже в чате)` : '',
+    d.receipt ? '🧾 Чек приложен (ниже в чате)' : '',
     d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 105 г / 4 ч, PLA' : '',
     d.disc ? `Скидка на сайте: −${d.discPct || 0}% (${esc(d.disc)})` : '',
     d.nth ? (d.nth % 5 === 0 ? `🎉 <b>${d.nth}-й заказ клиента</b> — положена скидка −30%` : `Заказ клиента №${d.nth} по этому номеру`) : '',
@@ -491,6 +493,57 @@ async function clientFeedback(env, req, origin, id, code) {
   return json(publicOrder(env, await feedback(env, origin, o, q || null)));
 }
 
+// Telegram upload (multipart): files from the site go to the operators group, Telegram stores them.
+async function tgForm(env, method, fields, fileField, blob, filename) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) if (v !== undefined && v !== null) fd.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+  fd.append(fileField, blob, filename);
+  const r = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, { method: 'POST', body: fd });
+  return r.json().catch(() => ({ ok: false }));
+}
+const MAX_UPLOAD = 45 * 1024 * 1024;
+const safeName = (s) => String(s || 'file').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120);
+// Model file or a reference photo attached to an order: forwarded under the order card in the operators chat.
+async function orderFile(env, req, url, id) {
+  const o = await getOrder(env, id);
+  if (!o || o.code !== url.searchParams.get('code')) return json({ error: 'not_found' }, 404);
+  const kind = url.searchParams.get('kind') === 'photo' ? 'photo' : 'model';
+  const name = safeName(decodeURIComponent(req.headers.get('x-file-name') || (kind === 'photo' ? 'photo.jpg' : 'model.stl')));
+  if (+req.headers.get('content-length') > MAX_UPLOAD) return json({ error: 'too_big' }, 413);
+  const d = JSON.parse(o.data || '{}'); d.files = d.files || [];
+  if (d.files.length >= 8) return json({ error: 'too_many' }, 400);
+  const buf = await req.arrayBuffer();
+  if (!buf.byteLength || buf.byteLength > MAX_UPLOAD) return json({ error: 'too_big' }, 413);
+  const chat = await kvGet(env, 'operator_chat');
+  if (!chat) return json({ error: 'no_operators' }, 503);
+  const r = await tgForm(env, 'sendDocument', { chat_id: chat, caption: `${kind === 'photo' ? '🖼 Фото для моделирования' : '📎 Файл модели'} · ${o.id} · ${o.client}\n${name}`,
+    reply_parameters: o.op_msg_id ? { message_id: o.op_msg_id, allow_sending_without_reply: true } : undefined }, 'document', new Blob([buf]), name);
+  if (!r.ok) return json({ error: 'telegram_failed' }, 502);
+  const doc = r.result.document || (r.result.photo || []).slice(-1)[0] || {};
+  d.files.push({ kind, name, size: buf.byteLength, fid: doc.file_id, mid: r.result.message_id });
+  await setStatus(env, id, { data: JSON.stringify(d) });
+  return json({ ok: true });
+}
+// "I've paid" with a receipt picture: the receipt goes to the operators with the "payment received" button.
+async function orderReceipt(env, req, url, id) {
+  const o = await getOrder(env, id);
+  if (!o || o.code !== url.searchParams.get('code')) return json({ error: 'not_found' }, 404);
+  if (!['pay', 'paycheck'].includes(o.status)) return json(publicOrder(env, o));
+  const buf = await req.arrayBuffer();
+  if (!buf.byteLength || buf.byteLength > 15 * 1024 * 1024) return json({ error: 'too_big' }, 413);
+  const name = safeName(decodeURIComponent(req.headers.get('x-file-name') || 'receipt.jpg'));
+  const chat = await kvGet(env, 'operator_chat');
+  const d = JSON.parse(o.data || '{}');
+  if (chat) {
+    const r = await tgForm(env, 'sendDocument', { chat_id: chat, caption: `🧾 Чек по ${o.id} от ${o.client} (с сайта) · ${o.price || '?'} AZN`,
+      reply_markup: { inline_keyboard: [[{ text: '💰 Оплата получена', callback_data: `p:${o.id}` }]] } }, 'document', new Blob([buf]), name);
+    if (r.ok) { const doc = r.result.document || (r.result.photo || []).slice(-1)[0] || {}; d.receipt = { name, fid: doc.file_id, mid: r.result.message_id }; }
+  }
+  const n = await setStatus(env, id, { status: 'paycheck', data: JSON.stringify(d) });
+  await refreshOperatorMsg(env, n);
+  return json(publicOrder(env, n));
+}
+
 async function clientPaid(env, id, code) {
   const o = await getOrder(env, id);
   if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
@@ -518,6 +571,9 @@ async function onUpdate(env, u, origin) {
   if (/^\/operator(@\w+)?$/.test(text)) {
     if (String(from.id) !== String(await adminId(env))) return say('Только владелец может назначить операторский чат. Сначала напишите боту в личку /admin');
     await kvSet(env, 'operator_chat', chat.id);
+    await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: chat.id }, commands: [
+      { command: 'panel', description: 'Вход в панель оператора на сайте' }, { command: 'cam', description: 'Камеры принтеров' },
+      { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' }, { command: 'rotate', description: 'Поворот камеры' } ] });
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
   if (/^\/draw(@\w+)?$/.test(text)) {
@@ -536,6 +592,14 @@ async function onUpdate(env, u, origin) {
     }
     await kvSet(env, 'rotate:' + pid, dir);
     return say(`✅ Камера ${printerName(pid)}: поворот ${dir}. Мост применит его в течение 10 секунд.`);
+  }
+  if (/^\/panel(@\w+)?$/.test(text)) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'optok:%' AND json_extract(v,'$.exp') < ?").bind(now()).run();
+    const tok = rnd(24);
+    await kvSet(env, 'optok:' + tok, JSON.stringify({ name: clip(from.first_name || 'Оператор', 30), uid: from.id, exp: now() + 30 * 864e5 }));
+    return say(`🔐 Вход в панель оператора для ${from.first_name || 'оператора'}. Ссылка действует 30 дней и запоминается в браузере. Не пересылайте её клиентам.`,
+      { reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть панель', url: `${origin}/#op-${tok}` }]] } });
   }
   if (/^\/cam(@\w+)?$/.test(text)) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
@@ -675,21 +739,8 @@ async function onCallback(env, q, origin) {
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
   if (act === 'fo' || act === 'fx') {
     if (!allowed) return answer('—');
-    const a = await env.DB.prepare('SELECT * FROM free_apps WHERE id=?').bind(+id).first();
-    if (!a) return answer('—');
-    if (['won', 'lost'].includes(a.status)) return answer('Розыгрыш уже прошёл');
-    const st = act === 'fo' ? 'ok' : 'no';
-    await env.DB.prepare('UPDATE free_apps SET status=? WHERE id=?').bind(st, a.id).run();
-    const n = { ...a, status: st };
-    if (q.message) await tg(env, 'editMessageText', { chat_id: q.message.chat.id, message_id: q.message.message_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(n) }, link_preview_options: n.link ? { url: n.link, prefer_small_media: true } : { is_disabled: true } });
-    if (st === a.status) return answer(st === 'ok' ? 'Уже допущена' : 'Уже отклонена');
-    if (a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: st === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_no', a.lang) });
-    const who = esc(q.from.first_name || 'Оператор');
-    if (q.message) await tg(env, 'sendMessage', { chat_id: q.message.chat.id, reply_parameters: { message_id: q.message.message_id, allow_sending_without_reply: true }, parse_mode: 'HTML',
-      text: st === 'ok'
-        ? `✅ ${who}: заявка №${a.id} (${esc(a.name)}) <b>допущена</b> к розыгрышу ${a.day} в 20:00. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота — уведомить не можем.'}`
-        : `❌ ${who}: заявка №${a.id} (${esc(a.name)}) <b>отклонена</b>. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота.'}` });
-    return answer(st === 'ok' ? '✅ Допущена к розыгрышу' : '❌ Отклонена');
+    const r = await freeDecide(env, +id, act === 'fo', q.from.first_name);
+    return answer(r.error || r.note);
   }
   if (act === 'ka' || act === 'kq') {
     const o = await getOrder(env, id);
@@ -702,19 +753,15 @@ async function onCallback(env, q, origin) {
   if (!allowed) return answer('Нет доступа');
   const o = await getOrder(env, id);
   if (!o) return answer('Заказ не найден');
-  const base = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
-  let n = o, note = '';
   if (act === 'm' || act === 'pl') {
     if (o.status !== 'review') return answer('Цена уже подтверждена');
-    n = await setStatus(env, id, { price: Math.max(1, base + (act === 'm' ? -2 : 2)) });
+    const base = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
+    let n = await setStatus(env, id, { price: Math.max(1, base + (act === 'm' ? -2 : 2)) });
     n = { ...n, status: 'review' };
     await refreshOperatorMsg(env, n);
     return answer(`Цена: ${n.price} AZN`);
   }
-  if (act === 'c' && o.status === 'review') { n = await setStatus(env, id, { status: 'pay', price: base }); await notifyClient(env, origin, n, 'confirmed'); note = 'Цена подтверждена'; }
-  else if (act === 'r' && o.status === 'review') { n = await setStatus(env, id, { status: 'rejected', reason: TX.rj_geo[1] }); await notifyClient(env, origin, n, 'rejected', { w: tx('rj_geo', n.lang) }); note = 'Отклонён'; }
-  else if (act === 'p' && ['pay', 'paycheck'].includes(o.status)) { n = await setStatus(env, id, { status: 'queue' }); await notifyClient(env, origin, n, 'paid'); note = 'Оплата отмечена'; }
-  else if (act === 's' && o.status === 'queue') {
+  if (act === 's' && o.status === 'queue') {
     const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
     const rows = PRINTERS.map((p) => {
       const b = busy.results.find((r) => r.id === p.id);
@@ -723,19 +770,31 @@ async function onCallback(env, q, origin) {
     await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
     return answer('На каком принтере?');
   }
-  else if (act === 'sp' && o.status === 'queue' && PRINTERS.some((p) => p.id === pid)) {
-    const d = JSON.parse(o.data || '{}'); d.printer = pid;
+  const r = await opAction(env, origin, o, act, { pid, chatId: q.message?.chat?.id });
+  return answer(r.error || r.note);
+}
+
+// One place for order actions: used by the bot buttons and by the web operator panel.
+async function opAction(env, origin, o, act, x = {}) {
+  const id = o.id, base = Number.isFinite(+x.price) && +x.price > 0 ? Math.round(+x.price) : (o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20));
+  let n = o, note = '';
+  if (act === 'c' && o.status === 'review') { n = await setStatus(env, id, { status: 'pay', price: base }); await notifyClient(env, origin, n, 'confirmed'); note = `Цена подтверждена: ${base} AZN`; }
+  else if (act === 'r' && o.status === 'review') { n = await setStatus(env, id, { status: 'rejected', reason: x.reason ? clip(x.reason, 200) : TX.rj_geo[1] }); await notifyClient(env, origin, n, 'rejected', { w: x.reason ? clip(x.reason, 200) : tx('rj_geo', n.lang) }); note = 'Отклонён'; }
+  else if (act === 'p' && ['pay', 'paycheck'].includes(o.status)) { n = await setStatus(env, id, { status: 'queue' }); await notifyClient(env, origin, n, 'paid'); note = 'Оплата отмечена'; }
+  else if (act === 'sp' && o.status === 'queue' && PRINTERS.some((p) => p.id === x.pid)) {
+    const d = JSON.parse(o.data || '{}'); d.printer = x.pid;
     n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
-    await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(pid, id, now()).run();
-    await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(pid)}`;
+    await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(x.pid, id, now()).run();
+    await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(x.pid)}`;
   }
   else if (act === 'd' && ['printing', 'post'].includes(o.status)) {
     n = await setStatus(env, id, { status: 'post' });
-    const r = await tg(env, 'sendMessage', { chat_id: q.message.chat.id,
+    const chat = x.chatId || Number(await kvGet(env, 'operator_chat'));
+    const r = chat ? await tg(env, 'sendMessage', { chat_id: chat,
       text: `📸 ${id}: пришлите 1–3 фото готовой детали ОТВЕТОМ на это сообщение (свайп влево по сообщению → фото). Первое фото сразу уйдёт клиенту.`,
-      reply_markup: { inline_keyboard: [[{ text: 'Готово без фото', callback_data: `dn:${id}` }]] } });
+      reply_markup: { inline_keyboard: [[{ text: 'Готово без фото', callback_data: `dn:${id}` }]] } }) : { ok: false };
     if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, id);
-    note = 'Жду фото';
+    note = 'Жду фото в Telegram';
   }
   else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
   else if (act === 'rp' && ['ready', 'done'].includes(o.status)) {
@@ -744,9 +803,9 @@ async function onCallback(env, q, origin) {
     await notifyClient(env, origin, n, 'reprint'); note = 'Перепечатка в очереди';
   }
   else if (act === 'g' && o.status === 'ready') { n = await setStatus(env, id, { status: 'done' }); await notifyClient(env, origin, n, 'done'); note = 'Выдан'; }
-  else return answer('Статус уже изменился');
+  else return { error: 'Статус уже изменился' };
   await refreshOperatorMsg(env, n);
-  return answer(note);
+  return { ok: true, note, order: n };
 }
 
 // Registers the webhook once per origin, so no manual /tg/setup call is needed.
@@ -796,6 +855,25 @@ function freeText(a) {
     a.order_id ? `Заказ: ${a.order_id}` : ''].filter(Boolean).join('\n');
 }
 const freeButtons = (a) => ['new', 'ok', 'no'].includes(a.status) ? [[{ text: a.status === 'ok' ? '✅ Подходит ✓' : '✅ Подходит', callback_data: `fo:${a.id}` }, { text: a.status === 'no' ? '❌ Не подходит ✓' : '❌ Не подходит', callback_data: `fx:${a.id}` }]] : [];
+
+// Operator approves (ok=true) or declines an application: from the bot buttons or the web panel.
+async function freeDecide(env, appId, ok, whoName) {
+  const a = await env.DB.prepare('SELECT * FROM free_apps WHERE id=?').bind(appId).first();
+  if (!a) return { error: 'Заявка не найдена' };
+  if (['won', 'lost'].includes(a.status)) return { error: 'Розыгрыш уже прошёл' };
+  const st = ok ? 'ok' : 'no';
+  if (st === a.status) return { note: ok ? 'Уже допущена' : 'Уже отклонена' };
+  await env.DB.prepare('UPDATE free_apps SET status=? WHERE id=?').bind(st, a.id).run();
+  const n = { ...a, status: st }, chat = await kvGet(env, 'operator_chat');
+  if (chat && a.op_msg_id) await tg(env, 'editMessageText', { chat_id: Number(chat), message_id: a.op_msg_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(n) }, link_preview_options: n.link ? { url: n.link, prefer_small_media: true } : { is_disabled: true } });
+  if (a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: ok ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_no', a.lang) });
+  const who = esc(whoName || 'Оператор');
+  if (chat) await tg(env, 'sendMessage', { chat_id: Number(chat), ...(a.op_msg_id ? { reply_parameters: { message_id: a.op_msg_id, allow_sending_without_reply: true } } : {}), parse_mode: 'HTML',
+    text: ok
+      ? `✅ ${who}: заявка №${a.id} (${esc(a.name)}) <b>допущена</b> к розыгрышу ${a.day} в 20:00. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота — уведомить не можем.'}`
+      : `❌ ${who}: заявка №${a.id} (${esc(a.name)}) <b>отклонена</b>. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота.'}` });
+  return { ok: true, note: ok ? '✅ Допущена к розыгрышу' : '❌ Отклонена' };
+}
 
 async function freeApply(env, req, origin) {
   const b = await req.json().catch(() => null);
@@ -880,6 +958,73 @@ async function drawFree(env, origin, day, manual) {
   return { msg: 'ok', posted: true };
 }
 
+/* ---------- operator web panel ----------
+   Login: /panel in the operators chat gives a link with a 30-day token; the site keeps it in the browser.
+   Every panel request carries the token (header x-op, or ?t= for file downloads). */
+async function opAuth(env, req, url) {
+  const tok = req.headers.get('x-op') || url.searchParams.get('t');
+  if (!tok) return null;
+  const v = JSON.parse((await kvGet(env, 'optok:' + tok)) || 'null');
+  return v && v.exp > now() ? v : null;
+}
+async function opState(env) {
+  const rs = await env.DB.prepare("SELECT * FROM orders WHERE status NOT IN ('done','rejected') OR updated_at > ? ORDER BY created_at DESC LIMIT 80").bind(now() - 3 * 864e5).all();
+  const orders = rs.results.map((o) => {
+    const d = JSON.parse(o.data || '{}');
+    return { id: o.id, status: o.status, client: o.client, contact: o.contact, ch: o.ch, email: o.email, tg: !!o.tg_chat_id, price: o.price, lo: o.lo, hi: o.hi, reason: o.reason,
+      name: d.name, mat: d.mat, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
+      pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
+      printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
+      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code };
+  });
+  const prs = (await env.DB.prepare('SELECT id, status, order_id, frame_at, updated_at FROM printers').all()).results;
+  const printers = [];
+  for (const p of PRINTERS) {
+    const r = prs.find((x) => x.id === p.id) || {};
+    const st = JSON.parse(r.status || '{}'), vd = await videoState(env, p.id, true);
+    printers.push({ id: p.id, name: p.name, order: r.order_id || null, state: st.state || null, percent: st.percent || 0, layer: st.layer || 0, layers: st.layers || 0,
+      remaining: st.remaining || 0, error: st.error || null, seen: st.at || null, /* last status from the bridge */ frame: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, video: vd.on });
+  }
+  const day = entryDay(now());
+  const fa = (await env.DB.prepare("SELECT id, day, name, contact, link, idea, status, tg_chat_id, order_id, created_at FROM free_apps WHERE day >= ? ORDER BY id DESC LIMIT 60").bind(bakuDay(now() - 864e5)).all()).results
+    .map((a) => ({ ...a, tg: !!a.tg_chat_id, tg_chat_id: undefined }));
+  return json({ orders, printers, free: fa, freeDay: day, drawn: !!(await kvGet(env, 'free_drawn:' + bakuDay(now()))) });
+}
+async function opApi(env, req, url, origin, p) {
+  const who = await opAuth(env, req, url);
+  if (!who) return json({ error: 'login' }, 401);
+  if (p === '/api/op/me') return json({ ok: true, name: who.name });
+  if (p === '/api/op/state') return opState(env);
+  let m = p.match(/^\/api\/op\/(file|receipt|photo)\/(S3D-\d+)(?:\/(\d))?$/);
+  if (m) { // download through the bot (Telegram lets bots fetch files up to 20 MB)
+    const o = await getOrder(env, m[2]); if (!o) return json({ error: 'not_found' }, 404);
+    const d = JSON.parse(o.data || '{}');
+    const f = m[1] === 'file' ? (d.files || [])[+m[3] || 0] : m[1] === 'receipt' ? d.receipt : { fid: (d.photos || [])[+m[3] || 0], name: `${o.id}-${+m[3] || 0}.jpg` };
+    if (!f || !f.fid) return json({ error: 'not_found' }, 404);
+    const g = await tg(env, 'getFile', { file_id: f.fid });
+    if (!g.ok) return new Response('Файл больше 20 МБ — скачайте его в Telegram, в группе операторов (сообщение под карточкой заказа).', { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    const r = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${g.result.file_path}`);
+    return new Response(r.body, { headers: { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name || 'file')}`, 'cache-control': 'private, no-store' } });
+  }
+  if (req.method !== 'POST') return json({ error: 'not_found' }, 404);
+  const b = await req.json().catch(() => ({}));
+  if (p === '/api/op/act') {
+    const o = await getOrder(env, String(b.id || ''));
+    if (!o) return json({ error: 'Заказ не найден' }, 404);
+    const r = await opAction(env, origin, o, String(b.act || ''), { pid: b.pid, price: b.price, reason: b.reason });
+    return json(r.error ? { error: r.error } : { ok: true, note: r.note });
+  }
+  if (p === '/api/op/free') { const r = await freeDecide(env, +b.id, !!b.ok, who.name); return json(r.error ? { error: r.error } : r); }
+  if (p === '/api/op/draw') { const r = await drawFree(env, origin, bakuDay(now()), true); return json({ ok: r.msg === 'ok', note: r.msg === 'ok' ? 'Победитель выбран — смотрите группу операторов' : r.msg }); }
+  if (p === '/api/op/camlink') {
+    if (!PRINTERS.some((x) => x.id === b.pid)) return json({ error: 'bad_printer' }, 400);
+    const tok = rnd(16); await kvSet(env, 'camtok:' + tok, JSON.stringify({ pid: b.pid, exp: now() + 2 * 3600e3 }));
+    return json({ ok: true, url: `${origin}/#cam-${b.pid}-${tok}` });
+  }
+  if (p === '/api/op/logout') { await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('optok:' + (req.headers.get('x-op') || '')).run(); return json({ ok: true }); }
+  return json({ error: 'not_found' }, 404);
+}
+
 /* ---------- router ---------- */
 let seenOrigin = '';
 export default {
@@ -905,6 +1050,7 @@ export default {
         return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
+      if (p.startsWith('/api/op/')) return opApi(env, req, url, origin, p);
       let fp = p.match(/^\/api\/free\/photo\/(S3D-\d+)\/(\d)$/);
       if (fp) return freePhoto(env, fp[1], +fp[2]);
       if (p === '/api/free') { if (req.method === 'POST') return freeApply(env, req, origin); return freeInfo(env); }
@@ -940,6 +1086,10 @@ export default {
       if (m) return orderPhoto(env, m[1], url.searchParams.get('code'), +m[2]);
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/feedback$/);
       if (m && req.method === 'POST') return clientFeedback(env, req, origin, m[1], url.searchParams.get('code'));
+      m = p.match(/^\/api\/orders\/(S3D-\d+)\/file$/);
+      if (m && req.method === 'POST') return orderFile(env, req, url, m[1]);
+      m = p.match(/^\/api\/orders\/(S3D-\d+)\/receipt$/);
+      if (m && req.method === 'POST') return orderReceipt(env, req, url, m[1]);
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/paid$/);
       if (m && req.method === 'POST') return clientPaid(env, m[1], url.searchParams.get('code'));
       if (p === '/tg/setup') {

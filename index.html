@@ -399,6 +399,19 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 @media (max-width:760px){.fr-now{grid-template-columns:1fr}}
 /* real site: no demo banner, no demo operator panel for visitors */
 .online .demo-note, .online nav a[data-route="admin"]{display:none}
+/* operator panel */
+.ops-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.ops-tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ops-list{display:grid;gap:12px}
+.opc{display:grid;gap:8px}
+.opc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.opc-h b{font-family:var(--f-mono)}
+.opc .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.opc .acts input,.opc .acts select{width:auto;min-width:0;padding:7px 10px;font-size:14px}
+.opc .acts input[type=number]{width:90px}
+.opc .files a{margin-right:12px;white-space:nowrap}
+.opc.dim{opacity:.6}
+.ops-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -415,6 +428,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
       <a href="#free" data-route="free" data-i="nav_free"></a>
       <a href="#live" data-route="live"><span data-i="nav_live"></span><span class="cnt" id="live-cnt" hidden></span></a>
       <a href="#orders" data-route="orders"><span data-i="nav_orders"></span><span class="cnt" id="my-cnt" hidden></span></a>
+      <a href="#ops" data-route="ops" id="nav-ops" hidden><span data-i="nav_ops"></span><span class="cnt" id="ops-cnt" hidden></span></a>
       <a href="#admin" data-route="admin"><span data-i="nav_admin"></span><span class="cnt" id="adm-cnt" hidden></span></a>
     </nav>
     <div class="langs" role="group" aria-label="Language" id="langs">
@@ -572,6 +586,15 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
     </form>
     <div class="panel quote" id="quote-out" aria-live="polite"></div>
   </div>
+</section>
+
+<!-- OPERATOR PANEL (login link from /panel in the operators' Telegram group) -->
+<section id="view-ops" hidden>
+  <div class="page-head"><div><p class="label" data-i="ops_label"></p><h1 data-i="ops_h"></h1><p class="note" id="ops-who"></p></div>
+    <div class="row"><button type="button" class="btn-sm" id="ops-refresh" data-i="ops_refresh"></button><button type="button" class="btn-sm btn-ghost" id="ops-logout" data-i="ops_logout"></button></div></div>
+  <p class="msg" id="ops-login" hidden></p>
+  <div class="ops-tabs" id="ops-tabs"></div>
+  <div id="ops-body"></div>
 </section>
 
 <!-- OPERATOR CAMERA (link from /cam in the operators' Telegram group) -->
@@ -1012,6 +1035,14 @@ pc_label:['Kamera · yalnız komanda üçün','Камера · только дл
 pc_note:['Video ~10 san gecikmə ilə. Kamera açılır — ilk görüntü 20–30 saniyəyə. Link 2 saat işləyir, müştərilərə göndərməyin.','Видео с задержкой ~10 с. Камера включается — первая картинка через 20–30 секунд. Ссылка действует 2 часа, клиентам не пересылайте.','Відео із затримкою ~10 с. Камера вмикається — перша картинка через 20–30 секунд. Посилання діє 2 години, клієнтам не пересилайте.','Video ~10 s behind. The camera is starting — first picture in 20–30 seconds. The link works for 2 hours; do not share it with clients.'],
 pc_expired:['Link köhnəlib. Operator qrupunda yenidən /cam yazın.','Ссылка устарела. Напишите /cam в группе операторов ещё раз.','Посилання застаріло. Напишіть /cam у групі операторів ще раз.','The link has expired. Send /cam in the operators group again.'],
 pc_starting:['Kamera açılır…','Включаем камеру…','Вмикаємо камеру…','Starting the camera…'],
+uploading:['Yüklənir…','Загружаю…','Завантажую…','Uploading…'],
+upload_failed:['Fayl yüklənmədi: {f}. Operator sizinlə əlaqə saxlayacaq.','Не удалось загрузить: {f}. Оператор свяжется с вами.','Не вдалося завантажити: {f}. Оператор зв\'яжеться з вами.','Could not upload: {f}. The operator will contact you.'],
+nav_ops:['Operator','Оператор','Оператор','Operator'],
+ops_label:['Yalnız komanda üçün','Только для команды','Лише для команди','Team only'],
+ops_h:['Operator paneli','Панель оператора','Панель оператора','Operator panel'],
+ops_refresh:['Yenilə','Обновить','Оновити','Refresh'],
+ops_logout:['Çıxış','Выйти','Вийти','Log out'],
+ops_need_login:['Daxil olmaq üçün operator qrupunda bota /panel yazın və gələn linki açın.','Чтобы войти, напишите боту /panel в группе операторов и откройте ссылку из ответа.','Щоб увійти, напишіть боту /panel у групі операторів і відкрийте посилання з відповіді.','To log in, send /panel to the bot in the operators group and open the link it sends.'],
 cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
 timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
 pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
@@ -1496,12 +1527,37 @@ async function detectServer(){
     const n = S.orders.length; S.orders = S.orders.filter(o => o.server); S.alerts = [];
     if (S.orders.length !== n) save();
     if (route() === 'admin') location.hash = 'home';
+    $('nav-ops').hidden = !OPTOK; if (OPTOK) loadOps();
     full(); badges(); loadLive();
   } } catch(e){}
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
   qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
   gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, kids:o.kids, disc:o.discName || '', discPct:o.disc || 0, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
+// Upload a file to the order (model, reference photo or receipt) with progress; the server forwards it to the operators.
+function uploadToOrder(o, path, file, onProgress){
+  return new Promise((resolve) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api/orders/${o.id}/${path}${path.includes('?') ? '&' : '?'}code=${o.code}`);
+    x.setRequestHeader('x-file-name', encodeURIComponent(file.name || 'file'));
+    x.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch(e){} resolve(x.status < 300 ? (j.ok !== undefined || j.status ? j : {ok:true}) : {error: j.error || 'http_' + x.status}); };
+    x.onerror = () => resolve({error:'network'});
+    x.send(file);
+  });
+}
+async function uploadOrderFiles(o, files){
+  const btn = $('place'), label = btn ? btn.textContent : '';
+  let failed = [];
+  for (let i = 0; i < files.length; i++){
+    const {file, kind} = files[i];
+    if (file.size > 45 * 1024 * 1024){ failed.push(file.name); continue; }
+    const r = await uploadToOrder(o, `file?kind=${kind}`, file, p => { if (btn) btn.textContent = `${t('uploading')} ${files.length > 1 ? (i + 1) + '/' + files.length + ' · ' : ''}${Math.round(p * 100)}%`; });
+    if (r.error) failed.push(file.name);
+  }
+  if (btn) btn.textContent = label;
+  if (failed.length) toast(t('upload_failed', {f: failed.join(', ')}));
+}
 async function pushOrder(o, extra){
   if (!SERVER) return true;
   try {
@@ -1687,6 +1743,10 @@ function bindPlace(q){
     };
     $('place').disabled = true;
     const ok = await pushOrder(o);
+    if (ok && o.server){
+      const files = form.kind === 'file' && form.modelFile ? [{file: form.modelFile, kind: 'model'}] : form.kind === 'photo' ? form.photos.map(f => ({file: f, kind: 'photo'})) : [];
+      if (files.length) await uploadOrderFiles(o, files);
+    }
     $('place').disabled = false;
     if (!ok) return;
     S.orders.unshift(o); if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (gift) clientNotif(o, 'n_gift', {to:gift.to}); }
@@ -1715,6 +1775,7 @@ function parseSTL(buf){
 }
 function loadFile(f){
   if (!f) return;
+  form.modelFile = f; // the original file, uploaded to the operators after the order is created
   if (!/\.stl$/i.test(f.name)){
     form.model = {file:f.name, manual:true}; $('drop-title').textContent = f.name; $('drop-sub').textContent = t('manual_quote');
     $('viewer').hidden = true; renderQuote(); return;
@@ -1820,7 +1881,7 @@ const drop = $('drop');
 drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
 $('sample-btn').onclick = () => {
   const m = {file:'desk-planter.stl', x:96, y:96, z:110, volCm3:96, tris:18432, lathe:true};
-  form.model = m; $('f-name').value = t('cat_pot');
+  form.model = m; form.modelFile = null; $('f-name').value = t('cat_pot');
   $('drop-title').textContent = 'desk-planter.stl'; $('drop-sub').textContent = '18 432 △ · 96 cm³';
   showModel(m); renderQuote();
 };
@@ -2092,7 +2153,11 @@ function renderTrack(){
     </div>`;
     if ($('copy-card')) $('copy-card').onclick = () => copyText(o.server ? ((o.card || '').match(/\d[\d ]{12,}\d/) || [o.card])[0] : '4169 0000 0000 0000');
     if ($('paid')) $('paid').onclick = async () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null;
-      if (o.server){ try { await api(`/api/orders/${o.id}/paid?code=${o.code}`, {}); } catch(e){ toast(t('server_err')); return; } }
+      if (o.server){
+        $('paid').disabled = true;
+        if (f){ const r = await uploadToOrder(o, 'receipt', f, p => { $('paid').textContent = `${t('uploading')} ${Math.round(p * 100)}%`; }); if (r.error){ $('paid').disabled = false; $('paid').textContent = t('paid_btn'); toast(t('server_err')); return; } }
+        else { try { await api(`/api/orders/${o.id}/paid?code=${o.code}`, {}); } catch(e){ $('paid').disabled = false; toast(t('server_err')); return; } }
+      }
       o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };
   } else pay.innerHTML = '';
   // notifications feed
@@ -2327,10 +2392,115 @@ $('free-form').addEventListener('submit', async e => {
   $('fr-done').hidden = false; if (FREE) FREE.count++; renderFree();
 });
 
+/* ---------- operator panel ---------- */
+let OPTOK = ''; try { OPTOK = localStorage.getItem('s3d-op') || ''; } catch(e){}
+let OPS = null, opsTab = 'orders', opsAll = false, opsLoadedAt = 0, opsDrawArm = false;
+const opsApi = async (path, body) => {
+  const r = await fetch(path, body ? {method:'POST', headers:{'content-type':'application/json', 'x-op': OPTOK}, body: JSON.stringify(body)} : {headers:{'x-op': OPTOK}, cache:'no-store'});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401){ opsLogout(true); throw new Error('login'); }
+  if (!r.ok || j.error) throw new Error(j.error || 'http_' + r.status);
+  return j;
+};
+function opsLogout(silent){ OPTOK = ''; try { localStorage.removeItem('s3d-op'); } catch(e){} OPS = null; $('nav-ops').hidden = true; if (!silent) location.hash = 'home'; else if (route() === 'ops') renderOps(); }
+async function loadOps(){ if (!OPTOK || !SERVER) return; opsLoadedAt = Date.now(); try { OPS = await opsApi('/api/op/state'); opsBadge(); if (route() === 'ops') renderOps(); } catch(e){} }
+function opsBadge(){
+  if (!OPS) return;
+  const n = OPS.orders.filter(o => ['review','paycheck'].includes(o.status)).length + OPS.free.filter(a => a.status === 'new').length;
+  $('ops-cnt').hidden = !n; $('ops-cnt').textContent = n;
+}
+const OPS_ORDER = ['review','paycheck','pay','queue','printing','post','ready','done','rejected'];
+const ago = ts => { const m = Math.round((Date.now() - ts) / 6e4); return m < 60 ? `${m} мин` : m < 1440 ? `${Math.round(m/60)} ч` : `${Math.round(m/1440)} д`; };
+const fsize = b => b > 1048576 ? (b/1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(b/1024)) + ' КБ';
+function opsOrderCard(o){
+  const busy = Object.fromEntries((OPS.printers || []).filter(p => p.order).map(p => [p.id, p.order]));
+  const pr = OPS.printers.find(p => p.id === o.printer);
+  const mid = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
+  let acts = '';
+  if (o.status === 'review') acts = `<input type="number" min="1" step="1" value="${mid}" data-price="${o.id}" aria-label="Цена"> AZN <button type="button" class="btn-sm btn-primary" data-op="c" data-id="${o.id}">✅ Подтвердить</button> <input type="text" placeholder="причина отказа" data-reason="${o.id}" style="width:160px"> <button type="button" class="btn-sm" data-op="r" data-id="${o.id}">❌ Отклонить</button>`;
+  else if (['pay','paycheck'].includes(o.status)) acts = `<button type="button" class="btn-sm btn-primary" data-op="p" data-id="${o.id}">💰 Оплата получена</button>`;
+  else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${p.name}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
+  else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
+  else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
+  else if (o.status === 'ready') acts = `<button type="button" class="btn-sm btn-primary" data-op="g" data-id="${o.id}">🙏 Выдан</button> <button type="button" class="btn-sm" data-op="rp" data-id="${o.id}">🔁 Перепечатать</button>`;
+  const files = o.files.map((f, i) => `<a href="/api/op/file/${o.id}/${i}?t=${encodeURIComponent(OPTOK)}">📎 ${esc(f.name)} · ${fsize(f.size)}</a>`).join('') + (o.receipt ? `<a href="/api/op/receipt/${o.id}?t=${encodeURIComponent(OPTOK)}">🧾 чек</a>` : '');
+  const price = o.price != null ? `${o.price} AZN` : o.lo ? `${o.lo}–${o.hi} AZN (расчёт)` : 'считает оператор';
+  return `<div class="panel opc ${['done','rejected'].includes(o.status) ? 'dim' : ''}">
+    <div class="opc-h"><b>${o.id}</b><span class="pill ${PILL[o.status] || 'mut'}">${t('st_' + o.status)}</span>${o.free ? '<span class="pill acc">🎁 бесплатно</span>' : ''}${o.urgent ? '<span class="pill bad">24 ч</span>' : ''}${o.pub ? '' : '<span class="pill mut">приватный</span>'}<span class="note">${ago(o.created)} назад</span></div>
+    <div><b>${esc(o.name || '—')}</b>${o.mat ? ` · ${esc(o.mat)} ${esc(o.colorName || '')}` : ''} · ${o.qty} шт.${o.grams ? ` · ≈${Math.round(o.grams)} г · ≈${(o.hours || 0).toFixed(1)} ч` : ''} · <b>${price}</b></div>
+    <div class="note">${esc(o.client)} · <a href="tel:${esc((o.contact || '').replace(/[^+\d]/g, ''))}">${esc(o.contact || '')}</a> · ${o.ch === 'email' ? 'email ' + esc(o.email || '') : o.tg ? 'Telegram ✓' : 'Telegram ✗ (бот не подключён)'}${o.deliv ? ' · курьер' : ''}</div>
+    ${[o.check ? `Проверка: ${esc(o.check)}` : '', o.comment ? `Комментарий: «${esc(o.comment)}»` : '', o.disc ? `Скидка на сайте: −${o.discPct}% (${esc(o.disc)})` : '', o.nth && o.nth % 5 === 0 ? `🎉 ${o.nth}-й заказ клиента — скидка −30%` : '', o.student ? '🎓 студент — проверить студенческий' : '', o.kids ? '🧸 детская игрушка' : '', o.gift ? `🎁 подарок для ${esc(o.gift)}` : '', o.accept === 'issue' ? `❓ Вопрос клиента: «${esc(o.issueText || '')}»` : '', o.reason ? `Причина отказа: ${esc(o.reason)}` : ''].filter(Boolean).map(x => `<div class="note">${x}</div>`).join('')}
+    ${o.link ? `<div class="note">🔗 <a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.link)}</a> — проверьте лицензию</div>` : ''}
+    ${files ? `<div class="files">${files}</div>` : (o.kind === 'file' ? '<div class="note">Файл не загружен — запросите у клиента</div>' : '')}
+    ${pr ? `<div class="note">🖨 ${pr.name}${pr.state ? ` · ${pr.state} ${pr.percent}% · слой ${pr.layer}/${pr.layers} · осталось ${fmtH((pr.remaining || 0) / 60)}` : ''}</div>` : ''}
+    ${acts ? `<div class="acts">${acts}</div>` : ''}
+  </div>`;
+}
+function renderOps(){
+  $('ops-login').hidden = !!OPTOK; $('ops-login').textContent = t('ops_need_login');
+  $('ops-refresh').hidden = $('ops-logout').hidden = !OPTOK;
+  if (!OPTOK){ $('ops-tabs').innerHTML = ''; $('ops-body').innerHTML = ''; return; }
+  if (!OPS){ $('ops-body').innerHTML = '<p class="note">…</p>'; if (Date.now() - opsLoadedAt > 3000) loadOps(); return; }
+  const active = OPS.orders.filter(o => !['done','rejected'].includes(o.status));
+  const freeNew = OPS.free.filter(a => a.status === 'new').length;
+  $('ops-tabs').innerHTML = [['orders', `Заказы · ${active.length}`], ['printers', 'Принтеры'], ['free', `Розыгрыш${freeNew ? ' · ' + freeNew + ' новых' : ''}`]]
+    .map(([k, l]) => `<button type="button" class="btn-sm" data-tab="${k}" aria-pressed="${opsTab === k}">${l}</button>`).join('');
+  let html = '';
+  if (opsTab === 'orders'){
+    const list = (opsAll ? OPS.orders : active).slice().sort((a, b) => OPS_ORDER.indexOf(a.status) - OPS_ORDER.indexOf(b.status) || b.created - a.created);
+    html = `<div class="row" style="margin-bottom:12px"><label class="check"><input type="checkbox" id="ops-all" ${opsAll ? 'checked' : ''}> показывать выданные и отклонённые за 3 дня</label></div>
+      <div class="ops-list">${list.length ? list.map(opsOrderCard).join('') : '<div class="panel empty">Активных заказов нет</div>'}</div>`;
+  } else if (opsTab === 'printers'){
+    html = `<div class="ops-grid">${OPS.printers.map(p => {
+      const online = p.seen && Date.now() - p.seen < 120000;
+      return `<div class="panel opc"><div class="opc-h"><b>${p.name}</b><span class="pill ${online ? 'good' : 'mut'}">${online ? (p.state || 'на связи') : 'нет связи с мостом'}</span></div>
+        ${online && p.state ? `<div class="note">${p.percent}% · слой ${p.layer}/${p.layers} · осталось ${fmtH((p.remaining || 0) / 60)}</div>` : ''}
+        ${p.error ? `<div class="note" style="color:var(--bad)">Ошибка: ${esc(p.error)}</div>` : ''}
+        <div class="note">${p.order ? `Заказ: <b>${p.order}</b>` : 'Свободен'} · камера: ${p.video ? 'видео' : p.frame ? 'фото' : 'нет'}</div>
+        <div class="acts"><button type="button" class="btn-sm" data-cam="${p.id}">📹 Камера</button></div></div>`; }).join('')}</div>`;
+  } else {
+    const today = OPS.free.filter(a => a.day === OPS.freeDay), older = OPS.free.filter(a => a.day !== OPS.freeDay);
+    const card = a => `<div class="panel opc ${['no','lost'].includes(a.status) ? 'dim' : ''}"><div class="opc-h"><b>№${a.id}</b><span class="pill ${({new:'warn', ok:'good', no:'bad', won:'acc', lost:'mut'})[a.status]}">${({new:'ждёт проверки', ok:'допущена', no:'отклонена', won:'🎉 победитель', lost:'не выиграла'})[a.status]}</span><span class="note">${a.day}</span></div>
+      <div>${esc(a.name)} · <a href="tel:${esc((a.contact || '').replace(/[^+\d]/g, ''))}">${esc(a.contact || '')}</a> · ${a.tg ? 'Telegram ✓' : 'бот не подключён'}</div>
+      ${a.link ? `<div class="note">🔗 <a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.link)}</a></div>` : ''}${a.idea ? `<div class="note">«${esc(a.idea)}»</div>` : ''}${a.order_id ? `<div class="note">Заказ: ${a.order_id}</div>` : ''}
+      ${['new','ok','no'].includes(a.status) ? `<div class="acts"><button type="button" class="btn-sm ${a.status === 'ok' ? 'btn-primary' : ''}" data-fr="${a.id}" data-ok="1">✅ Подходит</button><button type="button" class="btn-sm" data-fr="${a.id}" data-ok="0">❌ Не подходит</button></div>` : ''}</div>`;
+    html = `<div class="panel" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span>Розыгрыш ${OPS.freeDay} в 20:00 · допущено ${today.filter(a => a.status === 'ok').length} из ${today.length}</span>
+      ${OPS.drawn ? '<span class="pill acc">сегодня уже разыграно</span>' : `<button type="button" class="btn-sm ${opsDrawArm ? 'btn-primary' : ''}" id="ops-draw">${opsDrawArm ? 'Точно разыграть сейчас? Нажмите ещё раз' : '🎲 Разыграть сейчас'}</button>`}</div>
+      <div class="ops-list">${today.length ? today.map(card).join('') : '<div class="panel empty">Заявок на этот розыгрыш пока нет</div>'}${older.length ? '<p class="label" style="margin-top:12px">Вчера</p>' + older.map(card).join('') : ''}</div>`;
+  }
+  // keep typed values (price / reason) across the periodic refresh
+  const keep = {}; document.querySelectorAll('#ops-body [data-price],#ops-body [data-reason],#ops-body [data-pid]').forEach(el => { keep[(el.dataset.price ? 'p' : el.dataset.reason ? 'r' : 's') + (el.dataset.price || el.dataset.reason || el.dataset.pid)] = el.value; });
+  const focused = document.activeElement && document.activeElement.closest('#ops-body') ? true : false;
+  if (focused) return; // don't redraw under someone typing
+  $('ops-body').innerHTML = html;
+  document.querySelectorAll('#ops-body [data-price],#ops-body [data-reason],#ops-body [data-pid]').forEach(el => { const k = (el.dataset.price ? 'p' : el.dataset.reason ? 'r' : 's') + (el.dataset.price || el.dataset.reason || el.dataset.pid); if (keep[k] !== undefined) el.value = keep[k]; });
+}
+$('ops-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; opsTab = b.dataset.tab; opsDrawArm = false; renderOps(); });
+$('ops-body').addEventListener('change', e => { if (e.target.id === 'ops-all'){ opsAll = e.target.checked; e.target.blur(); renderOps(); } });
+$('ops-body').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  try {
+    if (b.dataset.op){
+      const id = b.dataset.id, body = {id, act: b.dataset.op};
+      if (body.act === 'c') body.price = +(document.querySelector(`[data-price="${id}"]`) || {}).value;
+      if (body.act === 'r') body.reason = (document.querySelector(`[data-reason="${id}"]`) || {}).value || '';
+      if (body.act === 'sp') body.pid = (document.querySelector(`[data-pid="${id}"]`) || {}).value;
+      b.disabled = true; const r = await opsApi('/api/op/act', body); toast(r.note);
+    } else if (b.dataset.fr){ b.disabled = true; const r = await opsApi('/api/op/free', {id: +b.dataset.fr, ok: b.dataset.ok === '1'}); toast(r.note); }
+    else if (b.id === 'ops-draw'){ if (!opsDrawArm){ opsDrawArm = true; renderOps(); return; } opsDrawArm = false; const r = await opsApi('/api/op/draw', {}); toast(r.note); }
+    else if (b.dataset.cam){ const r = await opsApi('/api/op/camlink', {pid: b.dataset.cam}); location.href = r.url; return; }
+  } catch(err){ if (err.message !== 'login') toast(err.message); }
+  b.blur(); await loadOps();
+});
+$('ops-refresh').onclick = () => loadOps();
+$('ops-logout').onclick = async () => { try { await opsApi('/api/op/logout', {}); } catch(e){} opsLogout(false); };
+setInterval(() => { if (OPTOK && SERVER && (route() === 'ops' || Date.now() - opsLoadedAt > 60000)) loadOps(); }, 10000);
+
 let camPid = '', camTok = '';
-const ROUTES = ['home','new','free','cam','catalog','live','orders','track','admin'];
+const ROUTES = ['home','new','free','cam','ops','catalog','live','orders','track','admin'];
 function route(){
   const h = location.hash.slice(1);
+  if (h.startsWith('op-')){ OPTOK = h.slice(3); try { localStorage.setItem('s3d-op', OPTOK); } catch(e){} history.replaceState(null, '', location.pathname + location.search + '#ops'); return 'ops'; }
   if (h.startsWith('cam-')){ const parts = h.slice(4).split('-'); camTok = parts.pop(); camPid = parts.join('-'); return 'cam'; }
   if (h.startsWith('track-')){ const parts = h.slice(6).split('-'); trackId = parts.slice(0,2).join('-').toUpperCase(); trackCode = (parts[2] || '').toLowerCase(); return 'track'; }
   return ROUTES.includes(h) ? h : 'home';
@@ -2343,6 +2513,7 @@ function full(){
   const r = route();
   if (r === 'orders') renderOrders();
   if (r === 'free') renderFree();
+  if (r === 'ops') renderOps();
   if (r === 'track'){ if (!O(trackId) && trackCode) adoptOrder(trackId, trackCode); renderTrack(); }
   if (r === 'admin'){ adminSeen = true; renderAdmin(); }
   if (r === 'live' || r === 'home') renderLive();
