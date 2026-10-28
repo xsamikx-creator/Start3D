@@ -1282,13 +1282,16 @@ function vpReset(){
   if (VP.url) URL.revokeObjectURL(VP.url);
   Object.assign(VP, { key:'', pid:'', qs:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null, wait:undefined });
 }
-const MSE = () => window.ManagedMediaSource && navigator.userAgent.match(/iPhone|iPad/) ? null : (window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(VMIME) ? MediaSource : null);
+// iPhone/iPad (iOS 17.1+) have ManagedMediaSource; everything else MediaSource; only very old iPhones fall back to native HLS.
+const MSE = () => (window.ManagedMediaSource && ManagedMediaSource.isTypeSupported(VMIME)) ? ManagedMediaSource
+  : (window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(VMIME) ? MediaSource : null);
 function vpStart(){
   const v = $('cam-v'), pid = VP.pid, qs = VP.qs;
   const M = MSE();
   if (!M){ // iPhone / iPad: native HLS
     VP.native = true; v.src = `/api/cam/${pid}/live.m3u8?${qs}`; v.hidden = false; v.play().catch(() => {}); return;
   }
+  v.disableRemotePlayback = true; // required for ManagedMediaSource on iPhone
   VP.ms = new M(); VP.url = URL.createObjectURL(VP.ms); v.src = VP.url;
   VP.ms.addEventListener('sourceopen', () => { try { VP.sb = VP.ms.addSourceBuffer(VMIME); VP.sb.mode = 'sequence'; VP.sb.addEventListener('updateend', vpPump); vpPump(); } catch(e){} }, {once:true});
 }
