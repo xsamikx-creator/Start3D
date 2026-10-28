@@ -559,6 +559,12 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   </div>
 </section>
 
+<!-- OPERATOR CAMERA (link from /cam in the operators' Telegram group) -->
+<section id="view-cam" hidden>
+  <div class="page-head"><div><p class="label" data-i="pc_label"></p><h1 id="pc-title"></h1><p class="note" id="pc-note"></p></div></div>
+  <div id="pc-holder"></div>
+</section>
+
 <!-- FREE PRINT OF THE DAY -->
 <section id="view-free" hidden>
   <div class="page-head"><div><p class="label" data-i="fr_label"></p><h1 data-i="fr_h"></h1><p data-i="fr_p"></p></div></div>
@@ -980,6 +986,10 @@ assign_later:['operator təyin edəcək','назначит оператор','п
 cam_buf:['Yayın toplanır — tam axın kimi göstərmək üçün','Копим эфир, чтобы показать его плавно','Накопичуємо ефір, щоб показати його плавно','Buffering so the stream plays smoothly'],
 cam_buf_in:['başlayacaq','начнётся через','почнеться через','starts in'],
 cam_delay:['2 dəq gecikmə','задержка 2 мин','затримка 2 хв','2 min delay'],
+pc_label:['Kamera · yalnız komanda üçün','Камера · только для команды','Камера · лише для команди','Camera · team only'],
+pc_note:['Video ~10 san gecikmə ilə. Kamera açılır — ilk görüntü 20–30 saniyəyə. Link 2 saat işləyir, müştərilərə göndərməyin.','Видео с задержкой ~10 с. Камера включается — первая картинка через 20–30 секунд. Ссылка действует 2 часа, клиентам не пересылайте.','Відео із затримкою ~10 с. Камера вмикається — перша картинка через 20–30 секунд. Посилання діє 2 години, клієнтам не пересилайте.','Video ~10 s behind. The camera is starting — first picture in 20–30 seconds. The link works for 2 hours; do not share it with clients.'],
+pc_expired:['Link köhnəlib. Operator qrupunda yenidən /cam yazın.','Ссылка устарела. Напишите /cam в группе операторов ещё раз.','Посилання застаріло. Напишіть /cam у групі операторів ще раз.','The link has expired. Send /cam in the operators group again.'],
+pc_starting:['Kamera açılır…','Включаем камеру…','Вмикаємо камеру…','Starting the camera…'],
 cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
 timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
 pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
@@ -1265,16 +1275,16 @@ async function playerLoad(pid, o, c){
    Chrome/Android/desktop Safari: Media Source Extensions fed with the delayed fMP4 segments.
    iPhone (no MSE): the native player with the server's HLS playlist. */
 const VMIME = 'video/mp4; codecs="avc1.4D401F"';
-const VP = { key:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null };
+const VP = { key:'', pid:'', qs:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null };
 function vpReset(){
   const v = document.getElementById('cam-v');
   if (v){ try { v.pause(); } catch(e){} v.removeAttribute('src'); try { v.load(); } catch(e){} v.hidden = true; }
   if (VP.url) URL.revokeObjectURL(VP.url);
-  Object.assign(VP, { key:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null });
+  Object.assign(VP, { key:'', pid:'', qs:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null, wait:undefined });
 }
 const MSE = () => window.ManagedMediaSource && navigator.userAgent.match(/iPhone|iPad/) ? null : (window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(VMIME) ? MediaSource : null);
-function vpStart(pid, o){
-  const v = $('cam-v'), qs = chunkQs(o);
+function vpStart(){
+  const v = $('cam-v'), pid = VP.pid, qs = VP.qs;
   const M = MSE();
   if (!M){ // iPhone / iPad: native HLS
     VP.native = true; v.src = `/api/cam/${pid}/live.m3u8?${qs}`; v.hidden = false; v.play().catch(() => {}); return;
@@ -1285,11 +1295,11 @@ function vpStart(pid, o){
 async function vpFetch(url){ const r = await fetch(url); if (!r.ok) throw new Error(r.status); return new Uint8Array(await r.arrayBuffer()); }
 async function vpPump(){
   if (!VP.sb || VP.sb.updating || VP.busy || !VP.queue.length) return;
-  const v = $('cam-v'), seg = VP.queue[0], pid = VP.key.split('|')[1], o = O(VP.key.split('|')[0]);
+  const v = $('cam-v'), seg = VP.queue[0], pid = VP.pid, qs = VP.qs;
   VP.busy = true;
   try {
-    if (seg.sess !== VP.sess){ const init = await vpFetch(`/api/cam/${pid}/vinit/${seg.sess}?${chunkQs(o)}`); VP.sess = seg.sess; VP.busy = false; VP.sb.appendBuffer(init); return; }
-    const data = await vpFetch(`/api/cam/${pid}/vseg/${seg.n}?${chunkQs(o)}`);
+    if (seg.sess !== VP.sess){ const init = await vpFetch(`/api/cam/${pid}/vinit/${seg.sess}?${qs}`); VP.sess = seg.sess; VP.busy = false; VP.sb.appendBuffer(init); return; }
+    const data = await vpFetch(`/api/cam/${pid}/vseg/${seg.n}?${qs}`);
     VP.queue.shift(); VP.busy = false; VP.sb.appendBuffer(data);
   } catch(e){ VP.queue.shift(); VP.busy = false; setTimeout(vpPump, 500); return; }
   // start once a few seconds are buffered; keep the buffer small
@@ -1300,27 +1310,44 @@ async function vpPump(){
     if (VP.started && v.paused && !v.ended) v.play().catch(() => {});
   }
 }
-async function vpList(pid, o){
+async function vpList(){
   VP.listAt = Date.now();
   try {
-    const j = await api(`/api/cam/${pid}/vlist?${chunkQs(o)}since=${Math.max(0, VP.next)}`);
-    VP.wait = j.wait || 0;
+    const j = await api(`/api/cam/${VP.pid}/vlist?${VP.qs}since=${Math.max(0, VP.next)}`);
+    VP.wait = j.wait || 0; VP.on = !!j.on;
     let segs = j.segs || [];
     if (VP.next < 0) segs = segs.slice(-3); // join near the (delayed) live edge
     for (const x of segs){ VP.queue.push(x); VP.next = Math.max(VP.next, x.n); }
     vpPump();
   } catch(e){}
 }
-function videoTick(o, pid){
-  const key = o.id + '|' + pid;
-  if (VP.key !== key){ vpReset(); VP.key = key; vpStart(pid, o); }
-  if (!VP.native && Date.now() - VP.listAt > 2000) vpList(pid, o);
-  const buf = $('cam-buf'), wait = VP.native ? (o.live.video.wait || 0) : (VP.started ? 0 : (VP.wait ?? o.live.video.wait ?? 0));
+function videoTick(o, pid){ return videoTickG(o.id + '|' + pid, pid, chunkQs(o), o.live.video.wait || 0); }
+function videoTickG(key, pid, qs, srvWait){
+  if (VP.key !== key){ vpReset(); Object.assign(VP, {key, pid, qs}); vpStart(); }
+  if (!VP.native && Date.now() - VP.listAt > 2000) vpList();
+  const buf = $('cam-buf'), wait = VP.native ? srvWait : (VP.started ? 0 : (VP.wait ?? srvWait ?? 0));
   if (!VP.started && !VP.native || wait > 0){
     buf.hidden = false;
     buf.innerHTML = `<span>${t('cam_buf')}</span>${wait > 0 ? `<span>${t('cam_buf_in')} <b>${Math.floor(wait/60)}:${String(wait%60).padStart(2,'0')}</b></span>` : ''}`;
   } else buf.hidden = true;
   if (VP.started || VP.native){ $('cam-img').hidden = true; $('cam-video').hidden = true; }
+}
+let pcStillAt = 0, pcBad = false;
+function camTick(){
+  const p = {name: ({'a1-1':'A1 #1','a1-2':'A1 #2','k2':'K2 Plus','ender':'Ender 3 V3'})[camPid] || camPid}, qs = `tok=${encodeURIComponent(camTok)}&`;
+  $('pc-title').textContent = (p.name || camPid).replace(/^Printer /, '');
+  $('pc-note').textContent = pcBad ? t('pc_expired') : t('pc_note');
+  $('cam-canvas').style.visibility = 'hidden'; $('cam-banner').hidden = true; $('t-oled').innerHTML = '';
+  $('cam-printer').textContent = p.name || camPid; $('cam-live').hidden = false; $('cam-viewers').innerHTML = '';
+  if (pcBad) return;
+  videoTickG('cam|' + camPid, camPid, qs, 0);
+  if (!VP.started && !VP.native){
+    $('cam-buf').innerHTML = `<span>${t('pc_starting')}</span>`;
+    if (Date.now() - pcStillAt > 3000){ pcStillAt = Date.now(); // still photo while the video spins up (or for printers without a video camera)
+      fetch(`/api/cam/${camPid}?${qs}t=${Date.now()}`).then(r => { if (r.status === 403){ pcBad = true; return null; } return r.ok ? r.blob() : null; })
+        .then(b => { if (!b) return; const img = $('cam-img'), old = img.src; img.src = URL.createObjectURL(b); img.hidden = false; if (old.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(old), 1000); }).catch(() => {});
+    }
+  }
 }
 function playerTick(o){
   const vpid = o && o.live && o.live.video && o.status === 'printing' && !$('t-body').hidden ? (o.live.printer || o.printer_srv) : null;
@@ -2160,9 +2187,11 @@ $('free-form').addEventListener('submit', async e => {
   $('fr-done').hidden = false; if (FREE) FREE.count++; renderFree();
 });
 
-const ROUTES = ['home','new','free','catalog','live','orders','track','admin'];
+let camPid = '', camTok = '';
+const ROUTES = ['home','new','free','cam','catalog','live','orders','track','admin'];
 function route(){
   const h = location.hash.slice(1);
+  if (h.startsWith('cam-')){ const parts = h.slice(4).split('-'); camTok = parts.pop(); camPid = parts.join('-'); return 'cam'; }
   if (h.startsWith('track-')){ const parts = h.slice(6).split('-'); trackId = parts.slice(0,2).join('-').toUpperCase(); trackCode = (parts[2] || '').toLowerCase(); return 'track'; }
   return ROUTES.includes(h) ? h : 'home';
 }
@@ -2201,8 +2230,16 @@ function live(){
     if (camOn){ $('cam-banner').innerHTML = `<b>start3d</b><span>${esc(o.client || '')} · ${esc(o.name || '')}</span>${o.live.stream || o.live.video ? `<span class="cam-delay">· ${t('cam_delay')}</span>` : ''}`; $('t-oled').innerHTML = ''; }
   }
 }
+let camHome = null;
+function placeCam(r){
+  const scr = $('cam-canvas').parentElement;
+  if (!camHome) camHome = { parent: scr.parentElement, next: scr.nextSibling };
+  if (r === 'cam' && scr.parentElement !== $('pc-holder')) $('pc-holder').appendChild(scr);
+  if (r !== 'cam' && scr.parentElement !== camHome.parent) camHome.parent.insertBefore(scr, camHome.next);
+}
 function show(){
   const r = route();
+  placeCam(r);
   ROUTES.forEach(v => $('view-'+v).hidden = v !== r);
   document.querySelectorAll('nav a').forEach(a => (a.dataset.route === r || (r === 'track' && a.dataset.route === 'orders')) ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
   full(); window.scrollTo(0,0);
@@ -2557,7 +2594,8 @@ function frame(now){
       drawPrint(cv, p, o.layers, COLORS[o.color][1], noz, o.shape, err);
     });
   }
-  if (r === 'track') playerTick(O(trackId)); else { if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } if (VP.key){ vpReset(); $('cam-buf').hidden = true; } }
+  if (r === 'cam') camTick(); else if (VP.key && VP.key.startsWith('cam|')){ vpReset(); $('cam-buf').hidden = true; }
+  if (r === 'track') playerTick(O(trackId)); else if (r !== 'cam') { if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } if (VP.key){ vpReset(); $('cam-buf').hidden = true; } }
   if (r === 'track'){
     const o = O(trackId);
     if (o && !$('t-body').hidden){

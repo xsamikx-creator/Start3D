@@ -327,11 +327,11 @@ async function bridgeChunk(env, req, url, pid) {
 /* ---------- real video (IP camera → ffmpeg → fragmented MP4 segments) ----------
    The bridge uploads an init segment per ffmpeg session and ~4 s media segments. Viewers only see segments
    that arrived at least DELAY ago, so playback always has footage ready and stays smooth. */
-const delayOf = (env) => Number(env.STREAM_DELAY_MS) || STREAM_DELAY_MS;
-async function videoState(env, pid) {
+const delayOf = (env, preview) => preview ? 6000 : Number(env.STREAM_DELAY_MS) || STREAM_DELAY_MS;
+async function videoState(env, pid, preview) {
   const r = await env.DB.prepare('SELECT MIN(at) AS first, MAX(at) AS last FROM vid_seg WHERE pid=?').bind(pid).first();
   if (!r?.last || now() - r.last > 30000) return { on: false };
-  const d = delayOf(env);
+  const d = delayOf(env, preview);
   return { on: true, wait: Math.max(0, Math.ceil((d - (now() - r.first)) / 1000)), delay: d };
 }
 async function bridgeVInit(env, req, url, pid) {
@@ -359,13 +359,16 @@ async function bridgeVSeg(env, req, url, pid) {
 // Which printers have an order that is printing right now (the bridge records video only for those).
 async function bridgeBusy(env) {
   const rs = await env.DB.prepare("SELECT p.id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
-  return json({ busy: rs.results.map((r) => r.id) });
+  const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
+  const busy = new Set(rs.results.map((r) => r.id));
+  for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
+  return json({ busy: [...busy] });
 }
-const visibleSegs = (env, pid, since) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env)).all();
+const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
-  const rs = await visibleSegs(env, pid, Math.round(+url.searchParams.get('since') || 0));
-  return json({ segs: rs.results, ...(await videoState(env, pid)) });
+  const rs = await visibleSegs(env, pid, Math.round(+url.searchParams.get('since') || 0), a.preview);
+  return json({ segs: rs.results, ...(await videoState(env, pid, a.preview)) });
 }
 async function camVInit(env, url, pid, sess) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
@@ -382,8 +385,8 @@ async function camVSeg(env, url, pid, n) {
 // HLS playlist for Safari / iPhone (native player); same delayed segments.
 async function camM3u8(env, url, pid) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
-  const segs = (await visibleSegs(env, pid, 0)).results.slice(-8);
-  const q = url.searchParams.get('order') ? `?order=${encodeURIComponent(url.searchParams.get('order'))}&code=${encodeURIComponent(url.searchParams.get('code') || '')}` : '';
+  const segs = (await visibleSegs(env, pid, 0, a.preview)).results.slice(-8);
+  const sp = url.searchParams, q = sp.get('tok') ? `?tok=${encodeURIComponent(sp.get('tok'))}` : sp.get('order') ? `?order=${encodeURIComponent(sp.get('order'))}&code=${encodeURIComponent(sp.get('code') || '')}` : '';
   const out = ['#EXTM3U', '#EXT-X-VERSION:7', `#EXT-X-TARGETDURATION:${Math.ceil(Math.max(4, ...segs.map((x) => x.dur)))}`, `#EXT-X-MEDIA-SEQUENCE:${segs[0]?.n || 0}`, `#EXT-X-DISCONTINUITY-SEQUENCE:${segs[0]?.disc || 0}`];
   let sess = null;
   for (const x of segs) {
@@ -396,6 +399,15 @@ async function camM3u8(env, url, pid) {
 /* ---------- camera for viewers ---------- */
 // Who may watch printer pid: anyone for a public order, the owner (order + code) for a private one.
 async function camAccess(env, url, pid) {
+  const tok = url.searchParams.get('tok');
+  if (tok) { // operator preview link from /cam: any time, no order needed
+    const v = JSON.parse((await kvGet(env, 'camtok:' + tok)) || 'null');
+    if (!v || v.pid !== pid || v.exp < now()) return { deny: new Response('expired', { status: 403 }) };
+    const until = Number(await kvGet(env, 'campreview:' + pid) || 0);
+    if (until - now() < 4 * 60000) await kvSet(env, 'campreview:' + pid, now() + 5 * 60000);
+    const r = await env.DB.prepare('SELECT order_id, frame, frame_at, watched_at FROM printers WHERE id=?').bind(pid).first();
+    return { r: r || {}, preview: true };
+  }
   const r = await env.DB.prepare('SELECT order_id, frame, frame_at, watched_at FROM printers WHERE id=?').bind(pid).first();
   if (!r || !r.order_id) return { deny: new Response('no camera', { status: 404 }) };
   const o = await getOrder(env, r.order_id);
@@ -423,7 +435,7 @@ async function camFrame(env, url, pid) {
   const a = await camAccess(env, url, pid);
   if (a.deny) return a.deny;
   const r = a.r;
-  if (!r.frame) return new Response('no frame', { status: 404 });
+  if (!r || !r.frame) return new Response('no frame', { status: 404 });
   // D1 returns BLOB columns as plain arrays of numbers; wrap them, otherwise the browser receives "255,216,…" as text
   return new Response(new Uint8Array(r.frame), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-frame-at': String(r.frame_at) } });
 }
@@ -506,6 +518,17 @@ async function onUpdate(env, u, origin) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const r = await drawFree(env, origin, bakuDay(now()), true);
     return r.posted ? undefined : say(r.msg);
+  }
+  if (/^\/cam(@\w+)?$/.test(text)) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'camtok:%' AND json_extract(v,'$.exp') < ?").bind(now()).run();
+    const rows = [];
+    for (const pr of PRINTERS) {
+      const tok = rnd(16);
+      await kvSet(env, 'camtok:' + tok, JSON.stringify({ pid: pr.id, exp: now() + 2 * 3600e3 }));
+      rows.push([{ text: '📹 ' + pr.name, url: `${origin}/#cam-${pr.id}-${tok}` }]);
+    }
+    return say('📹 Камеры принтеров — смотреть можно в любой момент, задержка ~10 с. Ссылки действуют 2 часа, не пересылайте их клиентам.\nЕсли у принтера нет видеокамеры в config.json моста, будет только фото раз в минуту.', { reply_markup: { inline_keyboard: rows } });
   }
   if (/^\/id(@\w+)?$/.test(text)) return say(`Telegram ID: ${from.id}\nChat ID: ${chat.id}`);
   if (chat.type !== 'private') {
