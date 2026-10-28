@@ -257,6 +257,8 @@ for (const p of cfg.printers || []) {
   if (!p.id || (!p.ip && !p.video)) continue;
   log(p.id, [p.ip && `${p.type || 'bambu'} ${p.ip}`, p.video && 'видеокамера'].filter(Boolean).join(' + '));
   if (p.ip && p.type === 'bambu') bambuStatus(p);
-  if (p.video) { videoStreamer(p); if (!p.ip) { p.rtsp = p.video; camera(p); } }
-  else camera(p);
+  if (p.video) videoStreamer(p);
+  // still frames for thumbnails: the printer's own camera if it has one, otherwise snapshots from the video camera
+  if (!p.ip && p.video) p.rtsp = p.video;
+  camera(p);
 }
