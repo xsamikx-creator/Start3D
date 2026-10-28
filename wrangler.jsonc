@@ -20,7 +20,9 @@
   "vars": {
     "BOT_USERNAME": "Strt3d_bot",
     "ADMIN_TG_ID": "",
-    "DEPOSIT_PCT": "50"
+    "DEPOSIT_PCT": "50",
+    // main address of the site; empty = use whatever address the request came to
+    "PUBLIC_ORIGIN": ""
   }
   // Set in the dashboard, never here: BOT_TOKEN, WEBHOOK_SECRET (secrets), CARD_TEXT (payment details).
 }
