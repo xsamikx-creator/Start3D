@@ -660,7 +660,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
         <dt data-i="f_deliv"></dt><dd id="t-deliv"></dd>
       </dl>
       <div id="t-actions" class="row"></div>
-      <p class="note" data-i="speed_note"></p>
+      <p class="note" id="t-speed-note" data-i="speed_note"></p>
     </div>
   </div>
 </section>
@@ -2042,7 +2042,8 @@ function renderTrack(){
   $('cam-live').hidden = o.status !== 'printing' || paused;
   $('t-oled').innerHTML = o.status === 'printing' && o.printer ? `<span data-oled="${o.id}"></span>` : '';
   $('cam-viewers').innerHTML = o.status === 'printing' && o.pub ? `👁 <span data-viewers="${o.id}"></span>` : '';
-  $('t-printer').textContent = pr ? pr.model : t('assign_later');
+  $('t-printer').textContent = o.server ? (o.printerName || t('assign_later')) : pr ? pr.model : t('assign_later');
+  $('t-speed-note').hidden = !!o.server;
   $('t-mat').textContent = `${o.mat} · ${colorName(o.color)}`;
   $('t-price').textContent = o.price === 0 ? '0 AZN' : o.price ? azn(o.price) + (o.paid ? ` · ${Math.round(dep*100)}% ${t('o_paid')}` : '') : (o.lo ? t('pending_price',{lo:o.lo, hi:o.hi}) : t('manual_price'));
   $('t-deliv').textContent = o.deliv ? t('d_cour') : t('d_pick');
@@ -2097,11 +2098,11 @@ function renderTrack(){
   // actions
   const acts = $('t-actions'); acts.innerHTML = '';
   const add = (txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-sm ' + cls; b.textContent = txt; b.onclick = fn; acts.append(b); };
-  if (o.status === 'printing' && !paused) add(t('speed_btn'), '', () => { o.speed = Math.max(o.speed||0, 1/20); save(); });
+  if (o.status === 'printing' && !paused && !o.server) add(t('speed_btn'), '', () => { o.speed = Math.max(o.speed||0, 1/20); save(); });
   if (['post','ready','done'].includes(o.status)) add('▶ ' + t('timelapse'), 'btn-primary', () => { tlStart = performance.now(); });
   if (!owner && o.copy && ['printing','post','ready','done'].includes(o.status)) add(t('copy_h'), 'btn-primary', () => openModal('copy', o));
   if (owner && ['ready','done'].includes(o.status)) add(t('repeat'), '', () => openModal('repeat', o));
-  if (owner && !['done','rejected'].includes(o.status)) add(t(o.pub ? 'make_priv' : 'make_pub'), 'btn-ghost', () => { o.pub = !o.pub; save(); toast(t(o.pub ? 't_pub' : 't_priv')); full(); badges(); });
+  if (owner && !o.server && !['done','rejected'].includes(o.status)) add(t(o.pub ? 'make_priv' : 'make_pub'), 'btn-ghost', () => { o.pub = !o.pub; save(); toast(t(o.pub ? 't_pub' : 't_priv')); full(); badges(); });
 }
 $('t-copy').onclick = () => { const o = O(trackId); if (o) copyText('https://' + linkOf(o)); };
 
