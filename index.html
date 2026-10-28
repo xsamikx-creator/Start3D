@@ -620,7 +620,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   <p class="msg" id="t-locked" hidden></p>
   <div class="split" id="t-body">
     <div style="display:grid;gap:16px">
-      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><canvas id="cam-video" class="camimg" hidden></canvas><div id="cam-banner" class="banner" hidden></div><div id="cam-buf" class="cam-buf" hidden></div>
+      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><canvas id="cam-video" class="camimg" hidden></canvas><video id="cam-v" class="camimg" muted playsinline autoplay disableremoteplayback hidden></video><div id="cam-banner" class="banner" hidden></div><div id="cam-buf" class="cam-buf" hidden></div>
         <div class="tag"><span class="live" id="cam-live">LIVE</span><span id="cam-printer"></span><span id="cam-viewers"></span></div>
         <div id="t-oled"></div></div>
       <div class="reacts" id="t-reacts"></div>
@@ -1261,7 +1261,71 @@ async function playerLoad(pid, o, c){
   } catch(e){ c.failed = (c.failed || 0) + 1; }
   PLAYER.loading.delete(c.t0);
 }
+/* ---------- real video player (IP camera) ----------
+   Chrome/Android/desktop Safari: Media Source Extensions fed with the delayed fMP4 segments.
+   iPhone (no MSE): the native player with the server's HLS playlist. */
+const VMIME = 'video/mp4; codecs="avc1.4D401F"';
+const VP = { key:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null };
+function vpReset(){
+  const v = document.getElementById('cam-v');
+  if (v){ try { v.pause(); } catch(e){} v.removeAttribute('src'); try { v.load(); } catch(e){} v.hidden = true; }
+  if (VP.url) URL.revokeObjectURL(VP.url);
+  Object.assign(VP, { key:'', ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, native:false, url:null });
+}
+const MSE = () => window.ManagedMediaSource && navigator.userAgent.match(/iPhone|iPad/) ? null : (window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(VMIME) ? MediaSource : null);
+function vpStart(pid, o){
+  const v = $('cam-v'), qs = chunkQs(o);
+  const M = MSE();
+  if (!M){ // iPhone / iPad: native HLS
+    VP.native = true; v.src = `/api/cam/${pid}/live.m3u8?${qs}`; v.hidden = false; v.play().catch(() => {}); return;
+  }
+  VP.ms = new M(); VP.url = URL.createObjectURL(VP.ms); v.src = VP.url;
+  VP.ms.addEventListener('sourceopen', () => { try { VP.sb = VP.ms.addSourceBuffer(VMIME); VP.sb.mode = 'sequence'; VP.sb.addEventListener('updateend', vpPump); vpPump(); } catch(e){} }, {once:true});
+}
+async function vpFetch(url){ const r = await fetch(url); if (!r.ok) throw new Error(r.status); return new Uint8Array(await r.arrayBuffer()); }
+async function vpPump(){
+  if (!VP.sb || VP.sb.updating || VP.busy || !VP.queue.length) return;
+  const v = $('cam-v'), seg = VP.queue[0], pid = VP.key.split('|')[1], o = O(VP.key.split('|')[0]);
+  VP.busy = true;
+  try {
+    if (seg.sess !== VP.sess){ const init = await vpFetch(`/api/cam/${pid}/vinit/${seg.sess}?${chunkQs(o)}`); VP.sess = seg.sess; VP.busy = false; VP.sb.appendBuffer(init); return; }
+    const data = await vpFetch(`/api/cam/${pid}/vseg/${seg.n}?${chunkQs(o)}`);
+    VP.queue.shift(); VP.busy = false; VP.sb.appendBuffer(data);
+  } catch(e){ VP.queue.shift(); VP.busy = false; setTimeout(vpPump, 500); return; }
+  // start once a few seconds are buffered; keep the buffer small
+  const b = v.buffered;
+  if (b.length){
+    if (!VP.started && b.end(b.length - 1) - b.start(0) >= 6){ VP.started = true; v.currentTime = b.start(0) + .1; v.hidden = false; v.play().catch(() => {}); }
+    if (VP.started && v.currentTime - b.start(0) > 40 && !VP.sb.updating) setTimeout(() => { try { if (!VP.sb.updating) VP.sb.remove(0, v.currentTime - 20); } catch(e){} }, 0);
+    if (VP.started && v.paused && !v.ended) v.play().catch(() => {});
+  }
+}
+async function vpList(pid, o){
+  VP.listAt = Date.now();
+  try {
+    const j = await api(`/api/cam/${pid}/vlist?${chunkQs(o)}since=${Math.max(0, VP.next)}`);
+    VP.wait = j.wait || 0;
+    let segs = j.segs || [];
+    if (VP.next < 0) segs = segs.slice(-3); // join near the (delayed) live edge
+    for (const x of segs){ VP.queue.push(x); VP.next = Math.max(VP.next, x.n); }
+    vpPump();
+  } catch(e){}
+}
+function videoTick(o, pid){
+  const key = o.id + '|' + pid;
+  if (VP.key !== key){ vpReset(); VP.key = key; vpStart(pid, o); }
+  if (!VP.native && Date.now() - VP.listAt > 2000) vpList(pid, o);
+  const buf = $('cam-buf'), wait = VP.native ? (o.live.video.wait || 0) : (VP.started ? 0 : (VP.wait ?? o.live.video.wait ?? 0));
+  if (!VP.started && !VP.native || wait > 0){
+    buf.hidden = false;
+    buf.innerHTML = `<span>${t('cam_buf')}</span>${wait > 0 ? `<span>${t('cam_buf_in')} <b>${Math.floor(wait/60)}:${String(wait%60).padStart(2,'0')}</b></span>` : ''}`;
+  } else buf.hidden = true;
+  if (VP.started || VP.native){ $('cam-img').hidden = true; $('cam-video').hidden = true; }
+}
 function playerTick(o){
+  const vpid = o && o.live && o.live.video && o.status === 'printing' && !$('t-body').hidden ? (o.live.printer || o.printer_srv) : null;
+  if (vpid){ if (PLAYER.key) playerReset(''); return videoTick(o, vpid); }
+  if (VP.key){ vpReset(); $('cam-buf').hidden = true; }
   const pid = o && o.live && (o.live.printer || o.printer_srv), key = o ? o.id + '|' + pid : '';
   const on = !!(pid && o.live.stream && o.status === 'printing' && !$('t-body').hidden);
   if (!on){ if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } return; }
@@ -2128,12 +2192,13 @@ function live(){
     const o = O(trackId); if (!o) return;
     const fin = ['post','ready','done'].includes(o.status), pct = fin ? 1 : o.progress;
     $('t-pct').textContent = Math.floor(pct*100) + '%'; $('t-bar').style.width = (pct*100) + '%';
-    $('t-layer').textContent = o.status === 'printing' ? (o.live ? `${o.live.layer} / ${o.live.layers}` : `${Math.floor(o.progress*o.layers)} / ${o.layers}`) : fin ? `${o.layers} / ${o.layers}` : '—';
-    $('t-left').textContent = o.status === 'printing' ? (o.live ? fmtH((o.live.remaining || 0) / 60) : fmtH((1-o.progress)*o.hours)) : '—';
-    const camOn = !!(o.server && o.live && (o.live.cam || o.live.stream) && o.status === 'printing');
-    $('cam-img').hidden = !camOn; $('cam-canvas').style.visibility = camOn ? 'hidden' : 'visible';
+    const hasSt = !!(o.live && o.live.layers); // printers without a status link (camera only) report no layers
+    $('t-layer').textContent = o.status === 'printing' ? (hasSt ? `${o.live.layer} / ${o.live.layers}` : o.live ? '—' : `${Math.floor(o.progress*o.layers)} / ${o.layers}`) : fin ? `${o.layers} / ${o.layers}` : '—';
+    $('t-left').textContent = o.status === 'printing' ? (hasSt ? fmtH((o.live.remaining || 0) / 60) : o.live ? '—' : fmtH((1-o.progress)*o.hours)) : '—';
+    const camOn = !!(o.server && o.live && (o.live.cam || o.live.stream || o.live.video) && o.status === 'printing');
+    $('cam-img').hidden = !camOn || VP.started || VP.native || PLAYER.playing; $('cam-canvas').style.visibility = camOn ? 'hidden' : 'visible';
     $('cam-banner').hidden = !camOn;
-    if (camOn){ $('cam-banner').innerHTML = `<b>start3d</b><span>${esc(o.client || '')} · ${esc(o.name || '')}</span>${o.live.stream ? `<span class="cam-delay">· ${t('cam_delay')}</span>` : ''}`; $('t-oled').innerHTML = ''; }
+    if (camOn){ $('cam-banner').innerHTML = `<b>start3d</b><span>${esc(o.client || '')} · ${esc(o.name || '')}</span>${o.live.stream || o.live.video ? `<span class="cam-delay">· ${t('cam_delay')}</span>` : ''}`; $('t-oled').innerHTML = ''; }
   }
 }
 function show(){
@@ -2492,7 +2557,7 @@ function frame(now){
       drawPrint(cv, p, o.layers, COLORS[o.color][1], noz, o.shape, err);
     });
   }
-  if (r === 'track') playerTick(O(trackId)); else if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; }
+  if (r === 'track') playerTick(O(trackId)); else { if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } if (VP.key){ vpReset(); $('cam-buf').hidden = true; } }
   if (r === 'track'){
     const o = O(trackId);
     if (o && !$('t-body').hidden){

@@ -25,6 +25,8 @@ const SCHEMA = [
      link TEXT, idea TEXT, lang TEXT, status TEXT NOT NULL, tg_chat_id INTEGER, op_msg_id INTEGER, order_id TEXT, created_at INTEGER)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS free_day_phone ON free_apps(day, phone)`,
   `CREATE TABLE IF NOT EXISTS cam_chunks (pid TEXT NOT NULL, t0 INTEGER NOT NULL, dur INTEGER, at INTEGER, data BLOB, PRIMARY KEY (pid, t0))`,
+  `CREATE TABLE IF NOT EXISTS vid_seg (pid TEXT NOT NULL, n INTEGER NOT NULL, sess INTEGER, disc INTEGER, dur REAL, at INTEGER, data BLOB, PRIMARY KEY (pid, n))`,
+  `CREATE TABLE IF NOT EXISTS vid_init (pid TEXT NOT NULL, sess INTEGER NOT NULL, at INTEGER, data BLOB, PRIMARY KEY (pid, sess))`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
@@ -266,7 +268,8 @@ async function liveFor(env, o) {
   if (!r || r.order_id !== o.id) return null;
   const st = JSON.parse(r.status || '{}');
   const sc = await env.DB.prepare('SELECT MAX(at) AS at FROM cam_chunks WHERE pid=?').bind(pid).first();
-  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, stream: !!sc?.at && now() - sc.at < 30000, delay: STREAM_DELAY_MS };
+  const vd = await videoState(env, pid);
+  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, stream: !vd.on && !!sc?.at && now() - sc.at < 30000, delay: STREAM_DELAY_MS, video: vd.on ? vd : null };
 }
 
 /* ---------- workshop bridge ---------- */
@@ -319,6 +322,75 @@ async function bridgeChunk(env, req, url, pid) {
   await env.DB.prepare('INSERT OR REPLACE INTO cam_chunks (pid, t0, dur, at, data) VALUES (?,?,?,?,?)').bind(pid, t0, dur, now(), buf).run();
   await env.DB.prepare('DELETE FROM cam_chunks WHERE pid=? AND (t0 < ? OR at < ?)').bind(pid, t0 - STREAM_KEEP_MS, now() - STREAM_KEEP_MS - 60000).run();
   return json({ ok: true });
+}
+
+/* ---------- real video (IP camera → ffmpeg → fragmented MP4 segments) ----------
+   The bridge uploads an init segment per ffmpeg session and ~4 s media segments. Viewers only see segments
+   that arrived at least DELAY ago, so playback always has footage ready and stays smooth. */
+const delayOf = (env) => Number(env.STREAM_DELAY_MS) || STREAM_DELAY_MS;
+async function videoState(env, pid) {
+  const r = await env.DB.prepare('SELECT MIN(at) AS first, MAX(at) AS last FROM vid_seg WHERE pid=?').bind(pid).first();
+  if (!r?.last || now() - r.last > 30000) return { on: false };
+  const d = delayOf(env);
+  return { on: true, wait: Math.max(0, Math.ceil((d - (now() - r.first)) / 1000)), delay: d };
+}
+async function bridgeVInit(env, req, url, pid) {
+  const sess = Math.round(+url.searchParams.get('sess'));
+  const buf = await req.arrayBuffer();
+  if (!Number.isFinite(sess) || buf.byteLength < 8 || buf.byteLength > 200000) return json({ error: 'bad_init' }, 400);
+  await env.DB.prepare('INSERT OR REPLACE INTO vid_init (pid, sess, at, data) VALUES (?,?,?,?)').bind(pid, sess, now(), buf).run();
+  return json({ ok: true });
+}
+async function bridgeVSeg(env, req, url, pid) {
+  const sess = Math.round(+url.searchParams.get('sess')), dur = Math.max(.1, Math.min(20, +url.searchParams.get('dur') || 4));
+  const buf = await req.arrayBuffer();
+  if (!Number.isFinite(sess) || buf.byteLength < 8 || buf.byteLength > 1900000) return json({ error: 'bad_seg' }, 400);
+  const last = await env.DB.prepare('SELECT n, sess, disc FROM vid_seg WHERE pid=? ORDER BY n DESC LIMIT 1').bind(pid).first();
+  const n = Number(await kvGet(env, 'vseq:' + pid) || 0) + 1;
+  let disc = Number(await kvGet(env, 'vdisc:' + pid) || 0);
+  if (last && last.sess !== sess) { disc++; await kvSet(env, 'vdisc:' + pid, disc); }
+  await kvSet(env, 'vseq:' + pid, n);
+  await env.DB.prepare('INSERT OR REPLACE INTO vid_seg (pid, n, sess, disc, dur, at, data) VALUES (?,?,?,?,?,?,?)').bind(pid, n, sess, disc, dur, now(), buf).run();
+  const old = now() - delayOf(env) - 120000;
+  await env.DB.prepare('DELETE FROM vid_seg WHERE pid=? AND at < ?').bind(pid, old).run();
+  await env.DB.prepare('DELETE FROM vid_init WHERE pid=? AND at < ? AND sess NOT IN (SELECT sess FROM vid_seg WHERE pid=?)').bind(pid, old, pid).run();
+  return json({ ok: true, n });
+}
+// Which printers have an order that is printing right now (the bridge records video only for those).
+async function bridgeBusy(env) {
+  const rs = await env.DB.prepare("SELECT p.id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
+  return json({ busy: rs.results.map((r) => r.id) });
+}
+const visibleSegs = (env, pid, since) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env)).all();
+async function camVList(env, url, pid) {
+  const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
+  const rs = await visibleSegs(env, pid, Math.round(+url.searchParams.get('since') || 0));
+  return json({ segs: rs.results, ...(await videoState(env, pid)) });
+}
+async function camVInit(env, url, pid, sess) {
+  const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
+  const r = await env.DB.prepare('SELECT data FROM vid_init WHERE pid=? AND sess=?').bind(pid, sess).first();
+  if (!r) return new Response('gone', { status: 404 });
+  return new Response(new Uint8Array(r.data), { headers: { 'content-type': 'video/mp4', 'cache-control': 'private, max-age=3600' } });
+}
+async function camVSeg(env, url, pid, n) {
+  const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
+  const r = await env.DB.prepare('SELECT data FROM vid_seg WHERE pid=? AND n=?').bind(pid, n).first();
+  if (!r) return new Response('gone', { status: 404 });
+  return new Response(new Uint8Array(r.data), { headers: { 'content-type': 'video/iso.segment', 'cache-control': 'private, max-age=600' } });
+}
+// HLS playlist for Safari / iPhone (native player); same delayed segments.
+async function camM3u8(env, url, pid) {
+  const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
+  const segs = (await visibleSegs(env, pid, 0)).results.slice(-8);
+  const q = url.searchParams.get('order') ? `?order=${encodeURIComponent(url.searchParams.get('order'))}&code=${encodeURIComponent(url.searchParams.get('code') || '')}` : '';
+  const out = ['#EXTM3U', '#EXT-X-VERSION:7', `#EXT-X-TARGETDURATION:${Math.ceil(Math.max(4, ...segs.map((x) => x.dur)))}`, `#EXT-X-MEDIA-SEQUENCE:${segs[0]?.n || 0}`, `#EXT-X-DISCONTINUITY-SEQUENCE:${segs[0]?.disc || 0}`];
+  let sess = null;
+  for (const x of segs) {
+    if (x.sess !== sess) { if (sess !== null) out.push('#EXT-X-DISCONTINUITY'); out.push(`#EXT-X-MAP:URI="/api/cam/${pid}/vinit/${x.sess}${q}"`); sess = x.sess; }
+    out.push(`#EXTINF:${x.dur.toFixed(3)},`, `/api/cam/${pid}/vseg/${x.n}${q}`);
+  }
+  return new Response(out.join('\n') + '\n', { headers: { 'content-type': 'application/vnd.apple.mpegurl', 'cache-control': 'no-store' } });
 }
 
 /* ---------- camera for viewers ---------- */
@@ -774,6 +846,17 @@ export default {
       if (b) return camChunks(env, url, b[1]);
       b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/chunk\/(\d+)$/);
       if (b) return camChunk(env, url, b[1], +b[2]);
+      if (p === '/api/bridge/busy') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeBusy(env); }
+      b = p.match(/^\/api\/bridge\/(vinit|vseg)\/([a-z0-9-]+)$/);
+      if (b && req.method === 'POST') {
+        if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403);
+        if (!PRINTERS.some((x) => x.id === b[2])) return json({ error: 'unknown_printer' }, 400);
+        return b[1] === 'vinit' ? bridgeVInit(env, req, url, b[2]) : bridgeVSeg(env, req, url, b[2]);
+      }
+      b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/(vlist|live\.m3u8)$/);
+      if (b) return b[2] === 'vlist' ? camVList(env, url, b[1]) : camM3u8(env, url, b[1]);
+      b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/(vinit|vseg)\/(\d+)$/);
+      if (b) return b[2] === 'vinit' ? camVInit(env, url, b[1], +b[3]) : camVSeg(env, url, b[1], +b[3]);
       b = p.match(/^\/api\/bridge\/chunk\/([a-z0-9-]+)$/);
       if (b && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeChunk(env, req, url, b[1]); }
       b = p.match(/^\/api\/bridge\/(status|frame)\/([a-z0-9-]+)$/);

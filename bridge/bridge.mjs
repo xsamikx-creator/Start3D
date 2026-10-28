@@ -2,6 +2,8 @@
 // Reads print status and camera frames from printers on the local network
 // and sends them to the Start3D server. Run: node bridge.mjs
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import tls from 'node:tls';
 import { spawn, spawnSync } from 'node:child_process';
 import mqtt from 'mqtt';
@@ -27,8 +29,8 @@ const CHUNK_MS = 4000, MAX_FPS = 5, CHUNK_MAX = 1600000;
 const PRINTING = ['RUNNING', 'PREPARE', 'PAUSE', 'SLICING'];
 const log = (id, ...a) => console.log(new Date().toLocaleTimeString(), `[${id}]`, ...a);
 
-async function post(path, body, type = 'application/json') {
-  const r = await fetch(SERVER + path, {
+async function post(url, body, type = 'application/json') {
+  const r = await fetch(SERVER + url, {
     method: 'POST',
     headers: { authorization: `Bearer ${KEY}`, 'content-type': type },
     body: type === 'application/json' ? JSON.stringify(body) : body,
@@ -37,6 +39,16 @@ async function post(path, body, type = 'application/json') {
   if (!r.ok) throw new Error(`сервер ответил ${r.status}`);
   return r.json();
 }
+
+// Printers with an order in "printing" on the site (used for cameras of printers without a status connection).
+const BUSY = new Set();
+async function pollBusy() {
+  try {
+    const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}` } });
+    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); }
+  } catch {}
+}
+const isPrinting = (p) => p.stream === 'always' || PRINTING.includes(p._state?.gcode_state) || BUSY.has(p.id);
 
 /* ---------- Bambu Lab: status over MQTT ---------- */
 function bambuStatus(p) {
@@ -116,7 +128,7 @@ function ffmpegSnapshot(url) {
 function streamer(p) {
   let frames = [], t0 = 0, size = 0, lastKept = 0, busy = false, seen = 0, seenAt = Date.now(), fpsLogged = false;
   const queue = [];
-  const live = () => p.stream === 'always' || PRINTING.includes(p._state?.gcode_state);
+  const live = () => !p.video && isPrinting(p);
   const pump = async () => {
     if (busy || !queue.length) return;
     busy = true;
@@ -152,7 +164,7 @@ function camera(p) {
   let latest = null, sentAt = 0, watched = false, mode = null;
   const record = streamer(p);
   const send = async () => {
-    const streaming = p.stream === 'always' || PRINTING.includes(p._state?.gcode_state);
+    const streaming = isPrinting(p);
     if (!latest || Date.now() - sentAt < (streaming ? 30000 : watched ? FAST_MS : SLOW_MS)) return;
     const img = latest; sentAt = Date.now();
     try { watched = (await post(`/api/bridge/frame/${p.id}`, img, 'image/jpeg')).watched; }
@@ -166,7 +178,7 @@ function camera(p) {
     mode = 'ffmpeg'; log(p.id, 'камера: беру кадры через ffmpeg');
     const loop = async () => {
       try { latest = await ffmpegSnapshot(rtspUrl); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
-      setTimeout(loop, PRINTING.includes(p._state?.gcode_state) ? 300 : watched ? FAST_MS : 20000);
+      setTimeout(loop, p.video ? 30000 : isPrinting(p) ? 300 : watched ? FAST_MS : 20000);
     };
     loop();
   };
@@ -177,11 +189,74 @@ function camera(p) {
   }
 }
 
+/* ---------- real video from an IP camera: ffmpeg → fragmented MP4 segments → server ---------- */
+function videoInput(url) {
+  if (String(url).startsWith('lavfi:')) return ['-re', '-f', 'lavfi', '-i', String(url).slice(6)]; // test pattern
+  return [...(String(url).startsWith('rtsp') ? ['-rtsp_transport', 'tcp'] : []), '-i', url];
+}
+function videoStreamer(p) {
+  if (!hasFfmpeg()) { log(p.id, 'видео: нужен ffmpeg — выполните в PowerShell: winget install Gyan.FFmpeg, затем перезапустите мост'); return; }
+  let ff = null, sess = 0, dir = '', idle = 0, initSent = false, done = new Set(), queue = [], busy = false, stopping = false;
+  const pump = async () => {
+    if (busy || !queue.length) return;
+    busy = true;
+    const it = queue[0];
+    try {
+      const data = fs.readFileSync(it.file);
+      await post(`/api/bridge/${it.kind}/${p.id}?sess=${it.sess}${it.dur ? '&dur=' + it.dur : ''}`, data, 'application/octet-stream');
+      queue.shift(); if (it.kind === 'vseg') fs.rmSync(it.file, { force: true });
+    } catch (e) { log(p.id, 'видео: не отправил кусок:', e.message); if (queue.length > 15) queue.splice(1, 1); await new Promise((r) => setTimeout(r, 2000)); }
+    busy = false; pump();
+  };
+  const scan = () => {
+    if (!dir) return;
+    const init = path.join(dir, 'init.mp4');
+    if (!initSent && fs.existsSync(init)) { initSent = true; queue.unshift({ kind: 'vinit', sess, file: init }); }
+    let pl; try { pl = fs.readFileSync(path.join(dir, 'live.m3u8'), 'utf8'); } catch { return; }
+    if (!initSent) return;
+    const lines = pl.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^#EXTINF:([\d.]+)/);
+      if (!m || !lines[i + 1] || done.has(lines[i + 1])) continue;
+      done.add(lines[i + 1]); queue.push({ kind: 'vseg', sess, dur: (+m[1]).toFixed(3), file: path.join(dir, lines[i + 1].trim()) });
+    }
+    pump();
+  };
+  const start = () => {
+    sess = Date.now(); initSent = false; done = new Set(); stopping = false;
+    dir = path.join(os.tmpdir(), `start3d-video-${p.id}-${sess}`); fs.mkdirSync(dir, { recursive: true });
+    const args = ['-loglevel', 'error', ...videoInput(p.video), '-an',
+      '-vf', `scale='min(${p.videoWidth || 1280},iw)':-2,fps=${p.videoFps || 15}`,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main', '-level', '3.1', '-pix_fmt', 'yuv420p',
+      '-b:v', `${p.videoKbps || 1000}k`, '-maxrate', `${Math.round((p.videoKbps || 1000) * 1.4)}k`, '-bufsize', `${Math.round((p.videoKbps || 1000) * 2.8)}k`,
+      '-g', String((p.videoFps || 15) * 2), '-keyint_min', String((p.videoFps || 15) * 2), '-sc_threshold', '0',
+      '-f', 'hls', '-hls_time', '4', '-hls_list_size', '12', '-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4',
+      '-hls_segment_filename', path.join(dir, 's%06d.m4s'), path.join(dir, 'live.m3u8')];
+    ff = spawn('ffmpeg', args, { cwd: dir });
+    let errText = '';
+    ff.stderr.on('data', (d) => { errText = (errText + d).slice(-400); });
+    ff.on('close', (code) => {
+      const was = ff; ff = null;
+      if (!stopping) log(p.id, `видео: ffmpeg остановился (${code}) ${errText.trim().split('\n').pop() || ''} — перезапуск`);
+      setTimeout(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }, 60000);
+    });
+    log(p.id, 'видео: запись началась');
+  };
+  setInterval(scan, 1000);
+  setInterval(() => {
+    const want = isPrinting(p);
+    if (want) { idle = 0; if (!ff) start(); }
+    else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
+  }, 2000);
+}
+
 /* ---------- start ---------- */
 console.log(`Start3D мост → ${SERVER}`);
+pollBusy(); setInterval(pollBusy, 10000);
 for (const p of cfg.printers || []) {
-  if (!p.id || !p.ip) continue;
-  log(p.id, `${p.type} ${p.ip}`);
-  if (p.type === 'bambu') bambuStatus(p);
-  camera(p);
+  if (!p.id || (!p.ip && !p.video)) continue;
+  log(p.id, [p.ip && `${p.type || 'bambu'} ${p.ip}`, p.video && 'видеокамера'].filter(Boolean).join(' + '));
+  if (p.ip && p.type === 'bambu') bambuStatus(p);
+  if (p.video) { videoStreamer(p); if (!p.ip) { p.rtsp = p.video; camera(p); } }
+  else camera(p);
 }
