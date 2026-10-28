@@ -260,7 +260,7 @@ async function readOrder(env, id, code) {
 // Frames arrive about once a minute while nobody watches, so a frame counts as live for 2.5 minutes.
 const CAM_FRESH_MS = 150000;
 // Delayed stream: the site plays recorded chunks this far behind real time; chunks are kept a bit longer than that.
-const STREAM_DELAY_MS = 120000, STREAM_KEEP_MS = 240000;
+const STREAM_DELAY_MS = 15000, STREAM_KEEP_MS = 120000;
 async function liveFor(env, o) {
   const pid = JSON.parse(o.data || '{}').printer;
   if (!pid || o.status !== 'printing') return null;
