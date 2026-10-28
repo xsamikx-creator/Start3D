@@ -254,13 +254,15 @@ async function readOrder(env, id, code) {
   if (!o || o.code !== code) return json({ error: 'not_found' }, 404);
   return json(publicOrder(env, o, await liveFor(env, o)));
 }
+// Frames arrive about once a minute while nobody watches, so a frame counts as live for 2.5 minutes.
+const CAM_FRESH_MS = 150000;
 async function liveFor(env, o) {
   const pid = JSON.parse(o.data || '{}').printer;
   if (!pid || o.status !== 'printing') return null;
   const r = await env.DB.prepare('SELECT status, order_id, frame_at FROM printers WHERE id=?').bind(pid).first();
   if (!r || r.order_id !== o.id) return null;
   const st = JSON.parse(r.status || '{}');
-  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < 60000 };
+  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS };
 }
 
 /* ---------- workshop bridge ---------- */
@@ -314,13 +316,14 @@ async function camFrame(env, url, pid) {
   const own = o && url.searchParams.get('order') === o.id && url.searchParams.get('code') === o.code;
   if (!o || o.status !== 'printing' || !(pub || own)) return new Response('forbidden', { status: 403 });
   if (!r.watched_at || now() - r.watched_at > 10000) await env.DB.prepare('UPDATE printers SET watched_at=? WHERE id=?').bind(now(), pid).run();
-  return new Response(r.frame, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-frame-at': String(r.frame_at) } });
+  // D1 returns BLOB columns as plain arrays of numbers; wrap them, otherwise the browser receives "255,216,…" as text
+  return new Response(new Uint8Array(r.frame), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-frame-at': String(r.frame_at) } });
 }
 async function liveList(env) {
   const rs = await env.DB.prepare("SELECT p.id AS pid, p.status, p.frame_at, o.id, o.client, o.data FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
   return json(rs.results.filter((r) => JSON.parse(r.data || '{}').pub).map((r) => {
     const d = JSON.parse(r.data || '{}'), st = JSON.parse(r.status || '{}');
-    return { id: r.id, name: d.name, client: r.client, mat: d.mat, color: d.color ?? 0, printer: r.pid, printerName: printerName(r.pid), percent: st.percent || 0, layer: st.layer || 0, layers: st.layers || 0, remaining: st.remaining || 0, cam: !!r.frame_at && now() - r.frame_at < 60000 };
+    return { id: r.id, name: d.name, client: r.client, mat: d.mat, color: d.color ?? 0, printer: r.pid, printerName: printerName(r.pid), percent: st.percent || 0, layer: st.layer || 0, layers: st.layers || 0, remaining: st.remaining || 0, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS };
   }));
 }
 async function orderPhoto(env, id, code, n) {
