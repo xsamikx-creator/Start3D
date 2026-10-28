@@ -821,8 +821,24 @@ async function freeApply(env, req, origin) {
 async function freeInfo(env) {
   const day = entryDay(now());
   const c = await env.DB.prepare('SELECT COUNT(*) AS c FROM free_apps WHERE day=?').bind(day).first();
-  const w = await env.DB.prepare("SELECT f.day, f.name, f.order_id, o.data FROM free_apps f LEFT JOIN orders o ON o.id = f.order_id WHERE f.status='won' ORDER BY f.day DESC LIMIT 7").all();
-  return json({ day, count: c?.c || 0, winners: w.results.map((x) => ({ day: x.day, name: String(x.name).split(/\s+/)[0], order: x.order_id, model: JSON.parse(x.data || '{}').title || null })) });
+  const w = await env.DB.prepare("SELECT f.day, f.name, f.order_id, f.link, f.idea, o.status, o.data FROM free_apps f LEFT JOIN orders o ON o.id = f.order_id WHERE f.status='won' ORDER BY f.day DESC LIMIT 7").all();
+  const winners = [];
+  for (const x of w.results) {
+    const d = JSON.parse(x.data || '{}');
+    let host = null; try { host = x.link ? new URL(x.link).hostname.replace(/^www\./, '') : null; } catch {}
+    const live = x.status === 'printing' && d.printer ? await liveFor(env, { id: x.order_id, status: x.status, data: x.data }) : null;
+    winners.push({ day: x.day, name: String(x.name).split(/\s+/)[0], order: x.order_id, status: x.status || null,
+      model: d.title || (x.idea ? clip(x.idea, 60) : host ? host : null), photos: (d.photos || []).length,
+      printer: live ? d.printer : null, printerName: live ? printerName(d.printer) : null, video: !!live?.video, cam: !!live?.cam,
+      percent: live?.percent || 0 });
+  }
+  return json({ day, count: c?.c || 0, winners });
+}
+// Final photos of the free prints are public (winners agreed to publication).
+async function freePhoto(env, id, n) {
+  const o = await getOrder(env, id);
+  if (!o || !JSON.parse(o.data || '{}').free) return json({ error: 'not_found' }, 404);
+  return orderPhoto(env, id, o.code, n);
 }
 
 async function drawFree(env, origin, day, manual) {
@@ -883,6 +899,8 @@ export default {
         return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
+      let fp = p.match(/^\/api\/free\/photo\/(S3D-\d+)\/(\d)$/);
+      if (fp) return freePhoto(env, fp[1], +fp[2]);
       if (p === '/api/free') { if (req.method === 'POST') return freeApply(env, req, origin); return freeInfo(env); }
       if (seenOrigin !== origin){ seenOrigin = origin; ctx.waitUntil(kvSet(env, 'origin', origin)); }
       if (p === '/api/live') return liveList(env);

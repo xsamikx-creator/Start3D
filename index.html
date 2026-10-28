@@ -385,6 +385,18 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 .winners{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:14px}
 .winners li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:6px}
 .free-ok{display:grid;gap:10px;padding:16px;border-radius:12px;border:1px solid var(--good);background:color-mix(in srgb,var(--good) 10%,transparent)}
+.fr-now{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:20px;align-items:center;margin-bottom:24px}
+.fr-now .screen{aspect-ratio:16/10}
+.fr-now .screen img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;cursor:zoom-in}
+.fr-now h2{margin-top:6px}
+.fr-now .row{margin-top:12px}
+.winners li.click{cursor:pointer}
+.winners li.click:hover span:first-child{color:var(--accent)}
+.lightbox{position:fixed;inset:0;z-index:60;background:rgba(5,6,8,.92);display:grid;place-items:center;padding:16px}
+.lightbox img{max-width:100%;max-height:82vh;border-radius:12px}
+.lightbox .lb-bar{position:absolute;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:10px;color:#fff}
+.lightbox button{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.2)}
+@media (max-width:760px){.fr-now{grid-template-columns:1fr}}
 .disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -569,6 +581,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 <!-- FREE PRINT OF THE DAY -->
 <section id="view-free" hidden>
   <div class="page-head"><div><p class="label" data-i="fr_label"></p><h1 data-i="fr_h"></h1><p data-i="fr_p"></p></div></div>
+  <div class="panel fr-now" id="fr-now" hidden></div>
   <div class="split">
     <div style="display:grid;gap:16px;align-content:start">
       <form class="panel" id="free-form" style="display:grid;gap:14px" novalidate>
@@ -733,6 +746,12 @@ fr_left:['Seçimə qədər','До розыгрыша','До розіграшу',
 fr_today:['Bu gün müraciət','Заявок сегодня','Заявок сьогодні','Applications today'],
 fr_how:['Qalib saat 20:00-da yoxlanmış müraciətlər arasından təsadüfi seçilir. 20:00-dan sonrakı müraciətlər növbəti günün seçiminə düşür. Nəticə Telegram botuna gəlir.','Победитель выбирается случайно в 20:00 среди проверенных заявок. Заявки после 20:00 участвуют в розыгрыше следующего дня. Результат приходит в Telegram-бот.','Переможця обирають випадково о 20:00 серед перевірених заявок. Заявки після 20:00 беруть участь у розіграші наступного дня. Результат надходить у Telegram-бот.','The winner is picked at random at 20:00 among checked applications. Applications after 20:00 go into the next day\'s draw. The result arrives in the Telegram bot.'],
 fr_winners:['Son qaliblər','Последние победители','Останні переможці','Recent winners'],
+fr_now_live:['İndi çap olunur — {n} üçün hədiyyə','Сейчас печатается подарок для {n}','Зараз друкується подарунок для {n}','Now printing: a gift for {n}'],
+fr_now_queue:['{d} qalibi — {n}. Çap tezliklə başlayacaq','Победитель {d} — {n}. Печать скоро начнётся','Переможець {d} — {n}. Друк скоро почнеться','Winner of {d}: {n}. Printing starts soon'],
+fr_now_done:['{d} hədiyyəsi {n} üçün hazırdır','Подарок {d} для {n} готов','Подарунок {d} для {n} готовий','The {d} gift for {n} is ready'],
+fr_now_prev:['Əvvəlki: {n}, {d}','Предыдущий: {n}, {d}','Попередній: {n}, {d}','Previous: {n}, {d}'],
+fr_now_label:['Günün çapı','Печать дня','Друк дня','Print of the day'],
+fr_photos:['Fotoya bax','Смотреть фото','Дивитися фото','View photos'],
 fr_no_winners:['İlk qalib bu axşam olacaq.','Первый победитель будет уже этим вечером.','Перший переможець буде вже цього вечора.','The first winner will be picked this evening.'],
 fr_ok:['🎉 Müraciət №{n} qəbul edildi! Seçim saat 20:00-da ({d}).','🎉 Заявка №{n} принята! Розыгрыш в 20:00 ({d}).','🎉 Заявку №{n} прийнято! Розіграш о 20:00 ({d}).','🎉 Application #{n} received! The draw is at 20:00 ({d}).'],
 fr_ok_tg:['Nəticə Telegram-a gələcək.','Результат придёт в Telegram.','Результат надійде в Telegram.','The result will arrive in Telegram.'],
@@ -1462,7 +1481,7 @@ setInterval(() => {
   if (!SERVER || document.hidden) return;
   const r = route();
   if (r === 'track'){ const o = O(trackId); if (o && o.live && o.live.cam && !$('cam-img').hidden && !PLAYER.playing) refreshImg($('cam-img'), camUrl(o.live.printer || o.printer_srv, o)); }
-  if (r === 'live' || r === 'home') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
+  if (r === 'live' || r === 'home' || r === 'free') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
 }, 2500);
 let LIVE = [];
 async function loadLive(){ if (!SERVER) return; try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
@@ -2231,9 +2250,51 @@ function renderFree(){
   const ms = drawCountdown(); $('fr-timer').textContent = fmtH(ms/36e5);
   $('fr-count').textContent = FREE ? FREE.count : (SERVER ? '…' : '7');
   const w = FREE ? FREE.winners : (SERVER ? [] : DEMO_WINNERS());
-  $('fr-winners').innerHTML = w.length ? w.map(x => `<li><span>🎉 ${esc(x.name)}${x.model ? ' · ' + esc(x.model) : ''}</span><span class="mono note">${esc(x.day)}</span></li>`).join('') : `<li class="note">${t('fr_no_winners')}</li>`;
+  $('fr-winners').innerHTML = w.length ? w.map((x, i) => `<li class="${x.photos ? 'click' : ''}" data-wi="${i}"><span>${x.status === 'printing' ? '🔴' : '🎉'} ${esc(x.name)}${x.model ? ' · ' + esc(x.model) : ''}${x.photos ? ' 📷' : ''}</span><span class="mono note">${esc(x.day)}</span></li>`).join('') : `<li class="note">${t('fr_no_winners')}</li>`;
+  document.querySelectorAll('[data-wi]').forEach(li => { const x = w[+li.dataset.wi]; if (x && x.photos) li.onclick = () => lightbox(x); });
+  renderFreeNow(w);
   if (SERVER && !FREE) loadFree();
 }
+// the top block: today's gift live, or the latest finished one with its photo
+let frNowSig = '';
+function renderFreeNow(w){
+  const box = $('fr-now');
+  if (!SERVER || !w.length){ box.hidden = true; return; }
+  const cur = w[0], prev = w.slice(1).find(x => x.photos);
+  const show = cur.status === 'printing' ? cur : cur.photos ? cur : null;
+  const sig = lang + '|' + w.map(x => [x.order, x.status, x.photos, x.video, x.cam].join(':')).join(',');
+  if (sig === frNowSig && !box.hidden){ attachLiveVideos(); return; }
+  frNowSig = sig;
+  let media = '', head = '', sub = '';
+  if (cur.status === 'printing' && cur.printer){
+    media = `<div class="screen cam" id="fr-screen">${cur.cam ? `<img data-cam="${cur.printer}" class="camimg" src="${camUrl(cur.printer)}" alt="">` : ''}${cur.video ? `<div data-vslot="${cur.printer}"></div>` : ''}<div class="tag"><span class="live">LIVE</span><span>${esc(cur.printerName || '')}</span></div><div class="banner"><b>start3d</b><span>${esc(cur.name)} · 🎁</span></div></div>`;
+    head = t('fr_now_live', {n: esc(cur.name)}); sub = cur.model ? esc(cur.model) : '';
+  } else {
+    const ph = show || prev;
+    if (ph) media = `<div class="screen cam"><img class="ph" src="/api/free/photo/${ph.order}/0" alt="${esc(ph.name)}" data-lb="${ph.order}"></div>`;
+    head = cur.photos ? t('fr_now_done', {d: cur.day, n: esc(cur.name)}) : t('fr_now_queue', {d: cur.day, n: esc(cur.name)});
+    sub = [cur.model ? esc(cur.model) : '', !show && prev ? t('fr_now_prev', {n: esc(prev.name), d: prev.day}) : ''].filter(Boolean).join(' · ');
+  }
+  if (!media && !head){ box.hidden = true; return; }
+  box.innerHTML = `${media || '<div></div>'}<div><span class="label">${t('fr_now_label')}</span><h2>${head}</h2>${sub ? `<p class="note" style="margin-top:6px">${sub}</p>` : ''}${(show || prev) && (show || prev).photos ? `<div class="row"><button type="button" class="btn-sm" id="fr-lb">${t('fr_photos')}</button></div>` : ''}</div>`;
+  box.hidden = false;
+  const lbx = show && show.photos ? show : prev;
+  if ($('fr-lb') && lbx) $('fr-lb').onclick = () => lightbox(lbx);
+  box.querySelectorAll('[data-lb]').forEach(img => img.onclick = () => lightbox(w.find(x => x.order === img.dataset.lb)));
+  attachLiveVideos();
+}
+function lightbox(x){
+  if (!x || !x.photos) return;
+  let i = 0;
+  const el = document.createElement('div'); el.className = 'lightbox'; el.setAttribute('role', 'dialog');
+  const draw = () => { el.innerHTML = `<img src="/api/free/photo/${x.order}/${i}" alt="${esc(x.name)}"><div class="lb-bar">${x.photos > 1 ? `<button type="button" data-d="-1">‹</button><span class="mono">${i + 1} / ${x.photos}</span><button type="button" data-d="1">›</button>` : ''}<button type="button" data-x>✕</button></div>`; };
+  draw(); document.body.appendChild(el);
+  const close = () => { el.remove(); document.removeEventListener('keydown', key); };
+  const key = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', key);
+  el.onclick = e => { const d = e.target.closest('[data-d]'); if (d){ i = (i + +d.dataset.d + x.photos) % x.photos; draw(); return; } if (e.target === el || e.target.closest('[data-x]')) close(); };
+}
+setInterval(() => { if (route() === 'free' && SERVER) loadFree(); }, 10000);
 setInterval(() => { if (route() === 'free'){ const ms = drawCountdown(); $('fr-timer').textContent = fmtH(ms/36e5); } }, 30000);
 $('free-form').addEventListener('submit', async e => {
   e.preventDefault();
