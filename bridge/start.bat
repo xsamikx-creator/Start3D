@@ -10,7 +10,7 @@ if not exist config.json goto noconfig
 
 :loop
 rem Self-update: take the latest bridge.mjs from GitHub if it downloads and passes a syntax check.
-powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 -Uri 'https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/bridge.mjs' -OutFile 'bridge.new' } catch { }" >nul 2>nul
+powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 -Uri 'https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/bridge.mjs?t=%RANDOM%%RANDOM%' -OutFile 'bridge.new' } catch { }" >nul 2>nul
 if not exist bridge.new goto run
 node --check bridge.new >nul 2>nul
 if errorlevel 1 goto dropnew
