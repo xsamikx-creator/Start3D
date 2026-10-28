@@ -1324,6 +1324,57 @@ async function vpList(){
     vpPump();
   } catch(e){}
 }
+/* one independent player per live card (same delayed segments, public orders only) */
+function makeVPlayer(v, pid, qs){
+  const P = { v, pid, qs, ms:null, sb:null, next:-1, sess:null, queue:[], busy:false, listAt:0, started:false, url:null, native:false, seen:Date.now() };
+  const M = MSE();
+  const pump = async () => {
+    if (!P.sb || P.sb.updating || P.busy || !P.queue.length) return;
+    const seg = P.queue[0]; P.busy = true;
+    try {
+      if (seg.sess !== P.sess){ const init = await vpFetch(`/api/cam/${pid}/vinit/${seg.sess}?${qs}`); P.sess = seg.sess; P.busy = false; P.sb.appendBuffer(init); return; }
+      const data = await vpFetch(`/api/cam/${pid}/vseg/${seg.n}?${qs}`); P.queue.shift(); P.busy = false; P.sb.appendBuffer(data);
+    } catch(e){ P.queue.shift(); P.busy = false; setTimeout(pump, 500); return; }
+    const b = v.buffered;
+    if (b.length){
+      if (!P.started && b.end(b.length - 1) - b.start(0) >= 6){ P.started = true; v.currentTime = b.start(0) + .1; v.hidden = false; v.play().catch(() => {}); }
+      if (P.started && v.currentTime - b.start(0) > 40) setTimeout(() => { try { if (!P.sb.updating) P.sb.remove(0, v.currentTime - 20); } catch(e){} }, 0);
+      if (P.started && v.paused) v.play().catch(() => {});
+    }
+  };
+  const list = async () => {
+    P.listAt = Date.now();
+    try {
+      const j = await api(`/api/cam/${pid}/vlist?${qs}since=${Math.max(0, P.next)}`);
+      let segs = j.segs || []; if (P.next < 0) segs = segs.slice(-3);
+      for (const x of segs){ P.queue.push(x); P.next = Math.max(P.next, x.n); }
+      pump();
+    } catch(e){}
+  };
+  if (!M){ P.native = P.started = true; v.src = `/api/cam/${pid}/live.m3u8?${qs}`; v.hidden = false; v.play().catch(() => {}); }
+  else {
+    v.disableRemotePlayback = true; P.ms = new M(); P.url = URL.createObjectURL(P.ms); v.src = P.url;
+    P.ms.addEventListener('sourceopen', () => { try { P.sb = P.ms.addSourceBuffer(VMIME); P.sb.mode = 'sequence'; P.sb.addEventListener('updateend', pump); pump(); } catch(e){} }, {once:true});
+  }
+  P.tick = () => { if (!P.native && Date.now() - P.listAt > 2000) list(); if (P.started && v.paused && v.isConnected) v.play().catch(() => {}); };
+  P.destroy = () => { try { v.pause(); } catch(e){} v.removeAttribute('src'); try { v.load(); } catch(e){} if (P.url) URL.revokeObjectURL(P.url); v.remove(); };
+  return P;
+}
+const LIVE_PLAYERS = new Map(); // "container|printer" → player
+function attachLiveVideos(){
+  document.querySelectorAll('[data-vslot]').forEach(slot => {
+    const key = slot.closest('[id]').id + '|' + slot.dataset.vslot;
+    let p = LIVE_PLAYERS.get(key);
+    if (!p){ const v = document.createElement('video'); v.className = 'camimg'; v.muted = true; v.playsInline = true; v.autoplay = true; v.hidden = true; v.setAttribute('playsinline', ''); p = makeVPlayer(v, slot.dataset.vslot, ''); LIVE_PLAYERS.set(key, p); }
+    if (p.v.parentElement !== slot) slot.appendChild(p.v);
+  });
+}
+function liveVideoTick(){
+  LIVE_PLAYERS.forEach((p, k) => {
+    if (p.v.isConnected && p.v.parentElement && p.v.parentElement.offsetParent){ p.seen = Date.now(); p.tick(); } // the slot is on screen (the video itself stays hidden until it starts)
+    else if (Date.now() - p.seen > 15000){ p.destroy(); LIVE_PLAYERS.delete(k); }
+  });
+}
 function videoTick(o, pid){ return videoTickG(o.id + '|' + pid, pid, chunkQs(o), o.live.video.wait || 0); }
 function videoTickG(key, pid, qs, srvWait){
   if (VP.key !== key){ vpReset(); Object.assign(VP, {key, pid, qs}); vpStart(); }
@@ -1410,7 +1461,7 @@ setInterval(() => {
   if (!SERVER || document.hidden) return;
   const r = route();
   if (r === 'track'){ const o = O(trackId); if (o && o.live && o.live.cam && !$('cam-img').hidden && !PLAYER.playing) refreshImg($('cam-img'), camUrl(o.live.printer || o.printer_srv, o)); }
-  if (r === 'live' || r === 'home') document.querySelectorAll('img[data-cam]').forEach(img => refreshImg(img, camUrl(img.dataset.cam)));
+  if (r === 'live' || r === 'home') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
 }, 2500);
 let LIVE = [];
 async function loadLive(){ if (!SERVER) return; try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
@@ -1889,12 +1940,25 @@ const liveCard = (o, finished) => `<div class="lcard"><div class="screen"><a hre
   ${finished?`<button type="button" class="btn-sm play" data-play="${o.id}">▶ ${t('timelapse')}</button>`:''}</div>
   <div class="body"><div class="meta"><a href="#track-${o.id}"><b>${esc(o.name)}</b></a><span class="mono">${o.status==='printing'?'<span data-pct="'+o.id+'"></span>':o.status==='queue'?t('waiting_start'):''}</span></div>
   <div class="meta"><span class="note" data-rl="${o.id}">${reactLine(o)}</span>${o.video?`<span class="badge-ch">Mr Gadget Lab</span>`:''}</div></div></div>`;
-const srvCard = (x) => `<div class="lcard"><div class="screen">${x.cam ? `<img data-cam="${x.printer}" class="camimg" src="${camUrl(x.printer)}" alt="${esc(x.name)}">` : `<canvas data-live-srv="${x.id}" aria-hidden="true"></canvas>`}
+const srvCard = (x) => `<div class="lcard"><div class="screen">${x.cam ? `<img data-cam="${x.printer}" class="camimg" src="${camUrl(x.printer)}" alt="${esc(x.name)}">` : `<canvas data-live-srv="${x.id}" aria-hidden="true"></canvas>`}${x.video ? `<div data-vslot="${x.printer}"></div>` : ''}
   <span class="ov"><span class="live">LIVE</span><span>${esc(x.printerName)}</span></span>
   <div class="banner"><b>start3d</b><span>${esc(x.client)}</span></div></div>
-  <div class="body"><div class="meta"><b>${esc(x.name || x.id)}</b><span class="mono">${x.percent}%</span></div>
-  <div class="meta"><span class="note">${t('o_layer')} ${x.layer}/${x.layers}</span><span class="note mono">${fmtH((x.remaining || 0) / 60)}</span></div></div></div>`;
+  <div class="body"><div class="meta"><b>${esc(x.name || x.id)}</b><span class="mono" data-lp="${x.id}">${x.percent}%</span></div>
+  <div class="meta"><span class="note" data-ll="${x.id}">${t('o_layer')} ${x.layer}/${x.layers}</span><span class="note mono" data-lr="${x.id}">${fmtH((x.remaining || 0) / 60)}</span></div></div></div>`;
+let liveShape = '';
 function renderLive(){
+  if (SERVER){
+    const shape = lang + '|' + LIVE.map(x => [x.id, x.printer, !!x.cam, !!x.video].join(':')).join(',');
+    if (shape === liveShape && $('live-full').childElementCount){
+      LIVE.forEach(x => {
+        document.querySelectorAll(`[data-lp="${x.id}"]`).forEach(e => e.textContent = x.percent + '%');
+        document.querySelectorAll(`[data-ll="${x.id}"]`).forEach(e => e.textContent = `${t('o_layer')} ${x.layer}/${x.layers}`);
+        document.querySelectorAll(`[data-lr="${x.id}"]`).forEach(e => e.textContent = fmtH((x.remaining || 0) / 60));
+      });
+      return;
+    }
+    liveShape = shape;
+  }
   const srv = SERVER ? LIVE.map(srvCard).join('') : '';
   const now = SERVER ? [] : S.orders.filter(o => o.pub && ['printing','queue'].includes(o.status));
   const done = SERVER ? [] : S.orders.filter(o => o.pub && ['post','ready','done'].includes(o.status));
@@ -1903,6 +1967,7 @@ function renderLive(){
   $('live-done').innerHTML = done.length ? done.map(o => liveCard(o, true)).join('') : empty;
   $('live-teaser').innerHTML = SERVER ? (LIVE.length ? LIVE.slice(0,3).map(srvCard).join('') : empty) : now.length ? now.slice(0,3).map(o => liveCard(o)).join('') : empty;
   document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => { tlMap[b.dataset.play] = performance.now(); });
+  attachLiveVideos();
 }
 
 /* ---------- my orders ---------- */
@@ -2597,6 +2662,7 @@ function frame(now){
       drawPrint(cv, p, o.layers, COLORS[o.color][1], noz, o.shape, err);
     });
   }
+  if (LIVE_PLAYERS.size) liveVideoTick();
   if (r === 'cam') camTick(); else if (VP.key && VP.key.startsWith('cam|')){ vpReset(); $('cam-buf').hidden = true; }
   if (r === 'track') playerTick(O(trackId)); else if (r !== 'cam') { if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } if (VP.key){ vpReset(); $('cam-buf').hidden = true; } }
   if (r === 'track'){

@@ -441,10 +441,12 @@ async function camFrame(env, url, pid) {
 }
 async function liveList(env) {
   const rs = await env.DB.prepare("SELECT p.id AS pid, p.status, p.frame_at, o.id, o.client, o.data FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
-  return json(rs.results.filter((r) => JSON.parse(r.data || '{}').pub).map((r) => {
+  const list = rs.results.filter((r) => JSON.parse(r.data || '{}').pub).map((r) => {
     const d = JSON.parse(r.data || '{}'), st = JSON.parse(r.status || '{}');
     return { id: r.id, name: d.name, client: r.client, mat: d.mat, color: d.color ?? 0, printer: r.pid, printerName: printerName(r.pid), percent: st.percent || 0, layer: st.layer || 0, layers: st.layers || 0, remaining: st.remaining || 0, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS };
-  }));
+  });
+  for (const x of list) x.video = (await videoState(env, x.printer)).on;
+  return json(list);
 }
 async function orderPhoto(env, id, code, n) {
   const o = await getOrder(env, id);
