@@ -19,8 +19,12 @@ if (!SERVER || !KEY || KEY.includes('ВСТАВЬТЕ')) {
   process.exit(1);
 }
 
-const FAST_MS = 2500;   // frame interval while someone watches
+const FAST_MS = 2500;   // still-frame interval while someone watches
 const SLOW_MS = 60000;  // otherwise
+// While a print runs the camera is also recorded as a smooth delayed stream:
+// frames are packed into chunks of a few seconds and uploaded; the site plays them back 2 minutes behind.
+const CHUNK_MS = 4000, MAX_FPS = 5, CHUNK_MAX = 1600000;
+const PRINTING = ['RUNNING', 'PREPARE', 'PAUSE', 'SLICING'];
 const log = (id, ...a) => console.log(new Date().toLocaleTimeString(), `[${id}]`, ...a);
 
 async function post(path, body, type = 'application/json') {
@@ -37,6 +41,7 @@ async function post(path, body, type = 'application/json') {
 /* ---------- Bambu Lab: status over MQTT ---------- */
 function bambuStatus(p) {
   const state = {};
+  p._state = state;
   let lastSent = '', lastAt = 0;
   const client = mqtt.connect(`mqtts://${p.ip}:8883`, {
     username: 'bblp', password: p.accessCode, rejectUnauthorized: false,
@@ -107,11 +112,48 @@ function ffmpegSnapshot(url) {
   });
 }
 
+/* ---------- delayed stream: chunks of JPEG frames ---------- */
+function streamer(p) {
+  let frames = [], t0 = 0, size = 0, lastKept = 0, busy = false, seen = 0, seenAt = Date.now(), fpsLogged = false;
+  const queue = [];
+  const live = () => p.stream === 'always' || PRINTING.includes(p._state?.gcode_state);
+  const pump = async () => {
+    if (busy || !queue.length) return;
+    busy = true;
+    const c = queue[0];
+    try { await post(`/api/bridge/chunk/${p.id}?t0=${c.t0}&dur=${c.dur}`, c.buf, 'application/octet-stream'); queue.shift(); }
+    catch (e) { log(p.id, 'эфир: не отправил кусок:', e.message); if (queue.length > 12) queue.shift(); await new Promise((r) => setTimeout(r, 2000)); }
+    busy = false; pump();
+  };
+  const flush = () => {
+    if (!frames.length) return;
+    const head = Buffer.alloc(6); head.write('S3D1', 0, 'ascii'); head.writeUInt16LE(frames.length, 4);
+    const parts = [head];
+    for (const f of frames) { const h = Buffer.alloc(8); h.writeUInt32LE(f.t - t0, 0); h.writeUInt32LE(f.img.length, 4); parts.push(h, f.img); }
+    queue.push({ t0, dur: frames[frames.length - 1].t - t0 + Math.round(1000 / MAX_FPS), buf: Buffer.concat(parts) });
+    frames = []; size = 0; t0 = 0; pump();
+  };
+  setInterval(() => { if (frames.length && Date.now() - t0 > CHUNK_MS + 1500) flush(); }, 1000);
+  return (img) => {
+    const now = Date.now();
+    seen++;
+    if (!fpsLogged && now - seenAt > 30000) { fpsLogged = true; log(p.id, `камера даёт ~${(seen * 1000 / (now - seenAt)).toFixed(1)} кадр/с`); }
+    if (!live()) { if (frames.length) flush(); return; }
+    if (now - lastKept < 1000 / MAX_FPS) return;
+    lastKept = now;
+    if (!t0) t0 = now;
+    frames.push({ t: now, img }); size += img.length + 8;
+    if (now - t0 >= CHUNK_MS || size > CHUNK_MAX) flush();
+  };
+}
+
 function camera(p) {
   if (p.camera === 'off') return;
   let latest = null, sentAt = 0, watched = false, mode = null;
+  const record = streamer(p);
   const send = async () => {
-    if (!latest || Date.now() - sentAt < (watched ? FAST_MS : SLOW_MS)) return;
+    const streaming = p.stream === 'always' || PRINTING.includes(p._state?.gcode_state);
+    if (!latest || Date.now() - sentAt < (streaming ? 30000 : watched ? FAST_MS : SLOW_MS)) return;
     const img = latest; sentAt = Date.now();
     try { watched = (await post(`/api/bridge/frame/${p.id}`, img, 'image/jpeg')).watched; }
     catch (e) { log(p.id, 'не отправил кадр:', e.message); }
@@ -123,14 +165,14 @@ function camera(p) {
     if (!hasFfmpeg()) return log(p.id, 'камера: нужен ffmpeg (winget install ffmpeg) или другой способ подключения');
     mode = 'ffmpeg'; log(p.id, 'камера: беру кадры через ffmpeg');
     const loop = async () => {
-      try { latest = await ffmpegSnapshot(rtspUrl); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
-      setTimeout(loop, watched ? FAST_MS : 20000);
+      try { latest = await ffmpegSnapshot(rtspUrl); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
+      setTimeout(loop, PRINTING.includes(p._state?.gcode_state) ? 300 : watched ? FAST_MS : 20000);
     };
     loop();
   };
   if (p.rtsp || p.camera === 'rtsp') return useFfmpeg();
   if (p.type === 'bambu') {
-    bambuCamera6000(p, (img) => { if (mode !== '6000') { mode = '6000'; log(p.id, 'камера подключена (порт 6000)'); } latest = img; },
+    bambuCamera6000(p, (img) => { if (mode !== '6000') { mode = '6000'; log(p.id, 'камера подключена (порт 6000)'); } latest = img; record(img); },
       (e) => { log(p.id, `камера порт 6000 недоступна (${e.message}), пробую RTSPS`); useFfmpeg(); });
   }
 }

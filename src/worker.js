@@ -24,6 +24,7 @@ const SCHEMA = [
      id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, contact TEXT,
      link TEXT, idea TEXT, lang TEXT, status TEXT NOT NULL, tg_chat_id INTEGER, op_msg_id INTEGER, order_id TEXT, created_at INTEGER)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS free_day_phone ON free_apps(day, phone)`,
+  `CREATE TABLE IF NOT EXISTS cam_chunks (pid TEXT NOT NULL, t0 INTEGER NOT NULL, dur INTEGER, at INTEGER, data BLOB, PRIMARY KEY (pid, t0))`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
@@ -256,13 +257,16 @@ async function readOrder(env, id, code) {
 }
 // Frames arrive about once a minute while nobody watches, so a frame counts as live for 2.5 minutes.
 const CAM_FRESH_MS = 150000;
+// Delayed stream: the site plays recorded chunks this far behind real time; chunks are kept a bit longer than that.
+const STREAM_DELAY_MS = 120000, STREAM_KEEP_MS = 240000;
 async function liveFor(env, o) {
   const pid = JSON.parse(o.data || '{}').printer;
   if (!pid || o.status !== 'printing') return null;
   const r = await env.DB.prepare('SELECT status, order_id, frame_at FROM printers WHERE id=?').bind(pid).first();
   if (!r || r.order_id !== o.id) return null;
   const st = JSON.parse(r.status || '{}');
-  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS };
+  const sc = await env.DB.prepare('SELECT MAX(at) AS at FROM cam_chunks WHERE pid=?').bind(pid).first();
+  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, stream: !!sc?.at && now() - sc.at < 30000, delay: STREAM_DELAY_MS };
 }
 
 /* ---------- workshop bridge ---------- */
@@ -307,15 +311,47 @@ async function bridgeFrame(env, req, pid) {
   return json({ watched: !!r?.watched_at && now() - r.watched_at < 30000 });
 }
 
+async function bridgeChunk(env, req, url, pid) {
+  if (!PRINTERS.some((p) => p.id === pid)) return json({ error: 'unknown_printer' }, 400);
+  const t0 = Math.round(+url.searchParams.get('t0')), dur = Math.round(+url.searchParams.get('dur') || 0);
+  const buf = await req.arrayBuffer();
+  if (!Number.isFinite(t0) || buf.byteLength < 20 || buf.byteLength > 1900000) return json({ error: 'bad_chunk' }, 400);
+  await env.DB.prepare('INSERT OR REPLACE INTO cam_chunks (pid, t0, dur, at, data) VALUES (?,?,?,?,?)').bind(pid, t0, dur, now(), buf).run();
+  await env.DB.prepare('DELETE FROM cam_chunks WHERE pid=? AND (t0 < ? OR at < ?)').bind(pid, t0 - STREAM_KEEP_MS, now() - STREAM_KEEP_MS - 60000).run();
+  return json({ ok: true });
+}
+
 /* ---------- camera for viewers ---------- */
-async function camFrame(env, url, pid) {
+// Who may watch printer pid: anyone for a public order, the owner (order + code) for a private one.
+async function camAccess(env, url, pid) {
   const r = await env.DB.prepare('SELECT order_id, frame, frame_at, watched_at FROM printers WHERE id=?').bind(pid).first();
-  if (!r || !r.frame || !r.order_id) return new Response('no frame', { status: 404 });
+  if (!r || !r.order_id) return { deny: new Response('no camera', { status: 404 }) };
   const o = await getOrder(env, r.order_id);
   const pub = o && JSON.parse(o.data || '{}').pub;
   const own = o && url.searchParams.get('order') === o.id && url.searchParams.get('code') === o.code;
-  if (!o || o.status !== 'printing' || !(pub || own)) return new Response('forbidden', { status: 403 });
+  if (!o || o.status !== 'printing' || !(pub || own)) return { deny: new Response('forbidden', { status: 403 }) };
   if (!r.watched_at || now() - r.watched_at > 10000) await env.DB.prepare('UPDATE printers SET watched_at=? WHERE id=?').bind(now(), pid).run();
+  return { r };
+}
+async function camChunks(env, url, pid) {
+  const a = await camAccess(env, url, pid);
+  if (a.deny) return a.deny;
+  const since = Math.round(+url.searchParams.get('since') || 0);
+  const rs = await env.DB.prepare('SELECT t0, dur FROM cam_chunks WHERE pid=? AND t0 > ? ORDER BY t0').bind(pid, since).all();
+  return json({ delay: STREAM_DELAY_MS, chunks: rs.results });
+}
+async function camChunk(env, url, pid, t0) {
+  const a = await camAccess(env, url, pid);
+  if (a.deny) return a.deny;
+  const c = await env.DB.prepare('SELECT data FROM cam_chunks WHERE pid=? AND t0=?').bind(pid, t0).first();
+  if (!c) return new Response('gone', { status: 404 });
+  return new Response(new Uint8Array(c.data), { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'private, max-age=600' } });
+}
+async function camFrame(env, url, pid) {
+  const a = await camAccess(env, url, pid);
+  if (a.deny) return a.deny;
+  const r = a.r;
+  if (!r.frame) return new Response('no frame', { status: 404 });
   // D1 returns BLOB columns as plain arrays of numbers; wrap them, otherwise the browser receives "255,216,…" as text
   return new Response(new Uint8Array(r.frame), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-frame-at': String(r.frame_at) } });
 }
@@ -734,6 +770,12 @@ export default {
       if (p === '/api/live') return liveList(env);
       let b = p.match(/^\/api\/cam\/([a-z0-9-]+)$/);
       if (b) return camFrame(env, url, b[1]);
+      b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/chunks$/);
+      if (b) return camChunks(env, url, b[1]);
+      b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/chunk\/(\d+)$/);
+      if (b) return camChunk(env, url, b[1], +b[2]);
+      b = p.match(/^\/api\/bridge\/chunk\/([a-z0-9-]+)$/);
+      if (b && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeChunk(env, req, url, b[1]); }
       b = p.match(/^\/api\/bridge\/(status|frame)\/([a-z0-9-]+)$/);
       if (b && req.method === 'POST') {
         if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403);

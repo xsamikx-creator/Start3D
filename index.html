@@ -240,6 +240,9 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 .camimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111316}
 .banner{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(10,12,14,.72);color:#fff;font-family:var(--f-mono);font-size:12px;max-width:calc(100% - 20px);backdrop-filter:blur(4px)}
+.cam-buf{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:6px;padding:12px 16px;border-radius:12px;background:rgba(10,12,14,.78);color:#fff;font-family:var(--f-mono);font-size:13px;text-align:center;max-width:calc(100% - 32px);backdrop-filter:blur(4px)}
+.cam-buf b{font-size:22px;font-variant-numeric:tabular-nums;color:#FFB45E}
+.cam-delay{color:#C9CEC8}
 .banner b{font-family:var(--f-display);font-size:13px;color:#E3A84A;letter-spacing:.02em}
 .banner span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .oled{position:absolute;right:10px;bottom:10px;width:min(48%,190px);aspect-ratio:2/1;background:#000;border:3px solid #2B2F33;border-radius:6px;padding:6px 8px;font-family:var(--f-mono);color:#8FE9FF;font-size:10px;line-height:1.2;display:grid;align-content:space-between;box-shadow:0 0 14px rgba(143,233,255,.18);max-width:100%}
@@ -616,7 +619,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   <p class="msg" id="t-locked" hidden></p>
   <div class="split" id="t-body">
     <div style="display:grid;gap:16px">
-      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><div id="cam-banner" class="banner" hidden></div>
+      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><div id="cam-banner" class="banner" hidden></div><div id="cam-buf" class="cam-buf" hidden></div>
         <div class="tag"><span class="live" id="cam-live">LIVE</span><span id="cam-printer"></span><span id="cam-viewers"></span></div>
         <div id="t-oled"></div></div>
       <div class="reacts" id="t-reacts"></div>
@@ -973,6 +976,9 @@ o_left:['Qalıb','Осталось','Залишилось','Time left'],
 o_price:['Qiymət','Стоимость','Вартість','Price'],
 o_paid:['ödənilib','оплачено','сплачено','paid'],
 assign_later:['operator təyin edəcək','назначит оператор','призначить оператор','assigned by operator'],
+cam_buf:['Yayın toplanır — tam axın kimi göstərmək üçün','Копим эфир, чтобы показать его плавно','Накопичуємо ефір, щоб показати його плавно','Buffering so the stream plays smoothly'],
+cam_buf_in:['başlayacaq','начнётся через','почнеться через','starts in'],
+cam_delay:['2 dəq gecikmə','задержка 2 мин','затримка 2 хв','2 min delay'],
 cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
 timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
 pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
@@ -1215,12 +1221,83 @@ async function api(path, body){
   if (!r.ok) throw Object.assign(new Error(j.error || 'http_' + r.status), {code:j.error});
   return j;
 }
+/* ---------- delayed stream player ----------
+   The bridge uploads the camera as chunks of JPEG frames (format "S3D1": count, then [dt ms, length, jpeg]…).
+   We play them STREAM_DELAY behind the newest chunk, so there is always footage ready and playback stays smooth.
+   Times are the bridge's own clock, so client/server clock skew doesn't matter. */
+const PLAYER = { key:'', chunks:new Map(), frames:[], loading:new Set(), latestEnd:0, earliest:0, anchorAt:0, delay:120000, playing:false, cur:null, url:null, listAt:0, since:0 };
+function playerReset(key){
+  if (PLAYER.url) URL.revokeObjectURL(PLAYER.url);
+  Object.assign(PLAYER, { key, chunks:new Map(), frames:[], loading:new Set(), latestEnd:0, earliest:0, anchorAt:0, playing:false, cur:null, url:null, listAt:0, since:0 });
+}
+const chunkQs = o => o && o.code ? `order=${o.id}&code=${o.code}&` : '';
+async function playerList(pid, o){
+  PLAYER.listAt = Date.now();
+  try {
+    const j = await api(`/api/cam/${pid}/chunks?${chunkQs(o)}since=${PLAYER.since}`);
+    PLAYER.delay = j.delay || 120000;
+    for (const c of j.chunks){ if (!PLAYER.chunks.has(c.t0)) PLAYER.chunks.set(c.t0, c); PLAYER.since = Math.max(PLAYER.since, c.t0); }
+    const all = [...PLAYER.chunks.values()];
+    if (all.length){
+      const end = Math.max(...all.map(c => c.t0 + c.dur));
+      if (end > PLAYER.latestEnd){ PLAYER.latestEnd = end; PLAYER.anchorAt = performance.now(); }
+      PLAYER.earliest = Math.min(...all.map(c => c.t0));
+    }
+  } catch(e){}
+}
+async function playerLoad(pid, o, c){
+  PLAYER.loading.add(c.t0);
+  try {
+    const r = await fetch(`/api/cam/${pid}/chunk/${c.t0}?${chunkQs(o)}`); if (!r.ok) throw 0;
+    const b = new Uint8Array(await r.arrayBuffer()), dv = new DataView(b.buffer);
+    if (String.fromCharCode(...b.subarray(0,4)) !== 'S3D1') throw 0;
+    const n = dv.getUint16(4, true); let p = 6;
+    for (let i = 0; i < n && p + 8 <= b.length; i++){ const dt = dv.getUint32(p, true), len = dv.getUint32(p + 4, true); p += 8;
+      PLAYER.frames.push({ t: c.t0 + dt, blob: new Blob([b.subarray(p, p + len)], {type:'image/jpeg'}) }); p += len; }
+    PLAYER.frames.sort((a, b) => a.t - b.t); c.done = true;
+  } catch(e){ c.failed = (c.failed || 0) + 1; }
+  PLAYER.loading.delete(c.t0);
+}
+function playerTick(o){
+  const pid = o && o.live && (o.live.printer || o.printer_srv), key = o ? o.id + '|' + pid : '';
+  const on = !!(pid && o.live.stream && o.status === 'printing' && !$('t-body').hidden);
+  if (!on){ if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; } return; }
+  if (PLAYER.key !== key) playerReset(key);
+  if (Date.now() - PLAYER.listAt > 3000) playerList(pid, o);
+  if (!PLAYER.latestEnd) return;
+  const head = PLAYER.latestEnd + (performance.now() - PLAYER.anchorAt) - PLAYER.delay;
+  // fetch what the playhead needs next (a few chunks ahead), two at a time
+  for (const c of [...PLAYER.chunks.values()].sort((a, b) => a.t0 - b.t0)){
+    if (PLAYER.loading.size >= 2) break;
+    if (c.done || PLAYER.loading.has(c.t0) || (c.failed || 0) > 2) continue;
+    if (c.t0 + c.dur < head - 2000 || c.t0 > head + 20000) continue;
+    playerLoad(pid, o, c);
+  }
+  PLAYER.chunks.forEach((c, k) => { if (c.t0 + c.dur < head - 10000) PLAYER.chunks.delete(k); });
+  while (PLAYER.frames.length > 1 && PLAYER.frames[1].t <= head - 3000) PLAYER.frames.shift();
+  const buf = $('cam-buf');
+  if (head < PLAYER.earliest){ // not enough footage yet: count down to the start
+    PLAYER.playing = false; buf.hidden = false;
+    const s = Math.ceil((PLAYER.earliest - head) / 1000);
+    buf.innerHTML = `<span>${t('cam_buf')}</span><span>${t('cam_buf_in')} <b>${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}</b></span>`;
+    return;
+  }
+  buf.hidden = true;
+  let f = null; for (const x of PLAYER.frames){ if (x.t <= head) f = x; else break; }
+  if (!f) return;
+  PLAYER.playing = true;
+  if (f !== PLAYER.cur){
+    PLAYER.cur = f; const old = PLAYER.url, img = $('cam-img');
+    PLAYER.url = URL.createObjectURL(f.blob); img.src = PLAYER.url; img.hidden = false;
+    if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+  }
+}
 const camUrl = (pid, o) => `/api/cam/${pid}?` + (o && o.code ? `order=${o.id}&code=${o.code}&` : '') + 't=' + Date.now();
 function refreshImg(img, url){ if (img.dataset.busy) return; img.dataset.busy = 1; const n = new Image(); n.onload = () => { img.src = n.src; delete img.dataset.busy; }; n.onerror = () => delete img.dataset.busy; n.src = url; }
 setInterval(() => {
   if (!SERVER || document.hidden) return;
   const r = route();
-  if (r === 'track'){ const o = O(trackId); if (o && o.live && o.live.cam && !$('cam-img').hidden) refreshImg($('cam-img'), camUrl(o.live.printer || o.printer_srv, o)); }
+  if (r === 'track'){ const o = O(trackId); if (o && o.live && o.live.cam && !$('cam-img').hidden && !PLAYER.playing) refreshImg($('cam-img'), camUrl(o.live.printer || o.printer_srv, o)); }
   if (r === 'live' || r === 'home') document.querySelectorAll('img[data-cam]').forEach(img => refreshImg(img, camUrl(img.dataset.cam)));
 }, 2500);
 let LIVE = [];
@@ -2035,10 +2112,10 @@ function live(){
     $('t-pct').textContent = Math.floor(pct*100) + '%'; $('t-bar').style.width = (pct*100) + '%';
     $('t-layer').textContent = o.status === 'printing' ? (o.live ? `${o.live.layer} / ${o.live.layers}` : `${Math.floor(o.progress*o.layers)} / ${o.layers}`) : fin ? `${o.layers} / ${o.layers}` : '—';
     $('t-left').textContent = o.status === 'printing' ? (o.live ? fmtH((o.live.remaining || 0) / 60) : fmtH((1-o.progress)*o.hours)) : '—';
-    const camOn = !!(o.server && o.live && o.live.cam && o.status === 'printing');
+    const camOn = !!(o.server && o.live && (o.live.cam || o.live.stream) && o.status === 'printing');
     $('cam-img').hidden = !camOn; $('cam-canvas').style.visibility = camOn ? 'hidden' : 'visible';
     $('cam-banner').hidden = !camOn;
-    if (camOn){ $('cam-banner').innerHTML = `<b>start3d</b><span>${esc(o.client || '')} · ${esc(o.name || '')}</span>`; $('t-oled').innerHTML = ''; }
+    if (camOn){ $('cam-banner').innerHTML = `<b>start3d</b><span>${esc(o.client || '')} · ${esc(o.name || '')}</span>${o.live.stream ? `<span class="cam-delay">· ${t('cam_delay')}</span>` : ''}`; $('t-oled').innerHTML = ''; }
   }
 }
 function show(){
@@ -2397,6 +2474,7 @@ function frame(now){
       drawPrint(cv, p, o.layers, COLORS[o.color][1], noz, o.shape, err);
     });
   }
+  if (r === 'track') playerTick(O(trackId)); else if (PLAYER.key){ playerReset(''); $('cam-buf').hidden = true; }
   if (r === 'track'){
     const o = O(trackId);
     if (o && !$('t-body').hidden){
