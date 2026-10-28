@@ -119,7 +119,7 @@ function bambuCamera6000(p, onFrame, onFail) {
 const hasFfmpeg = () => { try { return spawnSync('ffmpeg', ['-version']).status === 0; } catch { return false; } };
 function ffmpegSnapshot(url, vf) {
   return new Promise((resolve, reject) => {
-    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', url, '-frames:v', '1', ...(vf ? ['-vf', vf] : []), '-q:v', '5', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
+    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', url, '-frames:v', '1', ...(vf ? ['-vf', vf] : []), '-q:v', '7', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
     const chunks = []; const t = setTimeout(() => ff.kill('SIGKILL'), 15000);
     ff.stdout.on('data', (c) => chunks.push(c));
     ff.on('close', (code) => { clearTimeout(t); const b = Buffer.concat(chunks); b.length > 100 ? resolve(b) : reject(new Error('ffmpeg code ' + code)); });
@@ -180,7 +180,7 @@ function camera(p) {
     if (!hasFfmpeg()) return log(p.id, 'камера: нужен ffmpeg (winget install ffmpeg) или другой способ подключения');
     mode = 'ffmpeg'; log(p.id, 'камера: беру кадры через ffmpeg');
     const loop = async () => {
-      try { latest = await ffmpegSnapshot(rtspUrl, rotFilter(p)); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
+      try { latest = await ffmpegSnapshot(rtspUrl, [rotFilter(p), "scale='if(gte(iw,ih),min(960,iw),-2)':'if(gte(iw,ih),-2,min(960,ih))'"].filter(Boolean).join(',')); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
       setTimeout(loop, p.video ? 30000 : isPrinting(p) ? 300 : watched ? FAST_MS : 20000);
     };
     loop();
