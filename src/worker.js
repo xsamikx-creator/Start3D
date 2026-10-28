@@ -682,8 +682,14 @@ async function onCallback(env, q, origin) {
     await env.DB.prepare('UPDATE free_apps SET status=? WHERE id=?').bind(st, a.id).run();
     const n = { ...a, status: st };
     if (q.message) await tg(env, 'editMessageText', { chat_id: q.message.chat.id, message_id: q.message.message_id, text: freeText(n), parse_mode: 'HTML', reply_markup: { inline_keyboard: freeButtons(n) }, link_preview_options: n.link ? { url: n.link, prefer_small_media: true } : { is_disabled: true } });
-    if (st !== a.status && a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: st === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_no', a.lang) });
-    return answer(st === 'ok' ? 'Допущена к розыгрышу' : 'Не подходит');
+    if (st === a.status) return answer(st === 'ok' ? 'Уже допущена' : 'Уже отклонена');
+    if (a.tg_chat_id) await tg(env, 'sendMessage', { chat_id: a.tg_chat_id, text: st === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_no', a.lang) });
+    const who = esc(q.from.first_name || 'Оператор');
+    if (q.message) await tg(env, 'sendMessage', { chat_id: q.message.chat.id, reply_parameters: { message_id: q.message.message_id, allow_sending_without_reply: true }, parse_mode: 'HTML',
+      text: st === 'ok'
+        ? `✅ ${who}: заявка №${a.id} (${esc(a.name)}) <b>допущена</b> к розыгрышу ${a.day} в 20:00. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота — уведомить не можем.'}`
+        : `❌ ${who}: заявка №${a.id} (${esc(a.name)}) <b>отклонена</b>. ${a.tg_chat_id ? 'Клиенту отправлено уведомление.' : 'Клиент не подключил бота.'}` });
+    return answer(st === 'ok' ? '✅ Допущена к розыгрышу' : '❌ Отклонена');
   }
   if (act === 'ka' || act === 'kq') {
     const o = await getOrder(env, id);

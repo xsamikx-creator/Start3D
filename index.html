@@ -397,6 +397,8 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 .lightbox .lb-bar{position:absolute;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:10px;color:#fff}
 .lightbox button{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.2)}
 @media (max-width:760px){.fr-now{grid-template-columns:1fr}}
+/* real site: no demo banner, no demo operator panel for visitors */
+.online .demo-note, .online nav a[data-route="admin"]{display:none}
 .disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -1488,7 +1490,14 @@ async function loadLive(){ if (!SERVER) return; try { LIVE = await api('/api/liv
 setInterval(loadLive, 5000);
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
-  try { const j = await api('/api/health'); if (j.ok) { SERVER = j; document.body.classList.add('online'); full(); loadLive(); } } catch(e){}
+  try { const j = await api('/api/health'); if (j.ok) {
+    SERVER = j; document.body.classList.add('online');
+    // real site: drop the demo orders and alerts that seed the offline demo
+    const n = S.orders.length; S.orders = S.orders.filter(o => o.server); S.alerts = [];
+    if (S.orders.length !== n) save();
+    if (route() === 'admin') location.hash = 'home';
+    full(); badges(); loadLive();
+  } } catch(e){}
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
   qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
@@ -2369,6 +2378,7 @@ function placeCam(r){
   if (r !== 'cam' && scr.parentElement !== camHome.parent) camHome.parent.insertBefore(scr, camHome.next);
 }
 function show(){
+  if (SERVER && route() === 'admin'){ location.hash = 'home'; return; } // the demo operator panel isn't part of the real site
   const r = route();
   placeCam(r);
   ROUTES.forEach(v => $('view-'+v).hidden = v !== r);
