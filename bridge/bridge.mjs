@@ -42,12 +42,15 @@ async function post(url, body, type = 'application/json') {
 
 // Printers with an order in "printing" on the site (used for cameras of printers without a status connection).
 const BUSY = new Set();
+const ROTATE = {}; // printer id → '0' | 'ccw' | 'cw' | '180' (set from the bot with /rotate, or "rotate" in config.json)
 async function pollBusy() {
   try {
     const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}` } });
-    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); }
+    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); }
   } catch {}
 }
+const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');
+const rotFilter = (p) => ({ ccw: 'transpose=2', cw: 'transpose=1', '180': 'hflip,vflip' })[rotOf(p)] || '';
 const isPrinting = (p) => p.stream === 'always' || PRINTING.includes(p._state?.gcode_state) || BUSY.has(p.id);
 
 /* ---------- Bambu Lab: status over MQTT ---------- */
@@ -114,9 +117,9 @@ function bambuCamera6000(p, onFrame, onFail) {
 
 /* ---------- any camera via ffmpeg (Bambu RTSPS 322, Tapo RTSP, …) ---------- */
 const hasFfmpeg = () => { try { return spawnSync('ffmpeg', ['-version']).status === 0; } catch { return false; } };
-function ffmpegSnapshot(url) {
+function ffmpegSnapshot(url, vf) {
   return new Promise((resolve, reject) => {
-    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', url, '-frames:v', '1', '-q:v', '5', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
+    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', url, '-frames:v', '1', ...(vf ? ['-vf', vf] : []), '-q:v', '5', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
     const chunks = []; const t = setTimeout(() => ff.kill('SIGKILL'), 15000);
     ff.stdout.on('data', (c) => chunks.push(c));
     ff.on('close', (code) => { clearTimeout(t); const b = Buffer.concat(chunks); b.length > 100 ? resolve(b) : reject(new Error('ffmpeg code ' + code)); });
@@ -177,7 +180,7 @@ function camera(p) {
     if (!hasFfmpeg()) return log(p.id, 'камера: нужен ffmpeg (winget install ffmpeg) или другой способ подключения');
     mode = 'ffmpeg'; log(p.id, 'камера: беру кадры через ffmpeg');
     const loop = async () => {
-      try { latest = await ffmpegSnapshot(rtspUrl); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
+      try { latest = await ffmpegSnapshot(rtspUrl, rotFilter(p)); record(latest); } catch (e) { log(p.id, 'камера ffmpeg:', e.message); }
       setTimeout(loop, p.video ? 30000 : isPrinting(p) ? 300 : watched ? FAST_MS : 20000);
     };
     loop();
@@ -226,7 +229,8 @@ function videoStreamer(p) {
     sess = Date.now(); initSent = false; done = new Set(); stopping = false;
     dir = path.join(os.tmpdir(), `start3d-video-${p.id}-${sess}`); fs.mkdirSync(dir, { recursive: true });
     const args = ['-loglevel', 'error', ...videoInput(p.video), '-an',
-      '-vf', `scale='min(${p.videoWidth || 1280},iw)':-2,fps=${p.videoFps || 15}`,
+      // rotate if needed, then fit the long side into videoWidth (portrait keeps the same pixel budget)
+      '-vf', [rotFilter(p), `scale='if(gte(iw,ih),min(${p.videoWidth || 1280},iw),-2)':'if(gte(iw,ih),-2,min(${p.videoWidth || 1280},ih))'`, `fps=${p.videoFps || 15}`].filter(Boolean).join(','),
       '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main', '-level', '3.1', '-pix_fmt', 'yuv420p',
       '-b:v', `${p.videoKbps || 1000}k`, '-maxrate', `${Math.round((p.videoKbps || 1000) * 1.4)}k`, '-bufsize', `${Math.round((p.videoKbps || 1000) * 2.8)}k`,
       '-g', String((p.videoFps || 15) * 2), '-keyint_min', String((p.videoFps || 15) * 2), '-sc_threshold', '0',
@@ -243,8 +247,11 @@ function videoStreamer(p) {
     log(p.id, 'видео: запись началась');
   };
   setInterval(scan, 1000);
+  let rotAt = rotOf(p);
   setInterval(() => {
     const want = isPrinting(p);
+    if (ff && rotOf(p) !== rotAt) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: поворот изменён, перезапускаю запись'); }
+    if (!ff) rotAt = rotOf(p);
     if (want) { idle = 0; if (!ff) start(); }
     else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
   }, 2000);

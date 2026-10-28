@@ -356,13 +356,17 @@ async function bridgeVSeg(env, req, url, pid) {
   await env.DB.prepare('DELETE FROM vid_init WHERE pid=? AND at < ? AND sess NOT IN (SELECT sess FROM vid_seg WHERE pid=?)').bind(pid, old, pid).run();
   return json({ ok: true, n });
 }
+// Camera rotation per printer; operators change it with /rotate in the operators chat.
+const DEFAULT_ROTATE = { 'a1-1': 'ccw' };
 // Which printers have an order that is printing right now (the bridge records video only for those).
 async function bridgeBusy(env) {
   const rs = await env.DB.prepare("SELECT p.id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
   const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
   const busy = new Set(rs.results.map((r) => r.id));
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
-  return json({ busy: [...busy] });
+  const rotate = {};
+  for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
+  return json({ busy: [...busy], rotate });
 }
 const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
@@ -520,6 +524,18 @@ async function onUpdate(env, u, origin) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const r = await drawFree(env, origin, bakuDay(now()), true);
     return r.posted ? undefined : say(r.msg);
+  }
+  const rot = text.match(/^\/rotate(?:@\w+)?(?:\s+(\S+))?(?:\s+(0|ccw|cw|180))?$/i);
+  if (rot) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    const pid = (rot[1] || '').toLowerCase(), dir = (rot[2] || '').toLowerCase();
+    if (!PRINTERS.some((x) => x.id === pid) || !dir) {
+      const cur = [];
+      for (const pr of PRINTERS) cur.push(`${pr.id}: ${(await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0'}`);
+      return say('Поворот камеры: /rotate <принтер> <0|ccw|cw|180>\nccw — 90° против часовой, cw — по часовой.\nНапример: /rotate a1-1 ccw\n\nСейчас:\n' + cur.join('\n'));
+    }
+    await kvSet(env, 'rotate:' + pid, dir);
+    return say(`✅ Камера ${printerName(pid)}: поворот ${dir}. Мост применит его в течение 10 секунд.`);
   }
   if (/^\/cam(@\w+)?$/.test(text)) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
