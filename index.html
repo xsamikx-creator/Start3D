@@ -240,6 +240,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
 
 .camimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111316}
 .banner{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(10,12,14,.72);color:#fff;font-family:var(--f-mono);font-size:12px;max-width:calc(100% - 20px);backdrop-filter:blur(4px)}
+.camimg[hidden]{display:none}
 .cam-buf{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:6px;padding:12px 16px;border-radius:12px;background:rgba(10,12,14,.78);color:#fff;font-family:var(--f-mono);font-size:13px;text-align:center;max-width:calc(100% - 32px);backdrop-filter:blur(4px)}
 .cam-buf b{font-size:22px;font-variant-numeric:tabular-nums;color:#FFB45E}
 .cam-delay{color:#C9CEC8}
@@ -619,7 +620,7 @@ dl.specs dt{color:var(--muted)} dl.specs dd{margin:0;font-family:var(--f-mono);t
   <p class="msg" id="t-locked" hidden></p>
   <div class="split" id="t-body">
     <div style="display:grid;gap:16px">
-      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><div id="cam-banner" class="banner" hidden></div><div id="cam-buf" class="cam-buf" hidden></div>
+      <div class="screen cam"><canvas id="cam-canvas"></canvas><img id="cam-img" class="camimg" alt="" hidden><canvas id="cam-video" class="camimg" hidden></canvas><div id="cam-banner" class="banner" hidden></div><div id="cam-buf" class="cam-buf" hidden></div>
         <div class="tag"><span class="live" id="cam-live">LIVE</span><span id="cam-printer"></span><span id="cam-viewers"></span></div>
         <div id="t-oled"></div></div>
       <div class="reacts" id="t-reacts"></div>
@@ -1228,6 +1229,8 @@ async function api(path, body){
 const PLAYER = { key:'', chunks:new Map(), frames:[], loading:new Set(), latestEnd:0, earliest:0, anchorAt:0, delay:120000, playing:false, cur:null, url:null, listAt:0, since:0 };
 function playerReset(key){
   if (PLAYER.url) URL.revokeObjectURL(PLAYER.url);
+  PLAYER.frames.forEach(x => x.bmp && x.bmp.close());
+  const cv = document.getElementById('cam-video'); if (cv) cv.hidden = true;
   Object.assign(PLAYER, { key, chunks:new Map(), frames:[], loading:new Set(), latestEnd:0, earliest:0, anchorAt:0, playing:false, cur:null, url:null, listAt:0, since:0 });
 }
 const chunkQs = o => o && o.code ? `order=${o.id}&code=${o.code}&` : '';
@@ -1283,14 +1286,29 @@ function playerTick(o){
     return;
   }
   buf.hidden = true;
-  let f = null; for (const x of PLAYER.frames){ if (x.t <= head) f = x; else break; }
-  if (!f) return;
-  PLAYER.playing = true;
-  if (f !== PLAYER.cur){
-    PLAYER.cur = f; const old = PLAYER.url, img = $('cam-img');
-    PLAYER.url = URL.createObjectURL(f.blob); img.src = PLAYER.url; img.hidden = false;
-    if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+  // decode frames around the playhead into bitmaps (ahead of time, so drawing never waits)
+  for (const x of PLAYER.frames){
+    if (x.t > head + 6000) break;
+    if (!x.bmp && !x.dec && x.t > head - 3000){ x.dec = true; createImageBitmap(x.blob).then(b => { x.bmp = b; }).catch(() => {}); }
   }
+  let i = -1; for (let k = 0; k < PLAYER.frames.length; k++){ if (PLAYER.frames[k].t <= head) i = k; else break; }
+  if (i < 0) return;
+  const f = PLAYER.frames[i], n = PLAYER.frames[i + 1];
+  if (!f.bmp) return;
+  PLAYER.playing = true;
+  const cv = $('cam-video'), box = cv.parentElement, w = box.clientWidth, h = box.clientHeight; if (!w) return;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== Math.round(w*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const cover = b => { const s = Math.max(W / b.width, H / b.height), dw = b.width * s, dh = b.height * s; g.drawImage(b, (W - dw) / 2, (H - dh) / 2, dw, dh); };
+  // crossfade into the next frame; with a slow camera the fade takes the last part of the gap (up to 1.2 s)
+  let k = 0;
+  if (n && n.bmp){ const gap = n.t - f.t, fade = Math.min(gap, 1200); k = Math.max(0, Math.min(1, (head - (n.t - fade)) / fade)); k = k * k * (3 - 2 * k); }
+  g.globalAlpha = 1; cover(f.bmp);
+  if (k > 0){ g.globalAlpha = k; cover(n.bmp); g.globalAlpha = 1; }
+  cv.hidden = false; $('cam-img').hidden = true;
+  // free bitmaps that are behind the playhead
+  for (let j = 0; j < i - 1; j++){ const x = PLAYER.frames[j]; if (x.bmp){ x.bmp.close(); x.bmp = null; } }
 }
 const camUrl = (pid, o) => `/api/cam/${pid}?` + (o && o.code ? `order=${o.id}&code=${o.code}&` : '') + 't=' + Date.now();
 function refreshImg(img, url){ if (img.dataset.busy) return; img.dataset.busy = 1; const n = new Image(); n.onload = () => { img.src = n.src; delete img.dataset.busy; }; n.onerror = () => delete img.dataset.busy; n.src = url; }
