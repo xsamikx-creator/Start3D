@@ -6,3 +6,4 @@ bridge
 wrangler.jsonc
 README.md
 .assetsignore
+.gitattributes
