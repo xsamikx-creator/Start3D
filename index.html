@@ -341,7 +341,8 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 .conv .st .done::before{background:var(--accent)}
 .conv .st .now{color:var(--ink);font-weight:600}
 .conv .st .now::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);animation:blink 1.4s infinite}
-@media (max-width:520px){.conv .st div{font-size:11px}.conv .pkg{width:28px;height:22px}}
+@media (max-width:520px){.conv .st div{font-size:11px;overflow-wrap:normal;hyphens:auto}.conv .pkg{width:28px;height:22px}}
+@media (max-width:400px){.conv .st div{font-size:10px;letter-spacing:-.02em}}
 @media (prefers-reduced-motion:reduce){.conv .belt::before{animation:none}.conv .pkg{transition:none}}
 
 /* ===== Skin C · «Цех»: deep dark workshop, hot-nozzle glow, live factory scene in the hero ===== */
@@ -412,6 +413,12 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 .opc .files a{margin-right:12px;white-space:nowrap}
 .opc.dim{opacity:.6}
 .ops-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+/* first-time Telegram connect, right under the order title */
+.tg-top{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border-radius:14px;margin-bottom:18px;
+  border:1px solid color-mix(in srgb,#2AABEE 60%,var(--line));background:linear-gradient(100deg,color-mix(in srgb,#2AABEE 16%,transparent),transparent 75%),var(--surface)}
+.tg-top b{font-size:16px}
+.tg-top p{color:var(--muted);margin-top:4px;max-width:62ch;font-size:14px}
+.tg-top .btn{background:#2AABEE;border-color:#2AABEE;color:#fff;font-size:15px;padding:12px 18px}
 .disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -661,6 +668,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
     <div><p class="label" id="t-sub"></p><h1 id="t-title"></h1><div class="row" id="t-badges" style="margin-top:8px;gap:6px"></div></div>
     <div class="row"><button type="button" id="t-copy" class="btn-sm" data-i="copy_link"></button><a class="btn btn-sm btn-ghost" href="#orders" data-i="back"></a></div>
   </div>
+  <div class="tg-top" id="t-tgtop" hidden></div>
   <div class="track" id="track"></div>
   <p class="msg" id="t-locked" hidden></p>
   <div class="split" id="t-body">
@@ -2162,7 +2170,10 @@ function renderTrack(){
   } else pay.innerHTML = '';
   // notifications feed
   const tg = o.ch === 'tg';
-  const tgCard = owner && tg && !o.tgLinked ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
+  const tgTop = owner && tg && !o.tgLinked && o.server;
+  $('t-tgtop').hidden = !tgTop;
+  if (tgTop) $('t-tgtop').innerHTML = `<div><b>📲 ${t('tg_h')}</b><p>${t('tg_p')}</p></div><a class="btn" href="https://t.me/${BOT()}?start=${o.id}${o.code ? '_' + o.code : ''}" target="_blank" rel="noopener">${t('tg_open')}</a>`;
+  const tgCard = owner && tg && !o.tgLinked && !o.server ? `<div class="cardbox" style="border-color:var(--info)"><span class="label">${t('tg_h')}</span><p>${t('tg_p')}</p>
     <div class="row"><a class="btn btn-sm btn-primary" href="https://t.me/${BOT()}?start=${o.id}${o.code ? '_' + o.code : ''}" target="_blank" rel="noopener">${t('tg_open')}</a>${o.server ? '' : `<button type="button" class="btn-sm" id="tg-demo">${t('tg_demo')}</button>`}</div>
     ${o.server && o.code ? `<p class="note">${t('tg_code')}</p><div class="row"><span class="cardnum" style="font-size:16px">${o.id} ${o.code}</span><button type="button" class="btn-sm" id="tg-code">${t('copy')}</button></div>` : ''}</div>` : '';
   const shown = tg && !o.tgLinked ? [] : (o.notifs || []);
