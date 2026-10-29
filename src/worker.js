@@ -87,6 +87,8 @@ const TX = {
   free_approved: ['✅ Müraciətiniz №{n} təsdiqləndi və {d} saat 20:00 seçiminə daxil edildi. Qalibi seçən kimi cavab bura gələcək. Uğurlar! 🍀', '✅ Ваша заявка №{n} одобрена и участвует в розыгрыше {d} в 20:00. Как только выберем победителя — вы получите ответ сюда. Желаем удачи! 🍀', '✅ Вашу заявку №{n} схвалено, вона бере участь у розіграші {d} о 20:00. Щойно оберемо переможця — ви отримаєте відповідь сюди. Бажаємо удачі! 🍀', '✅ Your application #{n} is approved and is in the {d} draw at 20:00. As soon as we pick the winner, you\'ll get an answer here. Good luck! 🍀'],
   free_lost: ['Bu gün qalib başqası oldu. Sabah yenidən müraciət edin — hər gün yeni qalib! Məsləhət: kiçik, maraqlı model şansı artırır.', 'Сегодня повезло другому. Подайте заявку завтра — каждый день новый победитель! Совет: небольшая интересная модель повышает шансы.', 'Сьогодні пощастило іншому. Подайте заявку завтра — щодня новий переможець! Порада: невелика цікава модель підвищує шанси.', 'Someone else won today. Apply again tomorrow — a new winner every day! Tip: a small, interesting model improves your chances.'],
   free_no: ['Bu günün müraciəti qaydalara uyğun gəlmədi (ölçü, çəki və ya məzmun). Sabah başqa modellə cəhd edin.', 'Сегодняшняя заявка не подошла под правила (размер, вес или содержание). Попробуйте завтра с другой моделью.', 'Сьогоднішня заявка не підійшла під правила (розмір, вага чи зміст). Спробуйте завтра з іншою моделлю.', 'Today\'s application didn\'t fit the rules (size, weight or content). Try again tomorrow with another model.'],
+  me_phone: ['Botda saxlanmış nömrəniz: {p}. Bu nömrə ilə sifarişlər avtomatik bura gəlir (indi qoşulu: {n}). Saytda eyni nömrəni yazın.', 'Ваш номер в боте: {p}. Заказы на этот номер приходят сюда автоматически (сейчас привязано: {n}). На сайте указывайте этот же номер.', 'Ваш номер у боті: {p}. Замовлення на цей номер надходять сюди автоматично (зараз прив\'язано: {n}). На сайті вказуйте цей самий номер.', 'Your number in the bot: {p}. Orders with this number arrive here automatically (linked now: {n}). Use the same number on the site.'],
+  me_none: ['Nömrəniz hələ saxlanmayıb. Aşağıdakı düyməni basın — bundan sonra bu nömrəyə olan sifarişlər özü gələcək.', 'Номер ещё не сохранён. Нажмите кнопку ниже — после этого заказы на ваш номер будут приходить сами.', 'Номер ще не збережено. Натисніть кнопку нижче — після цього замовлення на ваш номер надходитимуть самі.', 'Your number is not saved yet. Press the button below — then orders with your number will arrive by themselves.'],
   rj_geo: ['model çapa yararsızdır', 'модель непригодна для печати', 'модель непридатна для друку', 'model is not printable'],
 };
 const tx = (k, lang, v = {}) => {
@@ -232,6 +234,7 @@ async function createOrder(env, req, origin) {
   if (ch === 'tg') {
     const known = await env.DB.prepare('SELECT chat_id FROM phones WHERE phone=?').bind(normPhone(contact)).first();
     if (known) await env.DB.prepare('UPDATE orders SET tg_chat_id=? WHERE id=?').bind(known.chat_id, id).run();
+    else console.log('order', id, 'phone not linked yet', normPhone(contact).replace(/\d(?=\d{4})/g, '•'));
   }
   const o = await getOrder(env, id);
   await postToOperators(env, o);
@@ -654,13 +657,7 @@ async function onUpdate(env, u, origin) {
     const fa = await env.DB.prepare("SELECT * FROM free_apps WHERE phone=? AND tg_chat_id IS NULL AND status IN ('new','ok')").bind(phone).all();
     await env.DB.prepare("UPDATE free_apps SET tg_chat_id=? WHERE phone=? AND tg_chat_id IS NULL").bind(chat.id, phone).run();
     for (const a of fa.results) await say(a.status === 'ok' ? tx('free_approved', a.lang, { n: a.id, d: a.day }) : tx('free_ok', a.lang, { n: a.id }));
-    const rs = await env.DB.prepare("SELECT * FROM orders WHERE tg_chat_id IS NULL AND ch='tg' AND status NOT IN ('done','rejected') AND created_at > ?").bind(now() - 60 * 864e5).all();
-    for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
-      const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
-      await refreshOperatorMsg(env, n);
-      await say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }), { reply_markup: { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } });
-      if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
-    }
+    await linkByPhone(env, origin, chat.id, phone, say);
     return;
   }
   if (text && m.reply_to_message) {
@@ -685,6 +682,13 @@ async function onUpdate(env, u, origin) {
     if (!(await hasPhone(env, chat.id))) await say(tx('ask_phone', n.lang), phoneKeyboard(n.lang));
     return;
   }
+  if (/^\/me(@\w+)?$/.test(text) && chat.type === 'private') {
+    const p = await env.DB.prepare('SELECT phone, updated_at FROM phones WHERE chat_id=? ORDER BY updated_at DESC LIMIT 1').bind(chat.id).first();
+    const c = await env.DB.prepare("SELECT COUNT(*) AS c FROM orders WHERE tg_chat_id=?").bind(chat.id).first();
+    if (!p) return say(tx('me_none', lang), phoneKeyboard(lang));
+    return say(tx('me_phone', lang, { p: fmtPhone(p.phone), n: c?.c || 0 }));
+  }
+  if (/^\/(start|orders)/.test(text) && chat.type === 'private') await linkByPhone(env, origin, chat.id, null, say);
   if (/^\/start/.test(text)) {
     const has = await env.DB.prepare('SELECT COUNT(*) AS c FROM orders WHERE tg_chat_id=?').bind(chat.id).first();
     if (!has.c) {
@@ -713,6 +717,22 @@ async function onUpdate(env, u, origin) {
   return say(tx('hello', lang, { id: from.id }));
 }
 
+// Link open orders placed with this phone number to the chat (the phone was confirmed by Telegram's "share contact").
+async function linkByPhone(env, origin, chatId, phone, say) {
+  if (!phone) { const p = await env.DB.prepare('SELECT phone FROM phones WHERE chat_id=? ORDER BY updated_at DESC LIMIT 1').bind(chatId).first(); phone = p?.phone; }
+  if (!phone) return 0;
+  const rs = await env.DB.prepare("SELECT * FROM orders WHERE tg_chat_id IS NULL AND ch='tg' AND status NOT IN ('done','rejected') AND created_at > ?").bind(now() - 60 * 864e5).all();
+  let n = 0;
+  for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
+    const x = await setStatus(env, o.id, { tg_chat_id: chatId });
+    await refreshOperatorMsg(env, x);
+    await say(tx('linked', x.lang, { id: x.id, st: tx('st_' + x.status, x.lang) }), { reply_markup: { inline_keyboard: [[{ text: tx('open', x.lang), url: orderUrl(origin, x) }]] } });
+    if (x.status === 'pay') await notifyClient(env, origin, x, 'confirmed');
+    n++;
+  }
+  return n;
+}
+const fmtPhone = (p) => p && p.length === 9 ? `+994 ${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5, 7)} ${p.slice(7)}` : p || '';
 const phoneKeyboard = (lang) => ({ reply_markup: { keyboard: [[{ text: tx('share_btn', lang), request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } });
 async function hasPhone(env, chatId) { return !!(await env.DB.prepare('SELECT 1 FROM phones WHERE chat_id=? LIMIT 1').bind(chatId).first()); }
 
@@ -830,7 +850,7 @@ async function ensureWebhook(env, origin) {
   if (!r.ok) return console.error('setWebhook failed', r.description);
   await tg(env, 'setMyCommands', { commands: [
     { command: 'orders', description: 'Мои заказы' },
-    { command: 'id', description: 'Мой Telegram ID' },
+    { command: 'me', description: 'Мой номер в боте' },
   ] });
   const me = await tg(env, 'getMe', {});
   if (me.ok) await kvSet(env, 'bot_username', me.result.username);
