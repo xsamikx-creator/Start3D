@@ -594,12 +594,24 @@ async function onUpdate(env, u, origin) {
     return say(`✅ Камера ${printerName(pid)}: поворот ${dir}. Мост применит его в течение 10 секунд.`);
   }
   if (/^\/panel(@\w+)?$/.test(text)) {
-    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    // Only members of the operators group (or the owner) get a link, and only in a private chat with the bot.
+    const opChat = await kvGet(env, 'operator_chat'), owner = String(from.id) === String(await adminId(env));
+    let member = owner;
+    if (!member && opChat) { const cm = await tg(env, 'getChatMember', { chat_id: Number(opChat), user_id: from.id }); member = cm.ok && ['creator', 'administrator', 'member'].includes(cm.result.status); }
+    if (!member) return chat.type === 'private' ? say('Панель доступна только участникам группы операторов.') : undefined;
     await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'optok:%' AND json_extract(v,'$.exp') < ?").bind(now()).run();
     const tok = rnd(24);
     await kvSet(env, 'optok:' + tok, JSON.stringify({ name: clip(from.first_name || 'Оператор', 30), uid: from.id, exp: now() + 30 * 864e5 }));
-    return say(`🔐 Вход в панель оператора для ${from.first_name || 'оператора'}. Ссылка действует 30 дней и запоминается в браузере. Не пересылайте её клиентам.`,
-      { reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть панель', url: `${origin}/#op-${tok}` }]] } });
+    const dm = await tg(env, 'sendMessage', { chat_id: from.id,
+      text: `🔐 Ваш личный вход в панель оператора. Ссылка действует 30 дней и запоминается в браузере. Никому её не пересылайте — по ней открываются все заказы.\nЗакрыть все входы: /logout_all (только владелец).`,
+      reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть панель', url: `${origin}/#op-${tok}` }]] } });
+    if (!dm.ok) { await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('optok:' + tok).run(); return say(`${from.first_name || ''}, сначала откройте личный чат с ботом (@${(await kvGet(env, 'bot_username')) || env.BOT_USERNAME}) и нажмите «Старт», потом снова /panel.`); }
+    return chat.type === 'private' ? undefined : say(`🔐 ${from.first_name || 'Оператор'}, ссылка на панель отправлена вам в личные сообщения.`);
+  }
+  if (/^\/logout_all(@\w+)?$/.test(text)) {
+    if (String(from.id) !== String(await adminId(env))) return;
+    const r = await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'optok:%' OR k LIKE 'camtok:%'").run();
+    return say(`🔒 Все входы в панель и ссылки на камеры закрыты (${r.meta?.changes ?? 'все'}). Операторам нужно снова написать /panel.`);
   }
   if (/^\/cam(@\w+)?$/.test(text)) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
@@ -962,7 +974,7 @@ async function drawFree(env, origin, day, manual) {
    Login: /panel in the operators chat gives a link with a 30-day token; the site keeps it in the browser.
    Every panel request carries the token (header x-op, or ?t= for file downloads). */
 async function opAuth(env, req, url) {
-  const tok = req.headers.get('x-op') || url.searchParams.get('t');
+  const tok = req.headers.get('x-op');
   if (!tok) return null;
   const v = JSON.parse((await kvGet(env, 'optok:' + tok)) || 'null');
   return v && v.exp > now() ? v : null;

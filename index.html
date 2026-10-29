@@ -1042,7 +1042,7 @@ ops_label:['Yalnız komanda üçün','Только для команды','Ли�
 ops_h:['Operator paneli','Панель оператора','Панель оператора','Operator panel'],
 ops_refresh:['Yenilə','Обновить','Оновити','Refresh'],
 ops_logout:['Çıxış','Выйти','Вийти','Log out'],
-ops_need_login:['Daxil olmaq üçün operator qrupunda bota /panel yazın və gələn linki açın.','Чтобы войти, напишите боту /panel в группе операторов и откройте ссылку из ответа.','Щоб увійти, напишіть боту /panel у групі операторів і відкрийте посилання з відповіді.','To log in, send /panel to the bot in the operators group and open the link it sends.'],
+ops_need_login:['Daxil olmaq üçün bota /panel yazın — link şəxsi mesajla gələcək.','Чтобы войти, напишите боту /panel — ссылка придёт в личные сообщения.','Щоб увійти, напишіть боту /panel — посилання надійде в особисті повідомлення.','To log in, send /panel to the bot — the link arrives in a private message.'],
 cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
 timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
 pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
@@ -2423,7 +2423,7 @@ function opsOrderCard(o){
   else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
   else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
   else if (o.status === 'ready') acts = `<button type="button" class="btn-sm btn-primary" data-op="g" data-id="${o.id}">🙏 Выдан</button> <button type="button" class="btn-sm" data-op="rp" data-id="${o.id}">🔁 Перепечатать</button>`;
-  const files = o.files.map((f, i) => `<a href="/api/op/file/${o.id}/${i}?t=${encodeURIComponent(OPTOK)}">📎 ${esc(f.name)} · ${fsize(f.size)}</a>`).join('') + (o.receipt ? `<a href="/api/op/receipt/${o.id}?t=${encodeURIComponent(OPTOK)}">🧾 чек</a>` : '');
+  const files = o.files.map((f, i) => `<a href="#" data-dl="/api/op/file/${o.id}/${i}" data-name="${esc(f.name)}">📎 ${esc(f.name)} · ${fsize(f.size)}</a>`).join('') + (o.receipt ? `<a href="#" data-dl="/api/op/receipt/${o.id}" data-name="${o.id}-receipt">🧾 чек</a>` : '');
   const price = o.price != null ? `${o.price} AZN` : o.lo ? `${o.lo}–${o.hi} AZN (расчёт)` : 'считает оператор';
   return `<div class="panel opc ${['done','rejected'].includes(o.status) ? 'dim' : ''}">
     <div class="opc-h"><b>${o.id}</b><span class="pill ${PILL[o.status] || 'mut'}">${t('st_' + o.status)}</span>${o.free ? '<span class="pill acc">🎁 бесплатно</span>' : ''}${o.urgent ? '<span class="pill bad">24 ч</span>' : ''}${o.pub ? '' : '<span class="pill mut">приватный</span>'}<span class="note">${ago(o.created)} назад</span></div>
@@ -2478,6 +2478,15 @@ function renderOps(){
 $('ops-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; opsTab = b.dataset.tab; opsDrawArm = false; renderOps(); });
 $('ops-body').addEventListener('change', e => { if (e.target.id === 'ops-all'){ opsAll = e.target.checked; e.target.blur(); renderOps(); } });
 $('ops-body').addEventListener('click', async e => {
+  const dl = e.target.closest('[data-dl]');
+  if (dl){ // download with the key in a header (never in the address)
+    e.preventDefault();
+    const r = await fetch(dl.dataset.dl, {headers:{'x-op': OPTOK}});
+    if (!r.ok){ toast(r.status === 413 ? await r.text() : 'Не удалось скачать'); return; }
+    const u = URL.createObjectURL(await r.blob()), a = document.createElement('a');
+    a.href = u; a.download = dl.dataset.name || 'file'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000);
+    return;
+  }
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   try {
     if (b.dataset.op){
@@ -2549,7 +2558,9 @@ function placeCam(r){
   if (r !== 'cam' && scr.parentElement !== camHome.parent) camHome.parent.insertBefore(scr, camHome.next);
 }
 function show(){
-  if (SERVER && route() === 'admin'){ location.hash = 'home'; return; } // the demo operator panel isn't part of the real site
+  // real site: the demo operator panel doesn't exist, and the real one only for a logged-in operator
+  const REAL = SERVER || /(^|\.)start3d\.az$|workers\.dev$/.test(location.hostname);
+  if ((REAL && route() === 'admin') || (route() === 'ops' && !OPTOK)){ location.hash = 'home'; return; }
   const r = route();
   placeCam(r);
   ROUTES.forEach(v => $('view-'+v).hidden = v !== r);
