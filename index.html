@@ -419,6 +419,14 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 .tg-top b{font-size:16px}
 .tg-top p{color:var(--muted);margin-top:4px;max-width:62ch;font-size:14px}
 .tg-top .btn{background:#2AABEE;border-color:#2AABEE;color:#fff;font-size:15px;padding:12px 18px}
+/* order form: quick mode hides the advanced parameters */
+.mode-sw{display:flex;gap:6px;margin-bottom:4px}
+.mode-sw button{flex:1;padding:9px 10px;font-size:14px}
+.mode-sw button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#order-form.simple .adv{display:none!important}
+.quick-sum{display:none;font-size:13.5px;color:var(--muted);margin:0}
+#order-form.simple .quick-sum{display:block}
+.quick-sum button{padding:0;border:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
 .disc .off{opacity:.45;text-decoration:line-through}
 .skin-switch button{padding:4px 10px;font-size:12px;border-radius:6px}
 .skin-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -524,7 +532,8 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 <section id="view-new" hidden>
   <div class="page-head"><div><h1 data-i="new_h"></h1><p data-i="new_p"></p></div></div>
   <div class="split">
-    <form class="panel form" id="order-form" novalidate>
+    <form class="panel form simple" id="order-form" novalidate>
+      <div class="mode-sw" role="group" aria-label="Режим"><button type="button" data-mode="quick" data-i="mode_quick"></button><button type="button" data-mode="pro" data-i="mode_pro"></button></div>
       <div class="seg" id="seg-k"><button type="button" data-v="file" data-i="k_file"></button><button type="button" data-v="link" data-i="k_link"></button><button type="button" data-v="photo" data-i="k_photo"></button></div>
       <div id="file-block" class="form">
         <label class="drop" id="drop" for="file">
@@ -546,50 +555,50 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
           <span class="note" data-i="ph_s"></span>
         </label>
         <div class="thumbs" id="ph-thumbs"></div>
-        <div class="field"><label for="f-dims" data-i="f_dims"></label><input type="text" id="f-dims" placeholder="45 × 20 × 12 mm"></div>
+        <div class="field adv"><label for="f-dims" data-i="f_dims"></label><input type="text" id="f-dims" placeholder="45 × 20 × 12 mm"></div>
       </div>
-      <div class="field"><label for="f-name" data-i="f_name"></label><input type="text" id="f-name" data-ip="f_name_ph"></div>
-      <div class="row">
+      <p class="quick-sum" id="quick-sum"></p>
+      <div class="field adv"><label for="f-name" data-i="f_name"></label><input type="text" id="f-name" data-ip="f_name_ph"></div>
+      <div class="row adv">
         <div class="field"><label for="f-mat" data-i="f_mat"></label>
           <select id="f-mat"><option value="PLA">PLA</option><option value="PETG">PETG</option><option value="ABS">ABS / ASA</option><option value="TPU">TPU</option></select></div>
         <div class="field"><label for="f-qty" data-i="f_qty"></label><input type="number" id="f-qty" min="1" max="50" value="1"></div>
       </div>
-      <div class="field"><span class="flabel"><span data-i="f_color"></span>: <span id="color-name"></span></span><div class="swatches" id="swatches"></div><span class="note" data-i="stock_note"></span></div>
-      <div class="field" id="q-field"><span class="flabel" data-i="f_quality"></span>
+      <div class="field adv"><span class="flabel"><span data-i="f_color"></span>: <span id="color-name"></span></span><div class="swatches" id="swatches"></div><span class="note" data-i="stock_note"></span></div>
+      <div class="field adv" id="q-field"><span class="flabel" data-i="f_quality"></span>
         <div class="seg" id="seg-q"><button type="button" data-v="draft" data-i="q_draft"></button><button type="button" data-v="std" data-i="q_std"></button><button type="button" data-v="fine" data-i="q_fine"></button></div></div>
-      <div class="field" id="i-field"><span class="flabel" data-i="f_infill"></span>
+      <div class="field adv" id="i-field"><span class="flabel" data-i="f_infill"></span>
         <div class="seg" id="seg-i"><button type="button" data-v="15">15%</button><button type="button" data-v="30">30%</button><button type="button" data-v="60">60%</button></div></div>
-      <div class="field"><span class="flabel" data-i="f_urg"></span>
+      <div class="field adv"><span class="flabel" data-i="f_urg"></span>
         <div class="seg" id="seg-u"><button type="button" data-v="0" data-i="urg_n"></button><button type="button" data-v="1" data-i="urg_f"></button></div></div>
 
       <p class="fieldset-h" data-i="f_contact"></p>
       <div class="row">
-        <div class="field"><label for="f-cname" data-i="f_cname"></label><input type="text" id="f-cname" autocomplete="name" maxlength="16" required aria-describedby="cname-note"><span class="note" id="cname-note" data-i="cname_note"></span></div>
+        <div class="field"><label for="f-cname" data-i="f_cname"></label><input type="text" id="f-cname" autocomplete="name" maxlength="16" required aria-describedby="cname-note"><span class="note adv" id="cname-note" data-i="cname_note"></span></div>
         <div class="field"><label for="f-phone" data-i="f_phone"></label><input type="tel" id="f-phone" autocomplete="tel" placeholder="+994 50 000 00 00"></div>
       </div>
-      <div class="field"><span class="flabel" data-i="f_notify"></span>
+      <div class="field adv"><span class="flabel" data-i="f_notify"></span>
         <div class="seg" id="seg-n"><button type="button" data-v="tg">Telegram</button><button type="button" data-v="email">Email</button></div>
         <p class="note" id="tg-note" data-i="tg_note"></p>
         <div class="field" id="email-f" hidden><label for="f-email" data-i="f_email"></label><input type="email" id="f-email" autocomplete="email" placeholder="name@mail.az"></div></div>
-      <div class="field"><span class="flabel" data-i="f_deliv"></span>
+      <div class="field adv"><span class="flabel" data-i="f_deliv"></span>
         <div class="seg" id="seg-d"><button type="button" data-v="0" data-i="d_pick"></button><button type="button" data-v="1" data-i="d_cour"></button></div></div>
-      <label class="check"><input type="checkbox" id="f-gift"><span data-i="f_gift"></span></label>
-      <div class="field" id="gift-block" hidden><label for="f-gift-to" data-i="f_gift_to"></label><input type="text" id="f-gift-to" maxlength="16"><span class="note" data-i="gift_note"></span></div>
+      <label class="check adv"><input type="checkbox" id="f-gift"><span data-i="f_gift"></span></label>
+      <div class="field adv" id="gift-block" hidden><label for="f-gift-to" data-i="f_gift_to"></label><input type="text" id="f-gift-to" maxlength="16"><span class="note" data-i="gift_note"></span></div>
 
-      <p class="fieldset-h" data-i="f_vis"></p>
-      <div class="seg" id="seg-v"><button type="button" data-v="private" data-i="vis_priv"></button><button type="button" data-v="public" data-i="vis_pub"></button></div>
-      <p class="note" id="vis-note"></p>
-      <label class="check" id="copy-row" hidden><input type="checkbox" id="f-copy" checked><span data-i="f_copy"></span></label>
+      <p class="fieldset-h adv" data-i="f_vis"></p>
+      <div class="seg adv" id="seg-v"><button type="button" data-v="private" data-i="vis_priv"></button><button type="button" data-v="public" data-i="vis_pub"></button></div>
+      <p class="note adv" id="vis-note"></p>
+      <label class="check adv" id="copy-row" hidden><input type="checkbox" id="f-copy" checked><span data-i="f_copy"></span></label>
 
-      <p class="fieldset-h" data-i="f_disc"></p>
-      <div class="row" style="align-items:end">
+      <p class="fieldset-h adv" data-i="f_disc"></p>
+      <div class="row adv" style="align-items:end">
         <div class="field"><label for="f-promo" data-i="f_promo"></label><input type="text" id="f-promo" placeholder="START10" autocomplete="off"></div>
         <span class="note" id="promo-msg" style="flex:1 1 150px"></span>
       </div>
-      <label class="check"><input type="checkbox" id="f-student"><span data-i="f_student"></span></label>
-      <label class="check"><input type="checkbox" id="f-kids"><span data-i="f_kids"></span></label>
-      <div class="field"><label for="f-comment" data-i="f_comment"></label><textarea id="f-comment" data-ip="f_comment_ph"></textarea></div>
-      <label class="check note" id="rights-row"><input type="checkbox" id="f-rights"><span data-i="f_rights"></span></label>
+      <label class="check adv"><input type="checkbox" id="f-student"><span data-i="f_student"></span></label>
+      <label class="check adv"><input type="checkbox" id="f-kids"><span data-i="f_kids"></span></label>
+      <div class="field adv"><label for="f-comment" data-i="f_comment"></label><textarea id="f-comment" data-ip="f_comment_ph"></textarea></div>
     </form>
     <div class="panel quote" id="quote-out" aria-live="polite"></div>
   </div>
@@ -948,6 +957,7 @@ promo_bad:['Belə kod yoxdur','Такого кода нет','Такого ко�
 promo_own:['Öz kodunuzu istifadə etmək olmaz','Свой код использовать нельзя','Свій код використати не можна','You can’t use your own code'],
 f_comment:['Şərh','Комментарий','Коментар','Comment'],
 f_comment_ph:['məs., üst səth hamar olmalıdır; ya da modelin linki','например, верх должен быть гладким; или ссылка на модель','наприклад, верх має бути гладким; або посилання на модель','e.g. the top must be smooth; or a link to the model'],
+rights_by_send:['«{b}» düyməsini basmaqla bu modeli çap etməyə hüququnuz olduğunu təsdiq edirsiniz.','Нажимая «{b}», вы подтверждаете, что имеете право печатать эту модель.','Натискаючи «{b}», ви підтверджуєте, що маєте право друкувати цю модель.','By pressing “{b}” you confirm you have the right to print this model.'],
 f_rights:['Bu modeli çap etməyə hüququm var','У меня есть право печатать эту модель','Я маю право друкувати цю модель','I have the right to print this model'],
 quote_label:['İlkin qiymət','Предварительная цена','Попередня ціна','Estimated price'],
 quote_empty:['Model yükləyin və ya nümunəni seçin — burada qiymət aralığı, müddət və printer görünəcək.','Загрузите модель или возьмите пример — здесь появятся вилка цены, срок и принтер.','Завантажте модель або візьміть приклад — тут з’являться діапазон ціни, термін і принтер.','Upload a model or use the sample to see the price range, turnaround and printer here.'],
@@ -1051,6 +1061,10 @@ ops_h:['Operator paneli','Панель оператора','Панель опе�
 ops_refresh:['Yenilə','Обновить','Оновити','Refresh'],
 ops_logout:['Çıxış','Выйти','Вийти','Log out'],
 ops_need_login:['Daxil olmaq üçün bota /panel yazın — link şəxsi mesajla gələcək.','Чтобы войти, напишите боту /panel — ссылка придёт в личные сообщения.','Щоб увійти, напишіть боту /panel — посилання надійде в особисті повідомлення.','To log in, send /panel to the bot — the link arrives in a private message.'],
+mode_quick:['⚡ Sürətli','⚡ Быстро','⚡ Швидко','⚡ Quick'],
+mode_pro:['⚙️ Ətraflı','⚙️ Расширенно','⚙️ Розширено','⚙️ Advanced'],
+quick_sum:['Parametrlər: {p}.','Параметры: {p}.','Параметри: {p}.','Settings: {p}.'],
+quick_edit:['Dəyiş','Изменить','Змінити','Change'],
 cam_off:['kamera çap başlayanda açılacaq','камера включится при старте печати','камера ввімкнеться зі стартом друку','camera starts with the print'],
 timelapse:['Timelapse','Таймлапс','Таймлапс','Timelapse'],
 pending_price:['{lo}–{hi} AZN, təsdiq gözlənilir','{lo}–{hi} AZN, ждёт подтверждения','{lo}–{hi} AZN, очікує підтвердження','{lo}–{hi} AZN, awaiting confirmation'],
@@ -1682,11 +1696,12 @@ function compute(m){
   return {mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
 }
 const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(it => `<div class="${it === d.best ? '' : 'off'}"><span>${esc(it[0])}</span><span class="mono">−${it[1]}%</span></div>`).join('')}${d.list.length > 1 ? `<p class="note">${t('d_rule')}</p>` : ''}</div>` : '';
-const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>`;
+const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>${form.kind !== 'photo' ? `<p class="note" style="font-size:12px">${t('rights_by_send', {b: t('place')})}</p>` : ''}`;
 
 const SITES = {'makerworld.com':'MakerWorld','printables.com':'Printables','thingiverse.com':'Thingiverse','thangs.com':'Thangs','cults3d.com':'Cults3D','myminifactory.com':'MyMiniFactory','grabcad.com':'GrabCAD','sketchfab.com':'Sketchfab'};
 function linkInfo(v){ try { const u = new URL(v.trim()); if (!/^https?:$/.test(u.protocol)) return null; const h = u.hostname.replace(/^www\./,''); const k = Object.keys(SITES).find(d => h === d || h.endsWith('.' + d)); return {url:u.href, site:k ? SITES[k] : h}; } catch(e){ return null; } }
 function renderQuote(){
+  try { quickSum(); } catch(e){}
   const out = $('quote-out'), m = form.model;
   if (form.kind === 'link'){
     const li = linkInfo($('f-link').value);
@@ -1735,7 +1750,6 @@ function bindPlace(q){
     if (!$('f-cname').value.trim()) return fail('need_name', $('f-cname'));
     if (!contactOk($('f-phone').value)) return fail('need_contact', $('f-phone'));
     if (form.notify === 'email' && !emailOk($('f-email').value)) return fail('need_email', $('f-email'));
-    if (form.kind !== 'photo' && !$('f-rights').checked) return fail('need_rights', $('f-rights'));
     const m = form.model || {}, id = 'S3D-' + S.seq, d = discounts();
     const gift = $('f-gift').checked && $('f-gift-to').value.trim() ? {to:$('f-gift-to').value.trim().slice(0,16)} : null;
     const o = {
@@ -1866,8 +1880,26 @@ function seg(id, key, cb){
   el.querySelectorAll('button').forEach(b => b.onclick = () => set(b.dataset.v)); set(form[key]);
 }
 function visNote(){ $('vis-note').textContent = t(form.vis === 'public' ? 'vis_pub_n' : 'vis_priv_n'); $('copy-row').hidden = form.vis !== 'public'; }
-seg('seg-k','kind', v => { $('file-block').hidden = v !== 'file'; $('link-block').hidden = v !== 'link'; $('photo-block').hidden = v !== 'photo'; $('q-field').hidden = v !== 'file'; $('i-field').hidden = v !== 'file'; $('rights-row').hidden = v === 'photo'; });
+seg('seg-k','kind', v => { $('file-block').hidden = v !== 'file'; $('link-block').hidden = v !== 'link'; $('photo-block').hidden = v !== 'photo'; $('q-field').hidden = v !== 'file'; $('i-field').hidden = v !== 'file'; });
 seg('seg-q','quality'); seg('seg-i','infill'); seg('seg-u','urgent'); seg('seg-d','deliv');
+/* quick / advanced form */
+function quickSum(){
+  const parts = [$('f-mat').value, colorName(form.color)];
+  if (form.kind === 'file') parts.push(t('q_' + form.quality).split(' · ')[0]);
+  const q = Math.max(1, +$('f-qty').value || 1); if (q > 1) parts.push(q + ' ' + t('pcs'));
+  if (form.urgent === '1') parts.push('24 h');
+  $('quick-sum').innerHTML = `${esc(t('quick_sum', {p: parts.join(' · ')}))} <button type="button" data-mode="pro">${t('quick_edit')}</button>`;
+}
+function setMode(m){
+  const quick = m !== 'pro';
+  $('order-form').classList.toggle('simple', quick);
+  document.querySelectorAll('.mode-sw [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === (quick ? 'quick' : 'pro')));
+  try { localStorage.setItem('s3d-form-mode', quick ? 'quick' : 'pro'); } catch(e){}
+  quickSum();
+}
+$('order-form').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b){ setMode(b.dataset.mode); if (b.closest('.quick-sum')) $('f-mat').focus(); } });
+$('order-form').addEventListener('input', quickSum); $('order-form').addEventListener('click', e => { if (e.target.closest('.seg,.swatches')) setTimeout(quickSum, 0); });
+try { setMode(localStorage.getItem('s3d-form-mode') || 'quick'); } catch(e){ setMode('quick'); }
 seg('seg-v','vis', visNote);
 seg('seg-n','notify', v => { $('email-f').hidden = v !== 'email'; $('tg-note').hidden = v !== 'tg'; });
 $('f-gift').addEventListener('change', e => { $('gift-block').hidden = !e.target.checked; });
