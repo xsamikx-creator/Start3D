@@ -470,10 +470,9 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .qty-step button{background:#272E52;border-color:transparent}
 [data-skin="c"] .qty-step button[data-d="1"]{color:#FF982F}
 /* order page header with a print illustration */
-.new-hero{position:relative;border-radius:var(--r-xl,20px);overflow:hidden;margin:20px 0 18px;min-height:220px;display:flex;align-items:center;background:#0E1428}
-/* the illustration has a fixed size, so a longer title (another language) never rescales it */
-.new-hero .art{position:absolute;right:0;top:50%;transform:translateY(-50%);width:min(58%,520px);height:260px}
-.new-hero .art svg{width:100%;height:100%;display:block}
+.new-hero{position:relative;border-radius:var(--r-xl,20px);overflow:hidden;margin:20px 0 18px;height:250px;display:flex;align-items:center;
+  border:1px solid var(--line);background:#0E1428 url("img/hero-print.jpg") right center/cover no-repeat;box-shadow:var(--card-sh)}
+/* fixed height: the photo never rescales when the text is longer in another language */
 .new-hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,#10162B 0%,rgba(16,22,43,.75) 45%,rgba(16,22,43,.1) 100%)}
 .new-hero>div:last-child{position:relative;padding:26px 24px;max-width:min(560px,62%)}
 .new-hero h1{font-size:clamp(24px,7.4vw,44px);white-space:nowrap}
@@ -482,9 +481,8 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .new-hero{display:flex}
 [data-skin="c"] #view-new>.page-head{display:none}
 @media (max-width:640px){
-  .new-hero{min-height:210px}
-  .new-hero .art{width:66%;height:240px;opacity:.85}
-  .new-hero .shade{background:linear-gradient(90deg,#10162B 0%,rgba(16,22,43,.86) 52%,rgba(16,22,43,.3) 100%)}
+  .new-hero{height:220px;background-image:url("img/hero-print-m.jpg");background-position:72% center}
+  .new-hero .shade{background:linear-gradient(90deg,rgba(16,22,43,.95) 0%,rgba(16,22,43,.7) 50%,rgba(16,22,43,.15) 100%)}
   .new-hero>div:last-child{max-width:100%;padding:22px 18px}
   .new-hero p{max-width:30ch}
 }
@@ -674,40 +672,6 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 <section id="view-new" hidden>
   <div class="page-head"><div><h1 data-i="new_h"></h1><p data-i="new_p"></p></div></div>
   <div class="new-hero">
-    <div class="art" aria-hidden="true"><svg viewBox="0 0 520 260" preserveAspectRatio="xMaxYMid slice">
-      <defs>
-        <radialGradient id="nh-glow" cx=".62" cy=".42" r=".5"><stop offset="0" stop-color="#FF9A32" stop-opacity=".55"/><stop offset=".5" stop-color="#FF7A1A" stop-opacity=".12"/><stop offset="1" stop-color="#FF7A1A" stop-opacity="0"/></radialGradient>
-        <radialGradient id="nh-v" cx=".85" cy=".2" r=".6"><stop offset="0" stop-color="#6C63FF" stop-opacity=".35"/><stop offset="1" stop-color="#6C63FF" stop-opacity="0"/></radialGradient>
-        <linearGradient id="nh-vase" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C9561A"/><stop offset=".45" stop-color="#FF9A3A"/><stop offset="1" stop-color="#B9480F"/></linearGradient>
-        <linearGradient id="nh-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5D6585"/><stop offset="1" stop-color="#2B3150"/></linearGradient>
-        <clipPath id="nh-vclip"><path d="M270 236c-8-28 6-52 2-78-3-20-18-30-16-44h132c2 14-13 24-16 44-4 26 10 50 2 78z"/></clipPath>
-      </defs>
-      <rect width="520" height="260" fill="#0E1428"/>
-      <rect width="520" height="260" fill="url(#nh-v)"/>
-      <rect x="150" y="18" width="360" height="12" rx="6" fill="#262D4D"/>
-      <rect x="470" y="18" width="10" height="230" rx="5" fill="#1E2542"/>
-      <rect x="150" y="234" width="360" height="12" rx="4" fill="#2A3150"/>
-      <circle cx="330" cy="104" r="120" fill="url(#nh-glow)"/>
-      <g clip-path="url(#nh-vclip)">
-        <rect x="250" y="112" width="160" height="126" fill="url(#nh-vase)"/>
-        <g stroke="#7A2E08" stroke-opacity=".55" stroke-width="5" fill="none">
-          <path d="M240 240C290 200 300 150 280 112M280 240C330 200 340 150 320 112M320 240C370 200 380 150 360 112M360 240C410 200 420 150 400 112"/>
-          <path d="M420 240C370 200 360 150 380 112M380 240C330 200 320 150 340 112M340 240C290 200 280 150 300 112M300 240C250 200 240 150 260 112"/>
-        </g>
-      </g>
-      <g fill="none" stroke="#000" stroke-opacity=".14" stroke-width="1">
-        <path d="M262 124h136M260 136h140M259 148h142M260 160h140M262 172h136M264 184h132M266 196h128M267 208h126M268 220h124M268 232h124"/>
-      </g>
-      <rect x="252" y="110" width="156" height="5" rx="2.5" fill="#FFC27A"/>
-      <rect x="282" y="34" width="92" height="56" rx="10" fill="url(#nh-metal)"/>
-      <rect x="292" y="44" width="34" height="34" rx="6" fill="#1A2038"/>
-      <circle cx="309" cy="61" r="11" fill="none" stroke="#4A527A" stroke-width="2"/>
-      <path d="M309 52v18M300 61h18" stroke="#4A527A" stroke-width="2"/>
-      <rect x="334" y="46" width="30" height="5" rx="2" fill="#FF982F" opacity=".85"/>
-      <path d="M318 90h20l-4 12h-12z" fill="#C9CDD8"/>
-      <path d="M324 102h8l-4 8z" fill="#FFB24F"/>
-      <circle cx="328" cy="110" r="7" fill="#FFD08A" opacity=".9"/>
-    </svg></div>
     <div class="shade"></div>
     <div><h1 data-i="new_h"></h1><p data-i="new_p_c"></p></div>
   </div>
