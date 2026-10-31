@@ -470,21 +470,25 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .qty-step button{background:#272E52;border-color:transparent}
 [data-skin="c"] .qty-step button[data-d="1"]{color:#FF982F}
 /* order page header with a print illustration */
-.new-hero{position:relative;border-radius:var(--r-xl,20px);overflow:hidden;margin:20px 0 18px;height:250px;display:flex;align-items:center;
-  border:1px solid var(--line);background:#0E1428 url("img/hero-print.jpg") right center/cover no-repeat;box-shadow:var(--card-sh)}
-/* fixed height: the photo never rescales when the text is longer in another language */
-.new-hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,#10162B 0%,rgba(16,22,43,.75) 45%,rgba(16,22,43,.1) 100%)}
-.new-hero>div:last-child{position:relative;padding:26px 24px;max-width:min(560px,62%)}
-.new-hero h1{font-size:clamp(24px,7.4vw,44px);white-space:nowrap}
-.new-hero p{margin-top:8px;color:var(--ink-2)}
 .new-hero{display:none}
-[data-skin="c"] .new-hero{display:flex}
+/* order page header: full-bleed, the photo sits on the right and fades into the page; text on the clean dark left side */
+[data-skin="c"] .new-hero{display:flex;align-items:center;position:relative;height:300px;margin:0 calc(50% - 50vw) 6px;padding:0 max(16px,calc(50vw - 550px));overflow:hidden}
+.new-hero .photo{position:absolute;top:0;bottom:0;right:0;width:min(64%,820px);background:url("img/hero-print.jpg") 68% 45%/cover no-repeat;
+  -webkit-mask-image:radial-gradient(115% 95% at 72% 42%,#000 42%,transparent 82%);mask-image:radial-gradient(115% 95% at 72% 42%,#000 42%,transparent 82%)}
+.new-hero .arc{position:absolute;left:calc(max(16px,calc(50vw - 550px)) - 12%);bottom:34px;width:62%;max-width:640px;height:120px;border-bottom:1.5px solid rgba(138,128,255,.55);
+  border-radius:0 0 100% 70%/0 0 100% 100%;box-shadow:0 22px 46px -18px rgba(108,99,255,.55);pointer-events:none}
+.new-hero>.txt{position:relative;z-index:1;max-width:min(560px,56%)}
+.new-hero h1{font-size:clamp(28px,7.4vw,48px);white-space:nowrap}
+.new-hero p{margin-top:10px;color:var(--ink-2);font-size:17px;line-height:1.45}
 [data-skin="c"] #view-new>.page-head{display:none}
+html:has([data-skin]),[data-skin="c"] body{overflow-x:clip}
 @media (max-width:640px){
-  .new-hero{height:220px;background-image:url("img/hero-print-m.jpg");background-position:72% center}
-  .new-hero .shade{background:linear-gradient(90deg,rgba(16,22,43,.95) 0%,rgba(16,22,43,.7) 50%,rgba(16,22,43,.15) 100%)}
-  .new-hero>div:last-child{max-width:100%;padding:22px 18px}
-  .new-hero p{max-width:30ch}
+  [data-skin="c"] .new-hero{height:250px;align-items:flex-start;padding-top:34px}
+  .new-hero .photo{width:66%;background-image:url("img/hero-print-m.jpg");background-position:70% 40%;
+    -webkit-mask-image:radial-gradient(110% 90% at 70% 40%,#000 40%,transparent 80%);mask-image:radial-gradient(110% 90% at 70% 40%,#000 40%,transparent 80%)}
+  .new-hero>.txt{max-width:100%}
+  .new-hero p{max-width:62%;font-size:15.5px}
+  .new-hero .arc{left:-18%;width:92%;bottom:22px;height:110px}
 }
 /* features strip under the form */
 .feat-row{display:none}
@@ -672,8 +676,8 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 <section id="view-new" hidden>
   <div class="page-head"><div><h1 data-i="new_h"></h1><p data-i="new_p"></p></div></div>
   <div class="new-hero">
-    <div class="shade"></div>
-    <div><h1 data-i="new_h"></h1><p data-i="new_p_c"></p></div>
+    <div class="photo" aria-hidden="true"></div><div class="arc" aria-hidden="true"></div>
+    <div class="txt"><h1 data-i="new_h"></h1><p data-i="new_p_c"></p></div>
   </div>
   <div class="split">
     <form class="panel form simple" id="order-form" novalidate>
