@@ -2823,7 +2823,7 @@ function badges(){
 
 /* ---------- hero factory (skin C): the printer builds a part, pushes it onto the belt,
    the part passes the check gate and the photo booth and drops into the «ready» bin; then the next one starts ---------- */
-const FAC = { p:.35, phase:'print', k:0, n:0, colOv:null, items:[], made:37, last:0, flash:0, gate:0, mx:-1, my:-1, id:1043, seeded:false };
+const FAC = { p:.35, phase:'print', k:0, n:0, colOv:null, items:[], made:37, last:0, flash:0, gate:0, mx:-1, my:-1, id:1043, seeded:false }; window.__fac = FAC;
 const F_NAMES = ['Leyla','Murad','Aysel','Samir','Nigar','Elvin','Kamran','Günay','Rauf','Lala'];
 const F_L = 90, F_PRINT = 8.5;
 /* Baku landmarks: each is a detailed silhouette in its own units (origin = bottom centre, y up, height 100, width wu).
@@ -2845,14 +2845,14 @@ function part(g, path, fill, x0, x1, opt = {}){
 }
 const rr = (g, x, y, w, h, r) => g.roundRect(x, y, w, h, r);
 /* figurines from the studio photo: transparent cut-outs, printed layer by layer */
-const LM_IMG = (k, f, ar, hf, col) => { const img = new Image(); img.decoding = 'async'; img.src = `img/fig-${f}.webp`; img.onload = () => LM_CACHE.clear(); return {k, img, wu: ar * 100, hf, col}; };
+const LM_IMG = (k, f, ar, hf, col, anim) => { const img = new Image(); img.decoding = 'async'; img.src = `img/fig-${f}.webp`; img.onload = () => LM_CACHE.clear(); return {k, img, wu: ar * 100, hf, col, anim}; };
 const LANDMARKS = [
   LM_IMG('lm_maiden', 'maiden', .797, 1,   '#CDB089'),
-  LM_IMG('lm_gear',   'gear',   .99,  .78, '#8C96A3'),
+  LM_IMG('lm_gear',   'gear',   .99,  .78, '#8C96A3', 'roll'),
   LM_IMG('lm_tar',    'tar',    .444, 1,   '#8A4521'),
-  LM_IMG('lm_man',    'man',    .659, .92, '#B8352E'),
-  LM_IMG('lm_knight', 'horse',  1.034,.86, '#9A5A2E'),
-  LM_IMG('lm_dancer', 'dancer', .759, 1,   '#8E1F2E'),
+  LM_IMG('lm_man',    'man',    .659, .92, '#B8352E', 'walk'),
+  LM_IMG('lm_knight', 'horse',  1.034,.86, '#9A5A2E', 'gallop'),
+  LM_IMG('lm_dancer', 'dancer', .759, 1,   '#8E1F2E', 'dance'),
   LM_IMG('lm_nar',    'nar',    1.09, .74, '#C8202B'),
 ];
 const lmOf = n => LANDMARKS[((n % LANDMARKS.length) + LANDMARKS.length) % LANDMARKS.length];
@@ -2895,6 +2895,20 @@ function facObj(g, cx, baseY, lm, color, frac, F){
   const r = Math.max(0, Math.min(sp.runs.length - 1, Math.floor(H - hh - lh * .5)));
   return { top: baseY - hh, spans: (sp.runs[r] || []).map(([a, b]) => [cx - W/2 + a, cx - W/2 + b]), lh };
 }
+/* figures that come alive on the belt: the gear rolls, the man walks, the dancer twirls, the horse gallops */
+const F_SPEED = { roll: 1.3, walk: 1.2, gallop: 1.75, dance: 1 };
+function facLive(g, x, base, it, tm, F, S){
+  const lm = it.lm, H = lmSize(lm, F).H, d = it.d || 0, an = it.fall ? (lm.anim === 'roll' ? 'roll' : null) : lm.anim;
+  let rot = 0, sx = 1, lift = 0, py = 0, shadow = 0;
+  if (an === 'roll'){ py = H / 2; rot = d / (H / 2); }
+  else if (an === 'walk'){ const ph = d / (11 * S) * Math.PI; lift = Math.abs(Math.sin(ph)) * 3.5 * S; rot = Math.sin(ph) * .07; shadow = 1; }
+  else if (an === 'gallop'){ const ph = d / (34 * S) * Math.PI; lift = Math.abs(Math.sin(ph)) * 13 * S; rot = -Math.cos(ph) * .13; py = H * .35; shadow = 1; }
+  else if (an === 'dance'){ const c = Math.cos(tm * 2.4); sx = Math.sign(c || 1) * Math.max(.18, Math.abs(c)); rot = Math.sin(tm * 3.1) * .07; lift = Math.abs(Math.sin(tm * 2.4)) * 2.5 * S; shadow = 1; }
+  if (shadow && lift > .5){ g.save(); g.globalAlpha *= .35; g.fillStyle = '#000'; g.beginPath(); g.ellipse(x, base - 1, lmSize(lm, F).W * .38 * (1 - lift / (40 * S)), 2.2 * S, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+  g.save(); g.translate(x, base - lift - py); g.rotate(rot); g.scale(sx, 1); g.translate(0, py);
+  facObj(g, 0, 0, lm, it.col, 1, F); g.restore();
+  return base - lift - H;
+}
 function facTag(g, x, y, txt, F, ok){
   g.font = `${Math.round(10.5 * F.s)}px "JetBrains Mono", monospace`;
   const tw = g.measureText(txt).width + 12 * F.s, th = 18 * F.s, x0 = Math.max(4, x - tw / 2);
@@ -2914,9 +2928,12 @@ function drawFactory(cv, now){
   else if (FAC.phase === 'push'){ FAC.k += dt / 1.2;
     if (FAC.k >= 1){ FAC.items.push({x: F.b0 + half + 4, lm, col, id:'S3D-' + FAC.id, who:F_NAMES[FAC.id % F_NAMES.length], qc:false, ph:false, fall:0});
       FAC.id++; FAC.n++; FAC.colOv = null; FAC.p = 0; FAC.phase = 'print'; } }
+  let ahead = null;
   for (const it of FAC.items){
     if (it.fall){ it.fall += dt; continue; }
-    it.x += F.v * dt;
+    /* fast walkers queue behind the figure in front instead of running through it */
+    const lim = ahead ? ahead.x - (lmSize(ahead.lm, F).W + lmSize(it.lm, F).W) / 2 - 8 * F.s : Infinity;
+    const sv = Math.max(0, Math.min(F.v * (F_SPEED[it.lm.anim] || 1) * dt, lim - it.x)); it.x += sv; it.d = (it.d || 0) + sv; ahead = it;
     if (!it.qc && it.x >= F.gateX){ it.qc = true; FAC.gate = 1; }
     if (!it.ph && it.x >= F.camX){ it.ph = true; FAC.flash = 1; }
     if (it.x >= F.b1 + F.binW * .35) it.fall = .001;
@@ -2998,8 +3015,8 @@ function drawFactory(cv, now){
   for (const it of FAC.items){
     let x = it.x, base = by, a = 1;
     if (it.fall){ const k = it.fall / .55; x = it.x + k * 10 * S; base = by + k * k * (F.floor - by - 10 * S); a = 1 - k * .6; }
-    g.globalAlpha = a; const pt = facObj(g, x, base, it.lm, it.col, 1, F);
-    if (!it.fall) facTag(g, x, pt.top - 8 * S, it.ph ? `📷 ${it.who}` : it.qc ? `✓ ${t(it.lm.k)}` : it.id, F, it.qc && !it.ph);
+    g.globalAlpha = a; const top = facLive(g, x, base, it, tm, F, S);
+    if (!it.fall) facTag(g, x, top - 8 * S, it.ph ? `📷 ${it.who}` : it.qc ? `✓ ${t(it.lm.k)}` : it.id, F, it.qc && !it.ph);
     g.globalAlpha = 1;
   }
   g.fillStyle = '#1C2340'; g.beginPath(); g.moveTo(bx, bTop); g.lineTo(bx + bw, bTop); g.lineTo(bx + bw - 5 * S, F.floor); g.lineTo(bx + 5 * S, F.floor); g.closePath(); g.fill();
