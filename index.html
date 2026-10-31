@@ -470,17 +470,24 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .qty-step button{background:#272E52;border-color:transparent}
 [data-skin="c"] .qty-step button[data-d="1"]{color:#FF982F}
 /* order page header with a print illustration */
-.new-hero{position:relative;border-radius:var(--r-xl,20px);overflow:hidden;margin:20px 0 18px;min-height:180px;display:flex;align-items:center}
-.new-hero .art{position:absolute;inset:0 0 0 auto;width:min(58%,520px);height:100%}
+.new-hero{position:relative;border-radius:var(--r-xl,20px);overflow:hidden;margin:20px 0 18px;min-height:220px;display:flex;align-items:center;background:#0E1428}
+/* the illustration has a fixed size, so a longer title (another language) never rescales it */
+.new-hero .art{position:absolute;right:0;top:50%;transform:translateY(-50%);width:min(58%,520px);height:260px}
 .new-hero .art svg{width:100%;height:100%;display:block}
 .new-hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,#10162B 0%,rgba(16,22,43,.75) 45%,rgba(16,22,43,.1) 100%)}
 .new-hero>div:last-child{position:relative;padding:26px 24px;max-width:min(560px,62%)}
-.new-hero h1{font-size:clamp(30px,6vw,44px)}
+.new-hero h1{font-size:clamp(24px,7.4vw,44px);white-space:nowrap}
 .new-hero p{margin-top:8px;color:var(--ink-2)}
 .new-hero{display:none}
 [data-skin="c"] .new-hero{display:flex}
 [data-skin="c"] #view-new>.page-head{display:none}
-@media (max-width:640px){.new-hero .art{width:62%;opacity:.9}.new-hero>div:last-child{max-width:72%;padding:20px 16px}}
+@media (max-width:640px){
+  .new-hero{min-height:210px}
+  .new-hero .art{width:66%;height:240px;opacity:.85}
+  .new-hero .shade{background:linear-gradient(90deg,#10162B 0%,rgba(16,22,43,.86) 52%,rgba(16,22,43,.3) 100%)}
+  .new-hero>div:last-child{max-width:100%;padding:22px 18px}
+  .new-hero p{max-width:30ch}
+}
 /* features strip under the form */
 .feat-row{display:none}
 [data-skin="c"] .feat-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid rgba(113,107,255,.45);border-radius:var(--r-lg);background:linear-gradient(135deg,rgba(39,46,82,.75),rgba(23,29,52,.75));box-shadow:var(--glow-v);padding:14px 6px}
@@ -1820,6 +1827,7 @@ function candidates(o){
 
 /* ---------- i18n ---------- */
 function applyLang(){
+  setTimeout(fitHeroTitle, 0);
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i]').forEach(el => el.textContent = t(el.dataset.i));
   document.querySelectorAll('[data-ip]').forEach(el => el.placeholder = t(el.dataset.ip));
@@ -2075,6 +2083,15 @@ function quickSum(){
   if (form.urgent === '1') parts.push('24 h');
   $('quick-sum').innerHTML = `${esc(t('quick_sum', {p: parts.join(' · ')}))} <button type="button" data-mode="pro">${t('quick_edit')}</button>`;
 }
+// keep the order title on one line in every language (fonts differ in width): shrink it until it fits
+function fitHeroTitle(){
+  const h = document.querySelector('.new-hero h1'); if (!h || !h.offsetParent) return;
+  h.style.fontSize = '';
+  let f = parseFloat(getComputedStyle(h).fontSize);
+  while (h.scrollWidth > h.clientWidth + 1 && f > 18){ f -= 1; h.style.fontSize = f + 'px'; }
+}
+addEventListener('resize', fitHeroTitle);
+document.fonts && document.fonts.ready.then(fitHeroTitle);
 function setMode(m){
   const quick = m !== 'pro';
   $('order-form').classList.toggle('simple', quick);
@@ -2754,6 +2771,7 @@ function full(){
   const r = route();
   if (r === 'orders') renderOrders();
   if (r === 'free') renderFree();
+  if (r === 'new') setTimeout(fitHeroTitle, 0);
   if (r === 'ops') renderOps();
   if (r === 'track'){ if (!O(trackId) && trackCode) adoptOrder(trackId, trackCode); renderTrack(); }
   if (r === 'admin'){ adminSeen = true; renderAdmin(); }
