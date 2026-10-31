@@ -1039,8 +1039,8 @@ lm_benchy:['3DBenchy','3DBenchy','3DBenchy','3DBenchy'],
 lm_robot:['Robot','Робот','Робот','Robot toy'],
 lm_knight:['Qarabağ atı','Карабахский скакун','Карабаський скакун','Karabakh horse'],
 lm_nar:['Nar','Гранат','Гранат','Pomegranate'],
-lm_man:['Papaqlı kişi','Дядя в папахе','Дядько в папасі','Man in papakha'],
-lm_dancer:['Rəqqasə','Танцовщица','Танцівниця','Dancer'],
+lm_man:['Cırtdan','Джыртдан','Джиртдан','Jirtdan'],
+lm_dancer:['Cik-cik xanım','Джик-джик ханым','Джик-джик ханим','Jik-jik Khanum'],
 f_qc:['Yoxlama','Контроль','Контроль','Check'],
 f_photo:['Foto','Фото','Фото','Photo'],
 f_ready:['Hazır','Готово','Готово','Ready'],
@@ -2847,13 +2847,13 @@ const rr = (g, x, y, w, h, r) => g.roundRect(x, y, w, h, r);
 /* figurines from the studio photo: transparent cut-outs, printed layer by layer */
 const LM_IMG = (k, f, ar, hf, col, anim) => { const img = new Image(); img.decoding = 'async'; img.src = `img/fig-${f}.webp`; img.onload = () => LM_CACHE.clear(); return {k, img, wu: ar * 100, hf, col, anim}; };
 const LANDMARKS = [
-  LM_IMG('lm_maiden', 'maiden', .797, 1,   '#CDB089'),
-  LM_IMG('lm_gear',   'gear',   .99,  .78, '#8C96A3', 'roll'),
-  LM_IMG('lm_tar',    'tar',    .444, 1,   '#8A4521'),
-  LM_IMG('lm_man',    'man',    .659, .92, '#B8352E', 'walk'),
-  LM_IMG('lm_knight', 'horse',  1.034,.86, '#9A5A2E', 'gallop'),
-  LM_IMG('lm_dancer', 'dancer', .759, 1,   '#8E1F2E', 'dance'),
-  LM_IMG('lm_nar',    'nar',    1.09, .74, '#C8202B'),
+  LM_IMG('lm_maiden', 'maiden', .975, .9,  '#C99A5B'),
+  LM_IMG('lm_gear',   'gear',   1.022,.74, '#F2B21C', 'roll'),
+  LM_IMG('lm_tar',    'tar',    .322, 1,   '#8A4521'),
+  LM_IMG('lm_man',    'man',    .634, .95, '#D8352A', 'walk'),
+  LM_IMG('lm_knight', 'horse',  .941, .9,  '#A8582A', 'gallop'),
+  LM_IMG('lm_dancer', 'dancer', .459, .95, '#D8352A', 'dance'),
+  LM_IMG('lm_nar',    'nar',    1.069,.72, '#D8202B'),
 ];
 const lmOf = n => LANDMARKS[((n % LANDMARKS.length) + LANDMARKS.length) % LANDMARKS.length];
 const LM_CACHE = new Map(); window.__s3dModels = () => ({ LANDMARKS, lmSprite });
