@@ -614,6 +614,17 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
 @keyframes mgl-led{0%,100%{opacity:.45}50%{opacity:1}}
 @media (max-width:520px){.mgl-ig span{display:none}.mgl-ig{padding-left:10px}.mgl{gap:10px;padding-right:12px}}
 @media (prefers-reduced-motion:reduce){.mgl::before,.mgl-chip .tr path,.mgl-chip .led{animation:none}}
+
+/* timelapse cards and player */
+.tl-thumb{display:block;width:100%;padding:0;border:0;cursor:pointer;background:#0E1428;aspect-ratio:4/3}
+.tl-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tl-play{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;display:grid;place-items:center;font-size:20px;color:#fff;
+  background:rgba(255,140,40,.9);box-shadow:0 8px 24px rgba(255,140,40,.4);transition:transform .2s;padding-left:4px}
+.tl-thumb:hover .tl-play{transform:scale(1.08)}
+.tl-badge{position:absolute;top:10px;right:10px;font-size:18px}
+.tl-lb video{max-width:100%;max-height:80vh;border-radius:12px;background:#000}
+.tl-lb .lb-bar a{color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+.tl-mini{padding:1px 8px;font-size:11px;margin-left:6px;vertical-align:1px}
 </style>
 
 <header>
@@ -854,7 +865,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
 <section id="view-live" hidden>
   <div class="page-head"><div><h1 data-i="live_h"></h1><p data-i="live_p"></p></div></div>
   <div class="live-grid" id="live-full"></div>
-  <div class="page-head" style="padding-block:40px 16px"><div><h2 data-i="tl_h"></h2><p data-i="tl_p"></p></div></div>
+  <div class="page-head" id="tl-head" style="padding-block:40px 16px"><div><h2 data-i="tl_h"></h2><p data-i="tl_p"></p></div></div>
   <div class="live-grid" id="live-done"></div>
 </section>
 
@@ -1744,7 +1755,7 @@ setInterval(() => {
   if (r === 'live' || r === 'home' || r === 'free') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
 }, 2500);
 let LIVE = [];
-async function loadLive(){ if (!SERVER) return; try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
+async function loadLive(){ if (!SERVER) return; loadTlWeek(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
 setInterval(loadLive, 5000);
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
@@ -1804,6 +1815,7 @@ async function syncOrder(o){
     if (o.live){ o.progress = Math.min(1, (o.live.percent || 0) / 100); if (o.live.layers) o.layers = o.live.layers; live(); }
     for (const k of ['accept','issueText','answer']) if ((r[k] || null) !== (o[k] || null)){ o[k] = r[k] || null; ch = true; }
     if ((r.card || null) !== (o.card || null)){ o.card = r.card || null; ch = true; }
+    if ((r.tl || null) !== (o.tl || null)){ o.tl = r.tl || null; ch = true; }
     for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
     if (r.status === 'printing' && !o.speed) o.speed = 1/120;
     if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = !!o.srvPhotos; }
@@ -2370,9 +2382,26 @@ const srvCard = (x) => `<div class="lcard"><div class="screen">${x.cam ? `<img d
   <div class="body"><div class="meta"><b>${esc(x.name || x.id)}</b><span class="mono" data-lp="${x.id}">${x.percent}%</span></div>
   <div class="meta"><span class="note" data-ll="${x.id}">${t('o_layer')} ${x.layer}/${x.layers}</span><span class="note mono" data-lr="${x.id}">${fmtH((x.remaining || 0) / 60)}</span></div></div></div>`;
 let liveShape = '';
+/* real timelapses: built by the workshop bridge after each print */
+let TLW = [], tlwAt = 0;
+async function loadTlWeek(){ if (!SERVER || Date.now() - tlwAt < 60000) return; tlwAt = Date.now(); try { const r = await api('/api/tl/week'); const ch = JSON.stringify(r) !== JSON.stringify(TLW); TLW = r; if (ch){ liveShape = ''; if (route() === 'live') renderLive(); } } catch(e){} }
+const tlDate = ts => new Date(ts).toLocaleDateString(LOCALE[lang] || 'ru', {day:'numeric', month:'short'});
+const tlCard = x => `<div class="lcard tl-card"><button type="button" class="screen tl-thumb" data-tlp="${x.id}" aria-label="▶ ${esc(x.name)}">${x.poster ? `<img src="/api/tl/${x.id}/poster" alt="" loading="lazy">` : ''}<span class="tl-play" aria-hidden="true">▶</span>${x.free ? '<span class="tl-badge">🎁</span>' : ''}</button>
+  <div class="body"><div class="meta"><b>${esc(x.name)}</b><span class="mono">${x.hours ? fmtH(x.hours) : ''}</span></div>
+  <div class="meta"><span class="note">${esc(x.client || '')}${x.client ? ' · ' : ''}${esc(x.printerName || '')}</span><span class="note mono">${tlDate(x.at)}</span></div></div></div>`;
+function tlPlayer(id, code, name){
+  const el = document.createElement('div'); el.className = 'lightbox tl-lb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', name || 'Timelapse');
+  const q = code ? `?code=${encodeURIComponent(code)}` : '';
+  el.innerHTML = `<video src="/api/tl/${id}/video${q}" poster="/api/tl/${id}/poster${q}" controls autoplay muted playsinline loop></video><div class="lb-bar"><a class="btn btn-sm" href="/api/tl/${id}/video${q}" download="${esc((name || 'timelapse').replace(/[^\wа-яё -]/gi, ''))}.mp4">⬇</a><button type="button" data-x>✕</button></div>`;
+  document.body.appendChild(el);
+  const close = () => { el.querySelector('video').pause(); el.remove(); document.removeEventListener('keydown', key); };
+  const key = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', key);
+  el.onclick = e => { if (e.target === el || e.target.closest('[data-x]')) close(); };
+}
 function renderLive(){
   if (SERVER){
-    const shape = lang + '|' + LIVE.map(x => [x.id, x.printer, !!x.cam, !!x.video].join(':')).join(',');
+    const shape = lang + '|' + TLW.map(x => x.id).join(',') + '|' + LIVE.map(x => [x.id, x.printer, !!x.cam, !!x.video].join(':')).join(',');
     if (shape === liveShape && $('live-full').childElementCount){
       LIVE.forEach(x => {
         document.querySelectorAll(`[data-lp="${x.id}"]`).forEach(e => e.textContent = x.percent + '%');
@@ -2388,7 +2417,9 @@ function renderLive(){
   const done = SERVER ? [] : S.orders.filter(o => o.pub && ['post','ready','done'].includes(o.status));
   const empty = `<div class="panel empty" style="grid-column:1/-1">${t('live_empty')}</div>`;
   $('live-full').innerHTML = (srv || now.length) ? srv + now.map(o => liveCard(o)).join('') : empty;
-  $('live-done').innerHTML = done.length ? done.map(o => liveCard(o, true)).join('') : empty;
+  if (SERVER){ $('tl-head').hidden = $('live-done').hidden = !TLW.length; $('live-done').innerHTML = TLW.map(tlCard).join(''); }
+  else $('live-done').innerHTML = done.length ? done.map(o => liveCard(o, true)).join('') : empty;
+  document.querySelectorAll('[data-tlp]').forEach(b => b.onclick = () => { const x = TLW.find(v => v.id === +b.dataset.tlp); tlPlayer(x.id, '', x.name); });
   $('live-teaser').innerHTML = SERVER ? (LIVE.length ? LIVE.slice(0,3).map(srvCard).join('') : empty) : now.length ? now.slice(0,3).map(o => liveCard(o)).join('') : empty;
   document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => { tlMap[b.dataset.play] = performance.now(); });
   attachLiveVideos();
@@ -2510,7 +2541,7 @@ function renderTrack(){
   const acts = $('t-actions'); acts.innerHTML = '';
   const add = (txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-sm ' + cls; b.textContent = txt; b.onclick = fn; acts.append(b); };
   if (o.status === 'printing' && !paused && !o.server) add(t('speed_btn'), '', () => { o.speed = Math.max(o.speed||0, 1/20); save(); });
-  if (['post','ready','done'].includes(o.status)) add('▶ ' + t('timelapse'), 'btn-primary', () => { tlStart = performance.now(); });
+  if (o.server ? o.tl : ['post','ready','done'].includes(o.status)) add('▶ ' + t('timelapse'), 'btn-primary', () => { if (o.server) tlPlayer(o.tl, o.code, o.name); else tlStart = performance.now(); });
   if (!owner && o.copy && ['printing','post','ready','done'].includes(o.status)) add(t('copy_h'), 'btn-primary', () => openModal('copy', o));
   if (owner && ['ready','done'].includes(o.status)) add(t('repeat'), '', () => openModal('repeat', o));
   if (owner && !o.server && !['done','rejected'].includes(o.status)) add(t(o.pub ? 'make_priv' : 'make_pub'), 'btn-ghost', () => { o.pub = !o.pub; save(); toast(t(o.pub ? 't_pub' : 't_priv')); full(); badges(); });
@@ -2662,8 +2693,9 @@ function renderFree(){
   const ms = drawCountdown(); $('fr-timer').textContent = fmtH(ms/36e5);
   $('fr-count').textContent = FREE ? FREE.count : (SERVER ? '…' : '7');
   const w = FREE ? FREE.winners : (SERVER ? [] : DEMO_WINNERS());
-  $('fr-winners').innerHTML = w.length ? w.map((x, i) => `<li class="${x.photos ? 'click' : ''}" data-wi="${i}"><span>${x.status === 'printing' ? '🔴' : '🎉'} ${esc(x.name)}${x.model ? ' · ' + esc(x.model) : ''}${x.photos ? ' 📷' : ''}</span><span class="mono note">${esc(x.day)}</span></li>`).join('') : `<li class="note">${t('fr_no_winners')}</li>`;
+  $('fr-winners').innerHTML = w.length ? w.map((x, i) => `<li class="${x.photos ? 'click' : ''}" data-wi="${i}"><span>${x.status === 'printing' ? '🔴' : '🎉'} ${esc(x.name)}${x.model ? ' · ' + esc(x.model) : ''}${x.photos ? ' 📷' : ''}${x.tl ? ` <button type="button" class="btn-sm tl-mini" data-wtl="${i}">▶</button>` : ''}</span><span class="mono note">${esc(x.day)}</span></li>`).join('') : `<li class="note">${t('fr_no_winners')}</li>`;
   document.querySelectorAll('[data-wi]').forEach(li => { const x = w[+li.dataset.wi]; if (x && x.photos) li.onclick = () => lightbox(x); });
+  document.querySelectorAll('[data-wtl]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = w[+b.dataset.wtl]; tlPlayer(x.tl, '', x.model || x.name); });
   renderFreeNow(w);
   if (SERVER && !FREE) loadFree();
 }

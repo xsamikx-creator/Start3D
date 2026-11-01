@@ -9,6 +9,7 @@
 //   ADMIN_TG_ID     — Telegram user ID of the owner (who may bind the operator chat)
 //   CARD_TEXT       — card details shown to clients for the 50% deposit
 //   DEPOSIT_PCT     — deposit percent
+//   TL_CHAT_ID      — optional: a separate Telegram chat/channel for timelapses (default: the operators chat)
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS orders (
@@ -27,6 +28,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS cam_chunks (pid TEXT NOT NULL, t0 INTEGER NOT NULL, dur INTEGER, at INTEGER, data BLOB, PRIMARY KEY (pid, t0))`,
   `CREATE TABLE IF NOT EXISTS vid_seg (pid TEXT NOT NULL, n INTEGER NOT NULL, sess INTEGER, disc INTEGER, dur REAL, at INTEGER, data BLOB, PRIMARY KEY (pid, n))`,
   `CREATE TABLE IF NOT EXISTS vid_init (pid TEXT NOT NULL, sess INTEGER NOT NULL, at INTEGER, data BLOB, PRIMARY KEY (pid, sess))`,
+  `CREATE TABLE IF NOT EXISTS timelapses (id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, order_id TEXT, file_id TEXT, thumb_id TEXT, size INTEGER, dur REAL,
+     started INTEGER, ended INTEGER, state TEXT, task TEXT, sent INTEGER DEFAULT 0, created_at INTEGER)`,
+  `CREATE INDEX IF NOT EXISTS timelapses_order ON timelapses(order_id)`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
@@ -58,6 +62,7 @@ const TX = {
   done: ['🙏 {id} təhvil verildi. Təşəkkür edirik!', '🙏 {id} выдан. Спасибо!', '🙏 {id} видано. Дякуємо!', '🙏 {id} collected. Thank you!'],
   rejected: ['❌ {id} rədd edildi: {w}.', '❌ {id} отклонён: {w}.', '❌ {id} відхилено: {w}.', '❌ {id} rejected: {w}.'],
   hello_hint: ['Sifarişi qoşmaq üçün sifariş səhifəsindəki düyməni basın və ya mənə sifariş kodunu göndərin, məsələn: S3D-1032 abc123', 'Чтобы подключить заказ, нажмите кнопку на странице заказа или пришлите мне код заказа, например: S3D-1032 abc123', 'Щоб підключити замовлення, натисніть кнопку на сторінці замовлення або надішліть мені код, наприклад: S3D-1032 abc123', 'To link an order, press the button on the order page or send me the order code, e.g. S3D-1032 abc123'],
+  tl_caption: ['🎞 {id}: çapınızın timelapse-i', '🎞 {id}: таймлапс вашей печати', '🎞 {id}: таймлапс вашого друку', '🎞 {id}: timelapse of your print'],
   ready_photo: ['📦 {id} hazırdır! Budur hazır detal. Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Вот ваша деталь. Остаток при получении: {r} AZN.', '📦 {id} готове! Ось ваша деталь. Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Here is your part. Balance on collection: {r} AZN.'],
   received: ['📥 {id} sifarişi alındı: {name}. Operator 2 saat ərzində yoxlayacaq.', '📥 Заказ {id} принят: {name}. Оператор проверит его в течение 2 часов.', '📥 Замовлення {id} прийнято: {name}. Оператор перевірить його протягом 2 годин.', '📥 Order {id} received: {name}. An operator will check it within 2 hours.'],
   ask_phone: ['Nömrənizi paylaşın — bu nömrə ilə bütün sifarişlər avtomatik bura gələcək, linksiz.', 'Поделитесь номером — тогда все заказы на этот номер будут приходить сюда автоматически, без ссылок.', 'Поділіться номером — тоді всі замовлення на цей номер надходитимуть сюди автоматично, без посилань.', 'Share your number and every order with this number will arrive here automatically, no links needed.'],
@@ -254,7 +259,7 @@ function publicOrder(env, o, live) {
     name: d.name, mat: d.mat, color: d.color ?? 0, qty: d.qty, layers: d.layers, hours: d.hours, grams: d.grams,
     pub: !!d.pub, client: o.client, created: o.created_at, photos: (d.photos || []).length,
     card: ['pay', 'paycheck'].includes(o.status) ? (env.CARD_TEXT || null) : null,
-    accept: d.accept || null, issueText: d.issueText || null, answer: d.answer || null,
+    accept: d.accept || null, issueText: d.issueText || null, answer: d.answer || null, tl: d.tl || null,
   };
 }
 async function readOrder(env, id, code) {
@@ -365,13 +370,14 @@ async function bridgeVSeg(env, req, url, pid) {
 const DEFAULT_ROTATE = { 'a1-1': 'ccw' };
 // Which printers have an order that is printing right now (the bridge records video only for those).
 async function bridgeBusy(env) {
-  const rs = await env.DB.prepare("SELECT p.id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
+  const rs = await env.DB.prepare("SELECT p.id, p.order_id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
+  const orders = Object.fromEntries(rs.results.map((r) => [r.id, r.order_id]));
   const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
   const busy = new Set(rs.results.map((r) => r.id));
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
   const rotate = {};
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
-  return json({ busy: [...busy], rotate });
+  return json({ busy: [...busy], rotate, orders });
 }
 const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
@@ -497,10 +503,11 @@ async function clientFeedback(env, req, origin, id, code) {
 }
 
 // Telegram upload (multipart): files from the site go to the operators group, Telegram stores them.
-async function tgForm(env, method, fields, fileField, blob, filename) {
+async function tgForm(env, method, fields, fileField, blob, filename, extra = []) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) if (v !== undefined && v !== null) fd.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
   fd.append(fileField, blob, filename);
+  for (const [f, b, n] of extra) fd.append(f, b, n);
   const r = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, { method: 'POST', body: fd });
   return r.json().catch(() => ({ ok: false }));
 }
@@ -736,6 +743,102 @@ const fmtPhone = (p) => p && p.length === 9 ? `+994 ${p.slice(0, 2)} ${p.slice(2
 const phoneKeyboard = (lang) => ({ reply_markup: { keyboard: [[{ text: tx('share_btn', lang), request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } });
 async function hasPhone(env, chatId) { return !!(await env.DB.prepare('SELECT 1 FROM phones WHERE chat_id=? LIMIT 1').bind(chatId).first()); }
 
+/* ---------- timelapses: built by the bridge after each print, kept in Telegram ---------- */
+const MAX_TL = 45 * 1024 * 1024;
+async function tlChat(env) { return env.TL_CHAT_ID || (await kvGet(env, 'operator_chat')); }
+async function bridgeTl(env, req, url, pid) {
+  if (!PRINTERS.some((x) => x.id === pid)) return json({ error: 'unknown_printer' }, 400);
+  const chat = await tlChat(env);
+  if (!chat) return json({ error: 'no_chat' }, 503);
+  const fd = await req.formData().catch(() => null);
+  const video = fd && fd.get('video');
+  if (!video || typeof video === 'string' || video.size < 1000 || video.size > MAX_TL) return json({ error: 'bad_size' }, 400);
+  const q = (k) => fd.get(k) || url.searchParams.get(k);
+  const started = +q('started') || 0, ended = +q('ended') || now(), state = clip(q('state') || 'FINISH', 12), task = clip(q('task'), 80), dur = +q('dur') || null;
+  // Which order was on this printer: the one the bridge saw while printing, else the printer's current order, else the latest one sent to it.
+  let o = null; const want = clip(q('order'), 20);
+  if (want){ const x = await getOrder(env, want); if (x && JSON.parse(x.data || '{}').printer === pid) o = x; }
+  if (!o){ const pr = await env.DB.prepare('SELECT order_id FROM printers WHERE id=?').bind(pid).first(); if (pr?.order_id) o = await getOrder(env, pr.order_id); }
+  if (!o && started) o = await env.DB.prepare("SELECT * FROM orders WHERE json_extract(data,'$.printer')=? AND status IN ('printing','post','ready','done') AND updated_at >= ? ORDER BY updated_at DESC LIMIT 1").bind(pid, started - 3600e3).first();
+  const mins = started ? Math.round((ended - started) / 60000) : 0;
+  const caption = `🎞 Таймлапс ${o ? `${o.id} · ${o.client}` : '(без заказа)'} · ${printerName(pid)}${task ? ' · ' + task : ''}${mins ? ` · ${Math.floor(mins / 60)} ч ${mins % 60} мин печати` : ''}${state === 'FAILED' ? ' · ⚠️ печать прервана' : ''}`;
+  const extra = []; const poster = fd.get('poster');
+  if (poster && typeof poster !== 'string' && poster.size < 200000) extra.push(['thumbfile', poster, 'thumb.jpg']);
+  const r = await tgForm(env, 'sendVideo', { chat_id: Number(chat) || chat, caption: clip(caption, 1000), supports_streaming: true, duration: dur ? Math.round(dur) : undefined,
+    width: +q('w') || undefined, height: +q('h') || undefined, thumbnail: extra.length ? 'attach://thumbfile' : undefined }, 'video', video, `${o ? o.id : pid}-timelapse.mp4`, extra);
+  if (!r.ok) return json({ error: 'telegram', detail: r.description || null }, 502);
+  const v = r.result.video || r.result.document || r.result.animation || {};
+  const thumb = v.thumbnail || v.thumb || {};
+  const ins = await env.DB.prepare('INSERT INTO timelapses(pid, order_id, file_id, thumb_id, size, dur, started, ended, state, task, sent, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,0,?)')
+    .bind(pid, o?.id || null, v.file_id || null, thumb.file_id || null, video.size, dur, started, ended, state, task, now()).run();
+  const id = ins.meta?.last_row_id;
+  if (o && state === 'FINISH'){
+    const d = JSON.parse(o.data || '{}'); d.tl = id;
+    const n = await setStatus(env, o.id, { data: JSON.stringify(d) });
+    if (['ready', 'done'].includes(n.status)) await tlToClient(env, n);
+  }
+  return json({ ok: true, id, order: o?.id || null });
+}
+async function tlToClient(env, o) {
+  if (!o?.tg_chat_id) return;
+  const t = await env.DB.prepare("SELECT id, file_id FROM timelapses WHERE order_id=? AND state='FINISH' AND sent=0 AND file_id IS NOT NULL ORDER BY id DESC LIMIT 1").bind(o.id).first();
+  if (!t) return;
+  const r = await tg(env, 'sendVideo', { chat_id: o.tg_chat_id, video: t.file_id, caption: tx('tl_caption', o.lang, { id: o.id }), supports_streaming: true });
+  if (r.ok) await env.DB.prepare('UPDATE timelapses SET sent=1 WHERE order_id=?').bind(o.id).run();
+}
+// Who may watch: anyone for public and free prints, the owner with the order code otherwise.
+async function tlAccess(env, url, tid) {
+  const t = await env.DB.prepare('SELECT * FROM timelapses WHERE id=?').bind(tid).first();
+  if (!t || !t.order_id) return null;
+  const o = await getOrder(env, t.order_id); if (!o) return null;
+  const d = JSON.parse(o.data || '{}');
+  if (d.pub || d.free || url.searchParams.get('code') === o.code) return { t, o, d };
+  return null;
+}
+async function tgFilePath(env, fileId) {
+  const k = 'tgpath:' + fileId, c = await kvGet(env, k);
+  if (c){ const [at, fp] = c.split('|'); if (now() - +at < 50 * 60e3) return fp; }
+  const f = await tg(env, 'getFile', { file_id: fileId });
+  if (!f.ok) return null;
+  await kvSet(env, k, `${now()}|${f.result.file_path}`);
+  return f.result.file_path;
+}
+async function tlMedia(env, req, url, tid, kind) {
+  const a = await tlAccess(env, url, tid);
+  const fileId = a && (kind === 'poster' ? a.t.thumb_id : a.t.file_id);
+  if (!fileId) return json({ error: 'not_found' }, 404);
+  const fp = await tgFilePath(env, fileId);
+  if (!fp) return json({ error: 'not_found' }, 404);
+  const range = req.headers.get('range');
+  const up = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${fp}`, { headers: range ? { range } : {} });
+  if (!up.ok) return json({ error: 'not_found' }, 404);
+  const type = kind === 'poster' ? 'image/jpeg' : 'video/mp4', cache = 'public, max-age=86400';
+  if (kind === 'poster') return new Response(up.body, { headers: { 'content-type': type, 'cache-control': cache } });
+  if (up.status === 206) return new Response(up.body, { status: 206, headers: { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': up.headers.get('content-range'), 'content-length': up.headers.get('content-length'), 'cache-control': cache } });
+  // Telegram ignored the range: cut the piece here (Safari plays video only with ranges).
+  const m = range && range.match(/bytes=(\d*)-(\d*)/);
+  if (!m) return new Response(up.body, { headers: { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': up.headers.get('content-length'), 'cache-control': cache } });
+  const buf = new Uint8Array(await up.arrayBuffer()), size = buf.length;
+  let a0 = m[1] === '' ? size - (+m[2] || 0) : +m[1], a1 = m[1] === '' || m[2] === '' ? size - 1 : Math.min(+m[2], size - 1);
+  if (a0 < 0) a0 = 0;
+  if (a0 >= size) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+  return new Response(buf.slice(a0, a1 + 1), { status: 206, headers: { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a0}-${a1}/${size}`, 'content-length': String(a1 - a0 + 1), 'cache-control': cache } });
+}
+// The public reel: finished public and free prints of the last 7 days.
+async function tlWeek(env) {
+  const rs = await env.DB.prepare("SELECT t.id, t.pid, t.dur, t.created_at, t.ended, t.started, t.thumb_id, o.id AS oid, o.client, o.data FROM timelapses t JOIN orders o ON o.id = t.order_id WHERE t.state='FINISH' AND t.file_id IS NOT NULL AND t.created_at > ? ORDER BY t.id DESC LIMIT 40").bind(now() - 7 * 864e5).all();
+  const out = [], seen = new Set();
+  for (const r of rs.results) {
+    const d = JSON.parse(r.data || '{}');
+    if (!(d.pub || d.free) || seen.has(r.oid)) continue;
+    seen.add(r.oid);
+    out.push({ id: r.id, order: r.oid, name: d.title || d.name || r.oid, client: String(r.client || '').split(/\s+/)[0], printerName: printerName(r.pid), at: r.created_at,
+      dur: r.dur, hours: r.started ? (r.ended - r.started) / 3600e3 : null, free: !!d.free, poster: !!r.thumb_id, mat: d.mat || null });
+    if (out.length >= 12) break;
+  }
+  return json(out);
+}
+
 async function freePrinter(env, orderId) {
   await env.DB.prepare('UPDATE printers SET order_id=NULL WHERE order_id=?').bind(orderId).run();
 }
@@ -758,6 +861,7 @@ async function operatorPhoto(env, origin, id, fileId, say) {
         [{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } : undefined,
     });
   }
+  if (first) await tlToClient(env, n);
   await refreshOperatorMsg(env, n);
   return say(`✅ Фото ${d.photos.length} добавлено к ${n.id}` + (n.tg_chat_id ? ' и отправлено клиенту' : ' (клиент ещё не подключил бота, фото будет видно на сайте)'));
 }
@@ -828,7 +932,7 @@ async function opAction(env, origin, o, act, x = {}) {
     if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, id);
     note = 'Жду фото в Telegram';
   }
-  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); note = 'Готов'; }
+  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); await tlToClient(env, n); note = 'Готов'; }
   else if (act === 'rp' && ['ready', 'done'].includes(o.status)) {
     const d = JSON.parse(o.data || '{}'); d.reprints = (d.reprints || 0) + 1; d.accept = 'reprint';
     n = await setStatus(env, id, { status: 'queue', data: JSON.stringify(d) });
@@ -946,7 +1050,7 @@ async function freeInfo(env) {
     winners.push({ day: x.day, name: String(x.name).split(/\s+/)[0], order: x.order_id, status: x.status || null,
       model: d.title || (x.idea ? clip(x.idea, 60) : host ? host : null), photos: (d.photos || []).length,
       printer: live ? d.printer : null, printerName: live ? printerName(d.printer) : null, video: !!live?.video, cam: !!live?.cam,
-      percent: live?.percent || 0 });
+      percent: live?.percent || 0, tl: d.tl || null });
   }
   return json({ day, count: c?.c || 0, winners });
 }
@@ -1088,6 +1192,11 @@ export default {
       if (p === '/api/free') { if (req.method === 'POST') return freeApply(env, req, origin); return freeInfo(env); }
       if (seenOrigin !== origin){ seenOrigin = origin; ctx.waitUntil(kvSet(env, 'origin', origin)); }
       if (p === '/api/live') return liveList(env);
+      if (p === '/api/tl/week') return tlWeek(env);
+      let tlm = p.match(/^\/api\/tl\/(\d+)\/(video|poster)$/);
+      if (tlm) return tlMedia(env, req, url, +tlm[1], tlm[2]);
+      tlm = p.match(/^\/api\/bridge\/tl\/([a-z0-9-]+)$/);
+      if (tlm && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeTl(env, req, url, tlm[1]); }
       let b = p.match(/^\/api\/cam\/([a-z0-9-]+)$/);
       if (b) return camFrame(env, url, b[1]);
       b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/chunks$/);

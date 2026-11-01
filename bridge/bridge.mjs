@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tls from 'node:tls';
 import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import mqtt from 'mqtt';
 
 const cfgPath = new URL('./config.json', import.meta.url);
@@ -42,11 +43,12 @@ async function post(url, body, type = 'application/json') {
 
 // Printers with an order in "printing" on the site (used for cameras of printers without a status connection).
 const BUSY = new Set();
+const ORDERS = {}; // printer id → order printing on it now (from the site)
 const ROTATE = {}; // printer id → '0' | 'ccw' | 'cw' | '180' (set from the bot with /rotate, or "rotate" in config.json)
 async function pollBusy() {
   try {
     const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}` } });
-    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); }
+    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); }
   } catch {}
 }
 const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');
@@ -119,7 +121,7 @@ function bambuCamera6000(p, onFrame, onFail) {
 const hasFfmpeg = () => { try { return spawnSync('ffmpeg', ['-version']).status === 0; } catch { return false; } };
 function ffmpegSnapshot(url, vf) {
   return new Promise((resolve, reject) => {
-    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', url, '-frames:v', '1', ...(vf ? ['-vf', vf] : []), '-q:v', '7', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
+    const ff = spawn('ffmpeg', ['-loglevel', 'error', ...videoInput(url), '-frames:v', '1', ...(vf ? ['-vf', vf] : []), '-q:v', '7', '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1']);
     const chunks = []; const t = setTimeout(() => ff.kill('SIGKILL'), 15000);
     ff.stdout.on('data', (c) => chunks.push(c));
     ff.on('close', (code) => { clearTimeout(t); const b = Buffer.concat(chunks); b.length > 100 ? resolve(b) : reject(new Error('ffmpeg code ' + code)); });
@@ -165,7 +167,7 @@ function streamer(p) {
 function camera(p) {
   if (p.camera === 'off') return;
   let latest = null, sentAt = 0, watched = false, mode = null;
-  const record = streamer(p);
+  const rec = streamer(p), record = (img) => { rec(img); p._tl?.feed(img); };
   const send = async () => {
     const streaming = isPrinting(p);
     if (!latest || Date.now() - sentAt < (streaming ? 30000 : watched ? FAST_MS : SLOW_MS)) return;
@@ -257,6 +259,124 @@ function videoStreamer(p) {
   }, 2000);
 }
 
+/* ---------- timelapse: a frame per layer while printing → MP4 after the print → server (Telegram) ---------- */
+const TL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'timelapses');
+const TL_EVERY_MS = (cfg.timelapseSeconds || 8) * 1000; // fallback when the printer reports no layers
+const TL_MAX_FRAMES = 1500, TL_KEEP_DAYS = cfg.timelapseKeepDays || 30;
+const stamp = (t) => { const d = new Date(t), z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}`; };
+function ffmpegRun(args) {
+  return new Promise((resolve, reject) => {
+    const ff = spawn('ffmpeg', ['-loglevel', 'error', '-y', ...args]); let err = '';
+    ff.stderr.on('data', (d) => { err = (err + d).slice(-500); });
+    ff.on('close', (c) => (c === 0 ? resolve() : reject(new Error(err.trim().split('\n').pop() || 'ffmpeg ' + c))));
+    ff.on('error', reject);
+  });
+}
+function timelapse(p) {
+  if (!hasFfmpeg()) { log(p.id, 'таймлапс: нужен ffmpeg (winget install Gyan.FFmpeg)'); return; }
+  fs.mkdirSync(TL_DIR, { recursive: true });
+  let sess = null, latest = null, grabbing = false, offSince = 0;
+  const printing = () => PRINTING.includes(p._state?.gcode_state) || BUSY.has(p.id);
+  const running = () => p._state?.gcode_state ? p._state.gcode_state === 'RUNNING' : BUSY.has(p.id);
+  const save = (img) => {
+    if (!sess || !img) return;
+    if (sess.n >= TL_MAX_FRAMES) { // very long print: keep every second frame and carry on
+      const files = fs.readdirSync(sess.dir).filter((f) => f.endsWith('.jpg')).sort();
+      files.forEach((f, i) => { if (i % 2) fs.rmSync(path.join(sess.dir, f)); });
+      files.filter((_, i) => !(i % 2)).forEach((f, i) => fs.renameSync(path.join(sess.dir, f), path.join(sess.dir, `f${String(i).padStart(6, '0')}.jpg`)));
+      sess.n = Math.ceil(files.length / 2); sess.every *= 2;
+    }
+    fs.writeFileSync(path.join(sess.dir, `f${String(sess.n++).padStart(6, '0')}.jpg`), img);
+    sess.lastAt = Date.now(); fs.writeFileSync(path.join(sess.dir, 'meta.json'), JSON.stringify({ ...sess, dir: undefined }));
+  };
+  const grab = async () => {
+    if (grabbing) return; grabbing = true;
+    try {
+      if (p.video) save(await ffmpegSnapshot(p.video, [rotFilter(p), "scale='if(gte(iw,ih),min(1280,iw),-2)':'if(gte(iw,ih),-2,min(1280,ih))'"].filter(Boolean).join(',')));
+      else save(latest);
+    } catch (e) { log(p.id, 'таймлапс: кадр не снят:', e.message); }
+    grabbing = false;
+  };
+  p._tl = { feed: (img) => { latest = img; } };
+  const begin = () => {
+    const task = p._state?.subtask_name || '', t = Date.now();
+    // the bridge was restarted mid-print: continue the unfinished recording of the same job
+    for (const d of fs.readdirSync(TL_DIR)) {
+      const mp = path.join(TL_DIR, d, 'meta.json');
+      if (!d.startsWith(p.id + '_') || !fs.existsSync(mp)) continue;
+      try { const m = JSON.parse(fs.readFileSync(mp, 'utf8')); if (m.task === task && t - m.lastAt < 30 * 60e3) { sess = { ...m, dir: path.join(TL_DIR, d) }; log(p.id, `таймлапс: продолжаю запись (${m.n} кадров)`); return; } } catch {}
+    }
+    sess = { dir: path.join(TL_DIR, `${p.id}_${stamp(t)}`), n: 0, started: t, lastAt: 0, lastLayer: -1, task, order: ORDERS[p.id] || null, every: 1 };
+    fs.mkdirSync(sess.dir, { recursive: true });
+    log(p.id, 'таймлапс: запись началась' + (task ? ` (${task})` : ''));
+  };
+  const finish = async (state) => {
+    const s0 = sess; sess = null; if (!s0) return;
+    // a last look at the finished part once the head has moved away
+    if (state === 'FINISH') { await new Promise((r) => setTimeout(r, 8000)); sess = s0; await grab(); sess = null; }
+    if (s0.n < 15) { log(p.id, `таймлапс: слишком мало кадров (${s0.n}), ролик не собираю`); fs.rmSync(s0.dir, { recursive: true, force: true }); return; }
+    const fps = Math.max(8, Math.min(30, Math.round(s0.n / 15)));
+    const name = `${p.id}_${stamp(s0.started)}${s0.order ? '_' + s0.order : ''}`, out = path.join(TL_DIR, name + '.mp4');
+    const vf = [!p.video && rotFilter(p), "scale='if(gte(iw,ih),min(1280,iw),-2)':'if(gte(iw,ih),-2,min(1280,ih))'", 'format=yuv420p', 'tpad=stop_mode=clone:stop_duration=2'].filter(Boolean).join(',');
+    try {
+      log(p.id, `таймлапс: собираю ролик из ${s0.n} кадров…`);
+      await ffmpegRun(['-framerate', String(fps), '-i', path.join(s0.dir, 'f%06d.jpg'), '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-profile:v', 'main', '-movflags', '+faststart', out]);
+      const last = path.join(s0.dir, `f${String(s0.n - 1).padStart(6, '0')}.jpg`);
+      await ffmpegRun(['-i', last, '-vf', [!p.video && rotFilter(p), 'scale=320:-2'].filter(Boolean).join(','), '-q:v', '5', path.join(TL_DIR, name + '.jpg')]).catch(() => {});
+      fs.writeFileSync(path.join(TL_DIR, name + '.pending.json'), JSON.stringify({ pid: p.id, order: s0.order || ORDERS[p.id] || null, started: s0.started, ended: Date.now(), state, task: s0.task, dur: s0.n / fps + 2 }));
+      fs.rmSync(s0.dir, { recursive: true, force: true });
+      log(p.id, `таймлапс готов: ${out}`);
+      tlUploadPending();
+    } catch (e) { log(p.id, 'таймлапс: ffmpeg не собрал ролик:', e.message, '— кадры оставлены в', s0.dir); }
+  };
+  setInterval(() => {
+    const st = p._state?.gcode_state;
+    if (printing()) {
+      offSince = 0;
+      if (!sess) begin();
+      if (sess && !sess.order && ORDERS[p.id]) sess.order = ORDERS[p.id];
+      if (!running()) return;
+      const layer = p._state?.layer_num;
+      if (layer > 0) { if (layer !== sess.lastLayer && (layer % sess.every === 0 || layer - sess.lastLayer >= sess.every)) { sess.lastLayer = layer; grab(); } }
+      else if (Date.now() - sess.lastAt >= TL_EVERY_MS * sess.every) grab();
+    } else if (sess) {
+      if (['FINISH', 'FAILED'].includes(st)) finish(st);
+      else if (!offSince) offSince = Date.now();
+      else if (Date.now() - offSince > 60000) finish(st === 'IDLE' || !st ? 'FINISH' : st);
+    }
+  }, 1500);
+}
+let tlUploading = false;
+async function tlUploadPending() {
+  if (tlUploading || !fs.existsSync(TL_DIR)) return; tlUploading = true;
+  try {
+    for (const f of fs.readdirSync(TL_DIR).filter((x) => x.endsWith('.pending.json')).sort()) {
+      const base = f.slice(0, -'.pending.json'.length), mp4 = path.join(TL_DIR, base + '.mp4'), jpg = path.join(TL_DIR, base + '.jpg');
+      const meta = JSON.parse(fs.readFileSync(path.join(TL_DIR, f), 'utf8'));
+      if (!fs.existsSync(mp4)) { fs.rmSync(path.join(TL_DIR, f)); continue; }
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(meta)) if (v !== null && v !== undefined && k !== 'pid') fd.append(k, String(v));
+      fd.append('video', new Blob([fs.readFileSync(mp4)], { type: 'video/mp4' }), base + '.mp4');
+      if (fs.existsSync(jpg)) fd.append('poster', new Blob([fs.readFileSync(jpg)], { type: 'image/jpeg' }), base + '.jpg');
+      try {
+        const r = await fetch(`${SERVER}/api/bridge/tl/${meta.pid}`, { method: 'POST', headers: { authorization: `Bearer ${KEY}` }, body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { log(meta.pid, `таймлапс: сервер не принял (${r.status}${j.error ? ' ' + j.error : ''}), попробую позже`); continue; }
+        fs.renameSync(path.join(TL_DIR, f), path.join(TL_DIR, base + '.sent.json'));
+        log(meta.pid, `таймлапс отправлен${j.order ? ' к заказу ' + j.order : ''}`);
+      } catch (e) { log(meta.pid, 'таймлапс: не отправил:', e.message); }
+    }
+  } finally { tlUploading = false; }
+}
+function tlCleanup() {
+  if (!fs.existsSync(TL_DIR)) return;
+  const old = Date.now() - TL_KEEP_DAYS * 864e5;
+  for (const f of fs.readdirSync(TL_DIR)) {
+    const fp = path.join(TL_DIR, f);
+    try { const st = fs.statSync(fp); if (st.isFile() && st.mtimeMs < old && !f.endsWith('.pending.json')) fs.rmSync(fp); } catch {}
+  }
+}
+
 /* ---------- start ---------- */
 console.log(`Start3D мост → ${SERVER}`);
 pollBusy(); setInterval(pollBusy, 5000);
@@ -267,5 +387,7 @@ for (const p of cfg.printers || []) {
   if (p.video) videoStreamer(p);
   // a printer with a separate video camera uses only that camera (stills too); the built-in one is ignored
   if (p.video) p.rtsp = p.video;
+  if (p.timelapse !== false && p.camera !== 'off') timelapse(p);
   camera(p);
 }
+setInterval(tlUploadPending, 60000); setTimeout(tlUploadPending, 5000); tlCleanup();
