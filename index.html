@@ -784,7 +784,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
         <div class="seg" id="seg-n"><button type="button" data-v="tg">Telegram</button><button type="button" data-v="email">Email</button></div>
         <p class="note" id="tg-note" data-i="tg_note"></p>
         <div class="field" id="email-f" hidden><label for="f-email" data-i="f_email"></label><input type="email" id="f-email" autocomplete="email" placeholder="name@mail.az"></div></div>
-      <div class="field adv"><span class="flabel" data-i="f_deliv"></span>
+      <div class="field"><span class="flabel" data-i="f_deliv"></span>
         <div class="seg" id="seg-d"><button type="button" data-v="0" data-i="d_pick"></button><button type="button" data-v="1" data-i="d_cour"></button></div></div>
       <label class="check adv"><input type="checkbox" id="f-gift"><span data-i="f_gift"></span></label>
       <div class="field adv" id="gift-block" hidden><label for="f-gift-to" data-i="f_gift_to"></label><input type="text" id="f-gift-to" maxlength="16"><span class="note" data-i="gift_note"></span></div>
@@ -1082,7 +1082,7 @@ a4:['Təhvildən əvvəl detalın fotosunu göndəririk. Qəbul etməzdən önc�
 q5:['Endirimlər varmı?','Есть скидки?','Є знижки?','Any discounts?'],
 a5:['Hər 5-ci sifariş −30%. Tələbələrə istənilən sifarişə −15%, uşaq oyuncaqlarına −15%. Dostunuza kodunuzu verin: ona −10%, sizə növbəti sifarişdə −10%. Endirimlər toplanmır — ən böyüyü tətbiq olunur. Hər gün isə bir çapı pulsuz edirik.','Каждый 5-й заказ −30%. Студентам −15% на любой заказ, детские игрушки −15%. Дайте другу свой код: ему −10%, вам −10% на следующий заказ. Скидки не суммируются — действует наибольшая. А ещё каждый день одну печать разыгрываем бесплатно.','Кожне 5-те замовлення −30%. Студентам −15% на будь-яке замовлення, дитячі іграшки −15%. Дайте другу свій код: йому −10%, вам −10% на наступне замовлення. Знижки не сумуються — діє найбільша. А ще щодня один друк розігруємо безкоштовно.','Every 5th order is 30% off. Students get 15% off any order, kids\' toys 15% off. Give a friend your code: 10% off for them and for your next order. Discounts don\'t stack — the largest applies. And every day we give one print away for free.'],
 q6:['Çatdırılma varmı?','Есть доставка?','Є доставка?','Do you deliver?'],
-a6:['Bakı daxilində kuryer — 5 AZN, ya da emalatxanadan özünüz götürün.','Курьер по Баку — 5 AZN, или самовывоз из мастерской.','Кур’єр по Баку — 5 AZN, або самовивіз із майстерні.','Courier within Baku is 5 AZN, or pick up from the workshop.'],
+a6:['Bakı daxilində kuryer — 3 AZN, ya da emalatxanadan pulsuz özünüz götürün. Minimum sifariş — 15 AZN.','Курьер по Баку — 3 AZN, или бесплатный самовывоз из мастерской. Минимальный заказ — 15 AZN.','Кур’єр по Баку — 3 AZN, або безкоштовний самовивіз із майстерні. Мінімальне замовлення — 15 AZN.','Courier within Baku is 3 AZN, or free pickup from the workshop. Minimum order is 15 AZN.'],
 skin_l:['Dizayn:','Оформление:','Оформлення:','Style:'],
 lm_maiden:['Qız qalası','Девичья башня','Дівоча вежа','Maiden Tower'],
 lm_flame:['Alov qüllələri','Пламенные башни','Вогняні вежі','Flame Towers'],
@@ -1151,7 +1151,8 @@ tg_note:['Sifarişdən sonra @Strt3d_bot-a Start basın və nömrənizi paylaş�
 f_notify:['Bildirişlər hara gəlsin','Куда присылать уведомления','Куди надсилати сповіщення','Where to send updates'],
 f_deliv:['Təhvil','Получение','Отримання','Delivery'],
 d_pick:['Özüm götürəcəm','Самовывоз','Самовивіз','Pickup'],
-d_cour:['Kuryer · +5 AZN','Курьер · +5 AZN','Кур’єр · +5 AZN','Courier · +5 AZN'],
+min_note:['Minimum sifariş — {m} AZN: kiçik detallar bu qiymətə çap olunur.','Минимальный заказ — {m} AZN: небольшие детали печатаются по этой цене.','Мінімальне замовлення — {m} AZN: невеликі деталі друкуються за цією ціною.','Minimum order is {m} AZN: small parts are printed at this price.'],
+d_cour:['Kuryer · +3 AZN','Курьер · +3 AZN','Кур’єр · +3 AZN','Courier · +3 AZN'],
 f_gift:['Bu hədiyyədir — alana çap linkini göndərəcəyik','Это подарок — получателю отправим ссылку на печать','Це подарунок — отримувачу надішлемо посилання на друк','This is a gift; we send the recipient a link to the print'],
 f_gift_to:['Kimə (ekranda görünəcək)','Кому (будет на дисплее)','Кому (буде на дисплеї)','For (shown on the display)'],
 gift_note:['Ekranda: «FOR Leyla · FROM Samir». Qiymət alana görünmür.','На дисплее: «FOR Лейла · FROM Самир». Цену получатель не видит.','На дисплеї: «FOR Лейла · FROM Самір». Ціну отримувач не бачить.','On the display: “FOR Leyla · FROM Samir”. The recipient never sees the price.'],
@@ -1460,10 +1461,10 @@ const PRINTER_DEF = [
   {id:'P04', name:'Printer 04', model:'Creality Ender 3 V3', type:'E3', max:220, mats:['PLA','PETG','TPU'], util:22}
 ];
 const CATALOG = [
-  {k:'cat_stand', price:12, mat:'PLA', color:3, grams:62, hours:3.1, z:110, shape:'stand'},
-  {k:'cat_hooks', price:10, mat:'PETG', color:0, grams:48, hours:2.4, z:40, shape:'hooks'},
+  {k:'cat_stand', price:15, mat:'PLA', color:3, grams:62, hours:3.1, z:110, shape:'stand'},
+  {k:'cat_hooks', price:15, mat:'PETG', color:0, grams:48, hours:2.4, z:40, shape:'hooks'},
   {k:'cat_pot', price:22, mat:'PETG', color:5, grams:140, hours:6.5, z:120, shape:'pot'},
-  {k:'cat_esp', price:14, mat:'PLA', color:2, grams:44, hours:2.2, z:30, shape:'box', ch:true},
+  {k:'cat_esp', price:15, mat:'PLA', color:2, grams:44, hours:2.2, z:30, shape:'box', ch:true},
   {k:'cat_mdb', price:16, mat:'PETG', color:0, grams:52, hours:2.6, z:34, shape:'box', ch:true},
   {k:'cat_head', price:18, mat:'PLA', color:0, grams:118, hours:5.5, z:240, shape:'head'}
 ];
@@ -1477,7 +1478,7 @@ function seed(){
   const now = Date.now(), nf = (k, v, ago) => ({at: now - ago, k, v});
   return {
     seq:1031,
-    settings:{cg:.05, a1:2, k2:3, setup:3, min:10, dep:50, cour:5, student:15, kids:15, loyal:30, lube:100, nozzle:300},
+    settings:{cg:.05, a1:2, k2:3, setup:3, min:15, dep:50, cour:3, student:15, kids:15, loyal:30, lube:100, nozzle:300},
     history:{revenue:1840, orders:71, repeat:34},
     stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
     printers:[
@@ -1500,6 +1501,7 @@ function seed(){
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch(e){ S = seed(); }
+Object.assign(S.settings, {min: 15, cour: 3}); // current prices: minimum order 15 AZN, courier 3 AZN
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} };
 const P = id => PRINTER_DEF.find(p => p.id === id);
 const PS = id => S.printers.find(p => p.id === id);
@@ -1975,6 +1977,7 @@ function compute(m){
   const hours = Math.max(.3, grams / (type === 'K2' ? 14 : 11)) * QTIME[form.quality];
   const urg = form.urgent === '1' ? 1.5 : 1, d = discounts();
   const raw = (grams * st.cg * K_MAT[mat] + hours * (type === 'K2' ? st.k2 : st.a1)) * qty + st.setup;
+  const atMin = raw * urg * (1 - d.total/100) < st.min;
   const p = Math.max(st.min, raw * urg * (1 - d.total/100)) + (form.deliv === '1' ? st.cour : 0);
   const reasons = [];
   if (qty > 3) reasons.push('r_qty');
@@ -1983,7 +1986,7 @@ function compute(m){
   if (m.volCm3 < .5) reasons.push('r_tiny');
   if (m.tris > 400000) reasons.push('r_dense');
   if (!available(mat, form.color)) reasons.push('r_nostock');
-  return {mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
+  return {atMin, mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
 }
 const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(it => `<div class="${it === d.best ? '' : 'off'}"><span>${esc(it[0])}</span><span class="mono">−${it[1]}%</span></div>`).join('')}${d.list.length > 1 ? `<p class="note">${t('d_rule')}</p>` : ''}</div>` : '';
 const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>${form.kind !== 'photo' ? `<p class="note" style="font-size:12px">${t('rights_by_send', {b: t('place')})}</p>` : ''}`;
@@ -2026,7 +2029,7 @@ function renderQuote(){
       <dt>${t('o_printer')}</dt><dd>${q.type === 'K2' ? 'Creality K2 Plus' : 'Bambu Lab A1'}</dd>
       <dt>${t('sp_ready')}</dt><dd>${form.urgent === '1' ? t('ready_f') : t('ready_n')}</dd>
     </dl>${discHtml(q.d)}${placeHtml()}
-    <div class="formula">(${(q.grams*q.qty).toFixed(0)} g × ${S.settings.cg} × ${K_MAT[q.mat]} + ${(q.hours*q.qty).toFixed(1)} h × ${q.type==='K2'?S.settings.k2:S.settings.a1} + ${S.settings.setup})${q.urg>1?' × 1.5':''}${q.d.total?` × ${(1-q.d.total/100).toFixed(2)}`:''}${form.deliv==='1'?' + '+S.settings.cour:''} ≈ ${q.p.toFixed(1)} AZN</div>`;
+    <div class="formula">(${(q.grams*q.qty).toFixed(0)} g × ${S.settings.cg} × ${K_MAT[q.mat]} + ${(q.hours*q.qty).toFixed(1)} h × ${q.type==='K2'?S.settings.k2:S.settings.a1} + ${S.settings.setup})${q.urg>1?' × 1.5':''}${q.d.total?` × ${(1-q.d.total/100).toFixed(2)}`:''}${form.deliv==='1'?' + '+S.settings.cour:''} ≈ ${q.p.toFixed(1)} AZN</div>${q.atMin?`<p class="note">${t('min_note',{m:S.settings.min})}</p>`:''}`;
   bindPlace(q);
 }
 const contactOk = v => v.replace(/\D/g,'').length >= 7;
@@ -2354,7 +2357,7 @@ $('m-ok').onclick = async () => {
   $('m').hidden = true;
   const id = 'S3D-' + S.seq, s = M.src, qty = Math.max(1, Math.min(50, +$('m-qty').value || 1)), loy = loyaltyNext() ? 1 - S.settings.loyal/100 : 1;
   const o = {id, client:nm.slice(0,16), contact:ph, ch:M.ch || 'tg', email:M.email, tgLinked:M.tgLinked, mine:true, progress:0, deliv:0, created:Date.now(), notifs:[], react:{fire:0,clap:0,wow:0}};
-  if (M.mode === 'buy') Object.assign(o, {name:t(s.k), mat:s.mat, color:s.color, qty:1, grams:s.grams, hours:s.hours, layers:Math.round(s.z/.2), z:s.z, price:Math.round(s.price*loy), status:'pay', shape:s.shape, catalog:true});
+  if (M.mode === 'buy') Object.assign(o, {name:t(s.k), mat:s.mat, color:s.color, qty:1, grams:s.grams, hours:s.hours, layers:Math.round(s.z/.2), z:s.z, price:Math.max(S.settings.min, Math.round(s.price*loy)), status:'pay', shape:s.shape, catalog:true});
   else {
     const ratio = qty / (s.qty || 1), unit = s.price ? s.price / (s.qty || 1) : null;
     Object.assign(o, {name:s.name, mat:s.mat, color:M.color, qty, grams:s.grams*ratio, hours:s.hours*ratio, layers:s.layers, z:s.z, shape:s.shape, file:s.file});
@@ -2788,7 +2791,7 @@ function opsOrderCard(o){
   let acts = '';
   if (o.status === 'review') acts = `<input type="number" min="1" step="1" value="${mid}" data-price="${o.id}" aria-label="Цена"> AZN <button type="button" class="btn-sm btn-primary" data-op="c" data-id="${o.id}">✅ Подтвердить</button> <input type="text" placeholder="причина отказа" data-reason="${o.id}" style="width:160px"> <button type="button" class="btn-sm" data-op="r" data-id="${o.id}">❌ Отклонить</button>`;
   else if (['pay','paycheck'].includes(o.status)) acts = `<button type="button" class="btn-sm btn-primary" data-op="p" data-id="${o.id}">💰 Оплата получена</button>`;
-  else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${p.name}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="ap" data-id="${o.id}" title="Мост нарежет в Bambu Studio и запустит принтер">🤖 Автопечать</button> <button type="button" class="btn-sm" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
+  else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${p.name}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
   else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
   else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
   else if (o.status === 'ready') acts = `<button type="button" class="btn-sm btn-primary" data-op="g" data-id="${o.id}">🙏 Выдан</button> <button type="button" class="btn-sm" data-op="rp" data-id="${o.id}">🔁 Перепечатать</button>`;

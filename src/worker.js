@@ -118,6 +118,7 @@ async function tg(env, method, body) {
 async function kvGet(env, k) { const r = await env.DB.prepare('SELECT v FROM kv WHERE k=?').bind(k).first(); return r ? r.v : null; }
 async function kvSet(env, k, v) { await env.DB.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind(k, String(v)).run(); }
 
+const MIN_ORDER = 15; // AZN, the smallest paid order (courier included)
 const deposit = (env, price) => Math.round((price * (Number(env.DEPOSIT_PCT) || 50)) / 100);
 const orderUrl = (origin, o) => `${origin}/#track-${o.id}-${o.code}`;
 
@@ -155,6 +156,7 @@ function opText(o) {
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
     d.files?.length ? `📎 Файлы: ${d.files.map((f) => esc(f.name)).join(', ')} (ниже в чате)` : '',
     d.receipt ? '🧾 Чек приложен (ниже в чате)' : '',
+    d.deliv ? '🚚 Курьер по Баку: +3 AZN (входит в цену)' : '🏠 Самовывоз',
     d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 105 г / 4 ч, PLA' : '',
     d.disc ? `Скидка на сайте: −${d.discPct || 0}% (${esc(d.disc)})` : '',
     d.nth ? (d.nth % 5 === 0 ? `🎉 <b>${d.nth}-й заказ клиента</b> — положена скидка −30%` : `Заказ клиента №${d.nth} по этому номеру`) : '',
@@ -185,7 +187,7 @@ function opButtons(o) {
   switch (o.status) {
     case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('❌ Отклонить', 'r')]];
     case 'pay': case 'paycheck': return [[b('💰 Оплата получена', 'p')]];
-    case 'queue': return [[b('🤖 Автопечать', 'a'), b('🖨 Печать началась', 's')]];
+    case 'queue': return [[b('🖨 Печать началась', 's')]]; // auto print ('a') is switched off for now
     case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
     case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')]];
     case 'ready': return [[b('🙏 Выдан', 'g'), b('🔁 Перепечатать', 'rp')]];
@@ -987,7 +989,7 @@ async function onCallback(env, q, origin) {
   if (act === 'm' || act === 'pl') {
     if (o.status !== 'review') return answer('Цена уже подтверждена');
     const base = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
-    let n = await setStatus(env, id, { price: Math.max(1, base + (act === 'm' ? -2 : 2)) });
+    let n = await setStatus(env, id, { price: Math.max(MIN_ORDER, base + (act === 'm' ? -2 : 2)) });
     n = { ...n, status: 'review' };
     await refreshOperatorMsg(env, n);
     return answer(`Цена: ${n.price} AZN`);
@@ -1018,7 +1020,8 @@ async function onCallback(env, q, origin) {
 
 // One place for order actions: used by the bot buttons and by the web operator panel.
 async function opAction(env, origin, o, act, x = {}) {
-  const id = o.id, base = Number.isFinite(+x.price) && +x.price > 0 ? Math.round(+x.price) : (o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20));
+  const raw = Number.isFinite(+x.price) && +x.price > 0 ? Math.round(+x.price) : (o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20));
+  const id = o.id, base = JSON.parse(o.data || '{}').free ? raw : Math.max(MIN_ORDER, raw);
   let n = o, note = '';
   if (act === 'c' && o.status === 'review') { n = await setStatus(env, id, { status: 'pay', price: base }); await notifyClient(env, origin, n, 'confirmed'); note = `Цена подтверждена: ${base} AZN`; }
   else if (act === 'r' && o.status === 'review') { n = await setStatus(env, id, { status: 'rejected', reason: x.reason ? clip(x.reason, 200) : TX.rj_geo[1] }); await notifyClient(env, origin, n, 'rejected', { w: x.reason ? clip(x.reason, 200) : tx('rj_geo', n.lang) }); note = 'Отклонён'; }
