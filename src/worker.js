@@ -1167,13 +1167,13 @@ export default {
   // 16:00 UTC = 20:00 in Baku: the daily free-print draw
   async scheduled(ev, env, ctx) {
     await init(env);
-    const origin = (await kvGet(env, 'origin')) || 'https://start3d.xsamikx.workers.dev';
+    const origin = String(env.PUBLIC_ORIGIN || '').replace(/\/$/, '') || (await kvGet(env, 'origin')) || 'https://start3d.az';
     ctx.waitUntil(drawFree(env, origin, bakuDay(Date.now()), false).catch((e) => console.error('draw', e)));
   },
   async fetch(req, env, ctx) {
     const url = new URL(req.url), p = url.pathname;
     // PUBLIC_ORIGIN (e.g. https://start3d.az) is the one address for links, the bot webhook and redirects.
-    // The old workers.dev address keeps serving the API (bridge, webhook) but sends visitors to the main domain.
+    // Any other address of this worker (e.g. www) sends visitors to the main domain.
     const canon = String(env.PUBLIC_ORIGIN || '').replace(/\/$/, ''), origin = canon || url.origin;
     if (canon && url.origin !== canon && !p.startsWith('/api/') && !p.startsWith('/tg/') && (req.method === 'GET' || req.method === 'HEAD'))
       return Response.redirect(canon + p + url.search, 301);

@@ -13,8 +13,9 @@
     { "binding": "DB", "database_name": "start3d" }
   ],
   "observability": { "enabled": true },
-  // Own domain (zone start3d.az is on Cloudflare). workers.dev stays on for the bridge and old links.
-  "workers_dev": true,
+  // Only the own domain: the workers.dev address is switched off.
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [
     { "pattern": "start3d.az", "custom_domain": true },
     { "pattern": "www.start3d.az", "custom_domain": true }

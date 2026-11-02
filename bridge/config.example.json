@@ -1,5 +1,5 @@
 {
-  "server": "https://start3d.xsamikx.workers.dev",
+  "server": "https://start3d.az",
   "bridgeKey": "ВСТАВЬТЕ_ТОТ_ЖЕ_КЛЮЧ_ЧТО_BRIDGE_KEY_В_CLOUDFLARE",
   "printers": [
     {

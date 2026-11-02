@@ -15,6 +15,11 @@ if (!fs.existsSync(cfgPath)) {
   process.exit(1);
 }
 const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+// The old *.workers.dev address is switched off: use the site's own domain (and fix config.json once).
+if (/workers\.dev/i.test(String(cfg.server || ''))) {
+  cfg.server = 'https://start3d.az';
+  try { const raw = fs.readFileSync(cfgPath, 'utf8'); fs.writeFileSync(cfgPath, raw.replace(/"server"\s*:\s*"[^"]*"/, '"server": "https://start3d.az"')); } catch {}
+}
 const SERVER = String(cfg.server || '').replace(/\/$/, '');
 const KEY = cfg.bridgeKey;
 if (!SERVER || !KEY || KEY.includes('ВСТАВЬТЕ')) {
