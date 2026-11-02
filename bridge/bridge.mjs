@@ -7,6 +7,8 @@ import path from 'node:path';
 import tls from 'node:tls';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import mqtt from 'mqtt';
 
 const cfgPath = new URL('./config.json', import.meta.url);
@@ -53,7 +55,7 @@ const ROTATE = {}; // printer id → '0' | 'ccw' | 'cw' | '180' (set from the bo
 async function pollBusy() {
   try {
     const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}` } });
-    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); }
+    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const jb of j.jobs || []) autoJob(jb); }
   } catch {}
 }
 const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');
@@ -70,6 +72,7 @@ function bambuStatus(p) {
     reconnectPeriod: 5000, connectTimeout: 10000, clientId: 'start3d-' + p.id + '-' + Math.random().toString(16).slice(2, 8),
   });
   const report = `device/${p.serial}/report`, request = `device/${p.serial}/request`;
+  p._send = (obj) => new Promise((res, rej) => client.publish(request, JSON.stringify(obj), (e) => (e ? rej(e) : res())));
   client.on('connect', () => {
     log(p.id, 'MQTT подключён');
     client.subscribe(report);
@@ -263,6 +266,202 @@ function videoStreamer(p) {
     else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
   }, 2000);
 }
+
+/* ---------- auto print: the operator presses "Печать" → slice with Bambu Studio → upload to the printer → start ---------- */
+const SL = cfg.slicer || {};
+const SLICER_EXE = SL.exe || 'C:\\Program Files\\Bambu Studio\\bambu-studio.exe';
+const APPDATA = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+const JOB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'jobs');
+const JOBS = new Map(); // job id → { state, file3mf, ... } while this bridge works on it
+const jobPost = (id, body) => post(`/api/bridge/job/${id}`, body).catch((e) => ({ error: e.message }));
+
+// Bambu Studio presets: system ones (bundled + updated) and the user's own; a user preset only stores what differs.
+function presetIndex() {
+  const roots = [path.join(path.dirname(SLICER_EXE), 'resources', 'profiles', 'BBL'), path.join(APPDATA, 'BambuStudio', 'system', 'BBL')];
+  const userRoot = path.join(APPDATA, 'BambuStudio', 'user');
+  const idx = { machine: new Map(), process: new Map(), filament: new Map(), user: { machine: new Map(), process: new Map(), filament: new Map() } };
+  const walk = (dir, put) => { let ents = []; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) { const f = path.join(dir, e.name); if (e.isDirectory()) walk(f, put); else if (e.name.endsWith('.json')) { try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); if (j.name) put(j, f); } catch {} } } };
+  for (const r of roots) for (const t of ['machine', 'process', 'filament']) walk(path.join(r, t), (j) => idx[t].set(j.name, j)); // later root (updated copy) wins
+  let users = []; try { users = fs.readdirSync(userRoot); } catch {}
+  users.sort((a, b) => (a === 'default') - (b === 'default'));
+  for (const u of users) for (const t of ['machine', 'process', 'filament']) walk(path.join(userRoot, u, t), (j) => { if (!idx.user[t].has(j.name)) idx.user[t].set(j.name, j); });
+  return idx;
+}
+function flatten(idx, type, name) {
+  const chain = []; let cur = idx.user[type].get(name) || idx[type].get(name), guard = 0;
+  if (!cur) throw new Error(`нет профиля «${name}»`);
+  while (cur && guard++ < 20) { chain.unshift(cur); const inh = cur.inherits; cur = inh ? (idx.user[type].get(inh) || idx[type].get(inh)) : null; if (inh && !cur) throw new Error(`нет родительского профиля «${inh}»`); }
+  const out = {};
+  for (const c of chain) Object.assign(out, c);
+  out.name = name; out.from = chain.at(-1).from === 'User' ? 'User' : 'system'; out.inherits = chain.at(-1).inherits || '';
+  if (!out.type) out.type = type;
+  return out;
+}
+// The filament preset for an AMS tray: the user's own preset for this filament (if any), else Bambu's system one for the A1.
+function filamentFor(idx, tray) {
+  const machine = SL.machine || 'Bambu Lab A1 0.4 nozzle';
+  const ok = (j) => !j.compatible_printers || !j.compatible_printers.length || j.compatible_printers.includes(machine);
+  const fid = tray.tray_info_idx;
+  const over = (SL.filaments || {})[fid] || (SL.filaments || {})[String(tray.tray_type || '').toUpperCase()];
+  if (over) return over;
+  let sys = null;
+  if (fid) for (const [n, j] of idx.filament) { if (j.instantiation === 'false' || !/@BBL A1$/.test(n)) continue; try { const fl = flatten(idx, 'filament', n); if (fl.filament_id === fid && ok(fl)) { sys = n; break; } } catch {} }
+  if (!sys) for (const [n, j] of idx.filament) if (/@BBL A1$/.test(n) && j.instantiation !== 'false' && String(n).toUpperCase().startsWith('GENERIC ' + String(tray.tray_type || 'PLA').toUpperCase() + ' ')) { sys = n; break; }
+  if (!sys) throw new Error(`нет профиля пластика для ${tray.tray_type || '?'} (${fid || 'без кода'})`);
+  let best = null;
+  for (const [n, j] of idx.user.filament) if (j.inherits === sys && j.instantiation !== 'false') { if (!best || (j.updated_time || 0) > (best.updated_time || 0)) best = { ...j, n }; }
+  return best ? best.n : sys;
+}
+const hexRgb = (h) => { const m = String(h || '').replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i); return m ? m.slice(1).map((x) => parseInt(x, 16)) : null; };
+const colDist = (a, b) => (a && b ? Math.sqrt(2 * (a[0] - b[0]) ** 2 + 4 * (a[1] - b[1]) ** 2 + 3 * (a[2] - b[2]) ** 2) / 3 : 999);
+// Pick the AMS slot with the order's material and the closest colour.
+function pickTray(p, mat, color) {
+  const want = String(mat || 'PLA').toUpperCase(), rgb = hexRgb(color), trays = [];
+  for (const a of p._state?.ams?.ams || []) for (const t of a.tray || []) if (t.tray_type) trays.push({ ...t, slot: +a.id * 4 + +t.id });
+  if (!trays.length && p._state?.vt_tray?.tray_type) trays.push({ ...p._state.vt_tray, slot: 254 });
+  const exact = trays.filter((t) => String(t.tray_type).toUpperCase() === want);
+  const same = exact.length ? exact : trays.filter((t) => String(t.tray_type).toUpperCase().split(/[-\s+]/)[0] === want.split(/[-\s+]/)[0]);
+  if (!same.length) throw new Error(`в AMS нет ${want}` + (trays.length ? ` (есть: ${trays.map((t) => t.tray_type).join(', ')})` : ''));
+  same.forEach((t) => { t.d = colDist(hexRgb(t.tray_color), rgb); });
+  same.sort((a, b) => a.d - b.d);
+  if (rgb && same[0].d > (SL.colorTolerance || 70)) throw new Error(`в AMS нет нужного цвета ${color} для ${want} (ближайший слот ${same[0].slot % 4 + 1}: #${String(same[0].tray_color).slice(0, 6)})`);
+  return same[0];
+}
+// Minimal reader for the sliced .3mf (a zip): returns one file's text.
+function zipRead(buf, name) {
+  let e = buf.length - 22; while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
+  if (e < 0) return null;
+  let off = buf.readUInt32LE(e + 16); const n = buf.readUInt16LE(e + 10);
+  for (let i = 0; i < n; i++) {
+    const method = buf.readUInt16LE(off + 10), csize = buf.readUInt32LE(off + 20), fl = buf.readUInt16LE(off + 28), xl = buf.readUInt16LE(off + 30), cl = buf.readUInt16LE(off + 32), lho = buf.readUInt32LE(off + 42);
+    const fname = buf.toString('utf8', off + 46, off + 46 + fl);
+    if (fname === name) { const s0 = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28), data = buf.subarray(s0, s0 + csize); return (method === 8 ? zlib.inflateRawSync(data) : data).toString('utf8'); }
+    off += 46 + fl + xl + cl;
+  }
+  return null;
+}
+function runSlicer(args, cwd) {
+  return new Promise((resolve, reject) => {
+    const sp = spawn(SLICER_EXE, args, { cwd, windowsHide: true }); let out = '';
+    const t = setTimeout(() => sp.kill('SIGKILL'), (SL.timeoutMin || 15) * 60e3);
+    sp.stdout?.on('data', (d) => { out = (out + d).slice(-2000); }); sp.stderr?.on('data', (d) => { out = (out + d).slice(-2000); });
+    sp.on('close', (code) => { clearTimeout(t); resolve({ code, out }); });
+    sp.on('error', (e) => { clearTimeout(t); reject(new Error('Bambu Studio не запустился: ' + e.message)); });
+  });
+}
+async function slice(job, p, tray, dir, model) {
+  const idx = presetIndex();
+  const machine = SL.machine || 'Bambu Lab A1 0.4 nozzle', proc = SL.process || '0.20mm Standard @BBL A1', fil = filamentFor(idx, tray);
+  const m = flatten(idx, 'machine', machine), pr = flatten(idx, 'process', proc), f = flatten(idx, 'filament', fil);
+  if (SL.supports !== 'off') { pr.enable_support = '1'; pr.support_type = pr.support_type && /tree|normal/.test(pr.support_type) && /auto/.test(pr.support_type) ? pr.support_type : 'tree(auto)'; }
+  pr.curr_bed_type = SL.bedType || 'Textured PEI Plate';
+  const files = { m: path.join(dir, 'machine.json'), p: path.join(dir, 'process.json'), f: path.join(dir, 'filament.json') };
+  fs.writeFileSync(files.m, JSON.stringify(m)); fs.writeFileSync(files.p, JSON.stringify(pr)); fs.writeFileSync(files.f, JSON.stringify(f));
+  const out = path.join(dir, 'out'); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
+  const name = `${job.order}.3mf`;
+  const args = ['--orient', String(SL.orient ?? 0), '--arrange', '1', ...(job.qty > 1 ? ['--repetitions', String(job.qty)] : []),
+    '--load-settings', `${files.m};${files.p}`, '--load-filaments', files.f, '--slice', '0', '--outputdir', out, '--export-3mf', name, model];
+  log(p.id, `автопечать ${job.order}: нарезаю (${proc}, ${fil})…`);
+  const r = await runSlicer(args, dir);
+  let res = {}; try { res = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8')); } catch {}
+  const f3 = path.join(out, name);
+  if (r.code !== 0 || res.return_code || !fs.existsSync(f3)) throw new Error(`слайсер: ${res.error_string || 'ошибка ' + (res.return_code ?? r.code)}${res.sliced_plates?.[0]?.warning_message ? ' · ' + res.sliced_plates[0].warning_message : ''}`);
+  const buf = fs.readFileSync(f3), info = zipRead(buf, 'Metadata/slice_info.config') || '';
+  const meta = (k) => { const mm = info.match(new RegExp(`key="${k}" value="([^"]*)"`)); return mm ? mm[1] : null; };
+  const grams = +meta('weight') || +((info.match(/used_g="([\d.]+)"/) || [])[1]) || 0, sec = +meta('prediction') || res.sliced_plates?.[0]?.total_predication || 0;
+  return { file: f3, name, grams: Math.round(grams * 10) / 10, minutes: Math.round(sec / 60), md5: crypto.createHash('md5').update(buf).digest('hex').toUpperCase(), process: proc, filament: fil };
+}
+// Implicit FTPS (port 990) to the printer's storage, as Bambu Studio does in LAN mode.
+function ftpsUpload(p, local, remote) {
+  return new Promise((resolve, reject) => {
+    const ctl = tls.connect({ host: p.ip, port: p.ftpPort || 990, rejectUnauthorized: false, timeout: 20000 });
+    let buf = '', step = 0, done = false;
+    const fail = (e) => { if (done) return; done = true; try { ctl.destroy(); } catch {} reject(e instanceof Error ? e : new Error(String(e))); };
+    const send = (c) => ctl.write(c + '\r\n');
+    const cmds = [['USER bblp', /^331|^230/], ['PASS ' + p.accessCode, /^230/], ['PBSZ 0', /^200/], ['PROT P', /^200/], ['TYPE I', /^200/], ['PASV', /^227/]];
+    ctl.on('timeout', () => fail(new Error('FTP: нет ответа')));
+    ctl.on('error', fail);
+    ctl.on('data', (d) => {
+      buf += d.toString(); let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (/^\d{3}-/.test(line) || !/^\d{3}/.test(line)) continue;
+        if (step === 0) { if (!/^220/.test(line)) return fail(new Error('FTP: ' + line)); send(cmds[0][0]); step = 1; continue; }
+        if (step <= cmds.length) {
+          if (!cmds[step - 1][1].test(line)) return fail(new Error('FTP: ' + line.replace(p.accessCode, '***')));
+          if (step < cmds.length) { send(cmds[step][0]); step++; continue; }
+          const m = line.match(/\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)/); if (!m) return fail(new Error('FTP PASV: ' + line));
+          const port = +m[5] * 256 + +m[6];
+          const data = tls.connect({ host: p.ip, port, rejectUnauthorized: false, session: ctl.getSession(), timeout: 60000 });
+          data.on('error', fail); data.on('timeout', () => fail(new Error('FTP: передача зависла')));
+          data.on('secureConnect', () => { send('STOR ' + remote); step = cmds.length + 1; });
+          ctl._data = data; continue;
+        }
+        if (step === cmds.length + 1) { // 150 → send the file
+          if (!/^1\d\d/.test(line)) return fail(new Error('FTP STOR: ' + line));
+          fs.createReadStream(local).pipe(ctl._data); step++; continue;
+        }
+        if (step === cmds.length + 2) { if (!/^226/.test(line)) return fail(new Error('FTP: ' + line)); done = true; send('QUIT'); ctl.end(); return resolve(); }
+      }
+    });
+  });
+}
+const IDLE_STATES = ['IDLE', 'FINISH', 'FAILED', ''];
+async function autoJob(jb) {
+  const p = (cfg.printers || []).find((x) => x.id === jb.pid);
+  const cur = JOBS.get(jb.id);
+  if (!p) return;
+  if (cur && (cur.busy || cur.state === 'printing' || cur.state === 'error')) return;
+  if (jb.status === 'go' && cur?.sliced) return startJob(jb, p, cur);
+  if (cur || !['new', 'go'].includes(jb.status)) return;
+  if (p.type === 'bambu' && p._send && !p._state?.gcode_state) return; // status from the printer not received yet: try on the next poll // 'go' without a sliced file: the bridge was restarted, slice again
+  const st = { busy: true, state: 'taken' }; JOBS.set(jb.id, st);
+  const fail = async (e) => { st.state = 'error'; st.busy = false; log(p.id, `автопечать ${jb.order}: ${e.message}`); await jobPost(jb.id, { state: 'error', msg: e.message }); };
+  try {
+    if (p.type !== 'bambu' || !p._send) throw new Error('этот принтер не подключён к мосту по сети');
+    if (!IDLE_STATES.includes(p._state?.gcode_state || '')) throw new Error(`принтер занят (${p._state?.gcode_state})`);
+    if (!hasSlicer()) throw new Error(`не найден Bambu Studio: ${SLICER_EXE}`);
+    const tray = pickTray(p, jb.mat, jb.color);
+    await jobPost(jb.id, { state: 'slicing', msg: `слот AMS ${tray.slot === 254 ? 'внешняя катушка' : tray.slot % 4 + 1}, ${tray.tray_type} #${String(tray.tray_color).slice(0, 6)}` });
+    const dir = path.join(JOB_DIR, String(jb.id)); fs.mkdirSync(dir, { recursive: true });
+    const r = await fetch(`${SERVER}/api/bridge/jobfile/${jb.id}`, { headers: { authorization: `Bearer ${KEY}` } });
+    if (!r.ok) throw new Error(`не скачал файл модели (${r.status})`);
+    const ext = (String(jb.file || '').match(/\.(stl|3mf|obj|step|stp)$/i) || ['', 'stl'])[1].toLowerCase();
+    const model = path.join(dir, 'model.' + ext); fs.writeFileSync(model, Buffer.from(await r.arrayBuffer()));
+    const s = await slice(jb, p, tray, dir, model);
+    Object.assign(st, { sliced: s, tray });
+    const ans = await jobPost(jb.id, { state: 'sliced', grams: s.grams, minutes: s.minutes, msg: `${s.process} · ${s.filament}` });
+    st.busy = false;
+    if (ans?.go) return startJob(jb, p, st);
+    st.state = 'hold'; log(p.id, `автопечать ${jb.order}: жду решения оператора (вес ${s.grams} г)`);
+  } catch (e) { await fail(e); }
+}
+async function startJob(jb, p, st) {
+  if (st.busy) return; st.busy = true;
+  try {
+    if (!IDLE_STATES.includes(p._state?.gcode_state || '')) throw new Error(`принтер занят (${p._state?.gcode_state})`);
+    const s = st.sliced, remote = s.name;
+    await jobPost(jb.id, { state: 'uploading' });
+    log(p.id, `автопечать ${jb.order}: отправляю на принтер…`);
+    await ftpsUpload(p, s.file, remote);
+    const slot = st.tray.slot;
+    await p._send({ print: { sequence_id: String(Date.now() % 1e8), command: 'project_file', param: 'Metadata/plate_1.gcode', project_id: '0', profile_id: '0', task_id: '0', subtask_id: '0',
+      subtask_name: jb.order, file: remote, url: `ftp:///${remote}`, md5: s.md5, timelapse: false, bed_type: 'auto', bed_levelling: true, bed_leveling: true,
+      flow_cali: false, vibration_cali: true, layer_inspect: false, use_ams: slot !== 254, ams_mapping: [slot === 254 ? 254 : slot] } });
+    // wait until the printer really starts this job
+    const t0 = Date.now();
+    while (Date.now() - t0 < 120000) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const g = p._state?.gcode_state;
+      if (['PREPARE', 'RUNNING'].includes(g)) { st.state = 'printing'; await jobPost(jb.id, { state: 'printing' }); log(p.id, `автопечать ${jb.order}: печать началась`); fs.rmSync(path.join(JOB_DIR, String(jb.id)), { recursive: true, force: true }); return; }
+      if (g === 'FAILED' && p._state?.print_error) throw new Error(`принтер отказал: ошибка ${p._state.print_error}`);
+    }
+    throw new Error('принтер не начал печать за 2 минуты (включён ли режим разработчика в LAN?)');
+  } catch (e) { st.state = 'error'; log(p.id, `автопечать ${jb.order}: ${e.message}`); await jobPost(jb.id, { state: 'error', msg: e.message }); }
+  finally { st.busy = false; }
+}
+const hasSlicer = () => fs.existsSync(SLICER_EXE);
 
 /* ---------- timelapse: a frame per layer while printing → MP4 after the print → server (Telegram) ---------- */
 const TL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'timelapses');

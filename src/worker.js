@@ -31,6 +31,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS timelapses (id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, order_id TEXT, file_id TEXT, thumb_id TEXT, size INTEGER, dur REAL,
      started INTEGER, ended INTEGER, state TEXT, task TEXT, sent INTEGER DEFAULT 0, created_at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS timelapses_order ON timelapses(order_id)`,
+  `CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, pid TEXT NOT NULL, status TEXT NOT NULL, file_id TEXT, file_name TEXT,
+     mat TEXT, color TEXT, qty INTEGER, grams REAL, minutes INTEGER, msg TEXT, op_msg_id INTEGER, created_at INTEGER, updated_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
 ];
 let ready = false;
@@ -169,8 +171,8 @@ function opText(o) {
 }
 // Print farm. Ids must match "id" in bridge/config.json on the workshop computer.
 const PRINTERS = [
-  { id: 'a1-1', name: 'A1 #1' },
-  { id: 'a1-2', name: 'A1 #2' },
+  { id: 'a1-1', name: 'A1 #1', auto: true },
+  { id: 'a1-2', name: 'A1 #2', auto: true },
   { id: 'k2', name: 'K2 Plus' },
   { id: 'ender', name: 'Ender 3 V3' },
 ];
@@ -183,7 +185,7 @@ function opButtons(o) {
   switch (o.status) {
     case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('❌ Отклонить', 'r')]];
     case 'pay': case 'paycheck': return [[b('💰 Оплата получена', 'p')]];
-    case 'queue': return [[b('🖨 Печать началась', 's')]];
+    case 'queue': return [[b('🤖 Автопечать', 'a'), b('🖨 Печать началась', 's')]];
     case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
     case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')]];
     case 'ready': return [[b('🙏 Выдан', 'g'), b('🔁 Перепечатать', 'rp')]];
@@ -377,7 +379,7 @@ async function bridgeBusy(env) {
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
   const rotate = {};
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
-  return json({ busy: [...busy], rotate, orders });
+  return json({ busy: [...busy], rotate, orders, jobs: await jobsForBridge(env) });
 }
 const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
@@ -648,6 +650,14 @@ async function onUpdate(env, u, origin) {
       if (n.tg_chat_id) await notifyClient(env, origin, n, 'op_answer', { t: d.answer });
       return say(n.tg_chat_id ? `✅ Ответ отправлен клиенту ${n.client}` : `✅ Ответ сохранён — клиент увидит его на странице заказа (бот не подключён)`);
     }
+    if (m.document && m.reply_to_message) {
+      const o = await env.DB.prepare('SELECT * FROM orders WHERE op_msg_id=?').bind(m.reply_to_message.message_id).first();
+      const nm = safeName(m.document.file_name || 'model.stl');
+      if (!o || !MODEL_EXT.test(nm)) return;
+      const d = JSON.parse(o.data || '{}'); d.files = (d.files || []).concat({ kind: 'model', name: nm, size: m.document.file_size || 0, fid: m.document.file_id, mid: m.message_id, op: true });
+      await setStatus(env, o.id, { data: JSON.stringify(d) });
+      return say(`📎 ${nm} прикреплён к ${o.id} — его возьмёт автопечать`);
+    }
     if (!m.photo) return;
     let id = m.reply_to_message ? await kvGet(env, 'photo_wait:' + m.reply_to_message.message_id) : null;
     if (!id) { const c = (m.caption || '').match(/S3D-\d+/i); id = c ? c[0].toUpperCase() : null; }
@@ -742,6 +752,90 @@ async function linkByPhone(env, origin, chatId, phone, say) {
 const fmtPhone = (p) => p && p.length === 9 ? `+994 ${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5, 7)} ${p.slice(7)}` : p || '';
 const phoneKeyboard = (lang) => ({ reply_markup: { keyboard: [[{ text: tx('share_btn', lang), request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } });
 async function hasPhone(env, chatId) { return !!(await env.DB.prepare('SELECT 1 FROM phones WHERE chat_id=? LIMIT 1').bind(chatId).first()); }
+
+/* ---------- auto print: operator presses "Автопечать" → the bridge slices with Bambu Studio and starts the printer ---------- */
+const MODEL_EXT = /\.(stl|3mf|obj|step|stp)$/i;
+const COLOR_HEX = ['#2A2D31', '#ECECE6', '#8C9198', '#E2702F', '#2F5FD0', '#3E9B5A', '#C8372D'];
+const JOB_ACTIVE = ['new', 'slicing', 'hold', 'go', 'uploading'];
+const jobLine = (j, o) => `🤖 ${o.id} · ${o.client} → ${printerName(j.pid)}`;
+async function jobMsg(env, j, o, text, buttons) {
+  const chat = await kvGet(env, 'operator_chat'); if (!chat) return;
+  const body = { chat_id: Number(chat), text: `${jobLine(j, o)}\n${text}`, reply_markup: { inline_keyboard: buttons || [] } };
+  if (j.op_msg_id) { const r = await tg(env, 'editMessageText', { ...body, message_id: j.op_msg_id }); if (r.ok || /not modified/.test(r.description || '')) return; }
+  const r = await tg(env, 'sendMessage', { ...body, reply_parameters: o.op_msg_id ? { message_id: o.op_msg_id, allow_sending_without_reply: true } : undefined });
+  if (r.ok) await env.DB.prepare('UPDATE jobs SET op_msg_id=? WHERE id=?').bind(r.result.message_id, j.id).run();
+}
+async function jobCreate(env, o, pid) {
+  const pr = PRINTERS.find((p) => p.id === pid && p.auto);
+  if (!pr) return { error: 'Этот принтер не умеет автопечать' };
+  const d = JSON.parse(o.data || '{}');
+  const f = (d.files || []).filter((x) => x.kind === 'model' && x.fid && MODEL_EXT.test(x.name || '')).pop();
+  if (!f) return { error: 'Нет файла модели. Пришлите STL/3MF ответом на карточку заказа' };
+  if (f.size > 20 * 1024 * 1024) return { error: 'Файл больше 20 МБ — бот не может его скачать, запустите вручную' };
+  const act = await env.DB.prepare(`SELECT id FROM jobs WHERE order_id=? AND status IN (${JOB_ACTIVE.map(() => '?').join(',')})`).bind(o.id, ...JOB_ACTIVE).first();
+  if (act) return { error: 'Автопечать этого заказа уже идёт' };
+  const busy = await env.DB.prepare('SELECT order_id FROM printers WHERE id=?').bind(pid).first();
+  if (busy?.order_id && busy.order_id !== o.id) return { error: `${pr.name} занят заказом ${busy.order_id}` };
+  const t = now();
+  const ins = await env.DB.prepare('INSERT INTO jobs(order_id, pid, status, file_id, file_name, mat, color, qty, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind(o.id, pid, 'new', f.fid, f.name, d.mat || 'PLA', COLOR_HEX[d.color ?? 0] || null, d.qty || 1, t, t).run();
+  const j = await env.DB.prepare('SELECT * FROM jobs WHERE id=?').bind(ins.meta?.last_row_id).first();
+  await jobMsg(env, j, o, `⏳ Жду мост… (${f.name}, ${d.mat || 'PLA'}, ${d.colorName || ''}${d.qty > 1 ? ', ' + d.qty + ' шт' : ''})`);
+  return { ok: true, note: `Автопечать на ${pr.name}: мост нарежет и запустит` };
+}
+async function jobsForBridge(env) {
+  // a job nobody picked up in 10 minutes: the bridge is off
+  const old = await env.DB.prepare("SELECT * FROM jobs WHERE status='new' AND created_at < ?").bind(now() - 10 * 60e3).all();
+  for (const j of old.results) await jobUpdate(env, j, { state: 'error', msg: 'мост не ответил за 10 минут — он запущен?' });
+  const rs = await env.DB.prepare("SELECT id, order_id, pid, status, file_name, mat, color, qty FROM jobs WHERE status IN ('new','go') ORDER BY id").all();
+  return rs.results.map((j) => ({ id: j.id, order: j.order_id, pid: j.pid, status: j.status, file: j.file_name, mat: j.mat, color: j.color, qty: j.qty }));
+}
+async function jobUpdate(env, j, b, origin) {
+  const o = await getOrder(env, j.order_id); if (!o) return { error: 'no_order' };
+  const d = JSON.parse(o.data || '{}'), msg = b.msg ? clip(b.msg, 300) : null;
+  let status = j.status, text = '', buttons = null, out = { ok: true };
+  if (b.state === 'slicing') { status = 'slicing'; text = `✂️ Нарезаю в Bambu Studio…${msg ? '\n' + msg : ''}`; }
+  else if (b.state === 'sliced') {
+    const g = +b.grams || 0, min = +b.minutes || 0;
+    await env.DB.prepare('UPDATE jobs SET grams=?, minutes=? WHERE id=?').bind(g, min, j.id).run();
+    const want = +d.grams || 0, over = j.status !== 'go' && want > 0 && g > want * 1.3 + 5; // 'go' = the operator already approved
+    const line = `✂️ Нарезано: ${g} г, ${Math.floor(min / 60)} ч ${min % 60} мин${msg ? ' · ' + msg : ''}`;
+    if (over) { status = 'hold'; text = `${line}\n⚠️ Клиент оплатил ~${Math.round(want)} г, вышло ${g} г. Печатать?`; buttons = [[{ text: '▶ Печатать', callback_data: `ag:${j.id}` }, { text: '✖ Отмена', callback_data: `ax:${j.id}` }]]; out.go = false; }
+    else { status = 'go'; text = `${line}\n📤 Отправляю на принтер…`; out.go = true; }
+  }
+  else if (b.state === 'uploading') { status = 'uploading'; text = '📤 Отправляю файл на принтер…'; }
+  else if (b.state === 'printing') {
+    status = 'printing'; text = `🖨 Печать запущена${j.grams ? ` · ${j.grams} г · ${Math.floor((j.minutes || 0) / 60)} ч ${(j.minutes || 0) % 60} мин` : ''}`;
+    if (o.status === 'queue') await opAction(env, origin || (await kvGet(env, 'origin')) || '', o, 'sp', { pid: j.pid });
+  }
+  else if (b.state === 'error') { status = 'error'; text = `❌ Не запустилось: ${msg || 'ошибка'}\nИсправьте и нажмите ещё раз, или запустите вручную.`; buttons = [[{ text: '🔁 Ещё раз', callback_data: `ap:${j.pid}|${o.id}` }]]; }
+  else return { error: 'bad_state' };
+  await env.DB.prepare('UPDATE jobs SET status=?, msg=?, updated_at=? WHERE id=?').bind(status, msg, now(), j.id).run();
+  await jobMsg(env, { ...j, status }, o, text, buttons);
+  return out;
+}
+async function jobDecide(env, id, go, who) {
+  const j = await env.DB.prepare('SELECT * FROM jobs WHERE id=?').bind(id).first();
+  if (!j || j.status !== 'hold') return { error: 'Уже решено' };
+  const o = await getOrder(env, j.order_id);
+  await env.DB.prepare('UPDATE jobs SET status=?, updated_at=? WHERE id=?').bind(go ? 'go' : 'cancel', now(), id).run();
+  await jobMsg(env, j, o, go ? `▶ ${who || 'Оператор'}: печатать. 📤 Отправляю на принтер…` : `✖ ${who || 'Оператор'} отменил автопечать`);
+  return { ok: true, note: go ? 'Печатаем' : 'Отменено' };
+}
+async function bridgeJob(env, req, origin, id) {
+  const j = await env.DB.prepare('SELECT * FROM jobs WHERE id=?').bind(id).first();
+  if (!j) return json({ error: 'not_found' }, 404);
+  if (['cancel', 'printing'].includes(j.status)) return json({ ok: true, go: false });
+  return json(await jobUpdate(env, j, await req.json().catch(() => ({})), origin));
+}
+async function bridgeJobFile(env, id) {
+  const j = await env.DB.prepare('SELECT file_id FROM jobs WHERE id=?').bind(id).first();
+  if (!j?.file_id) return json({ error: 'not_found' }, 404);
+  const fp = await tgFilePath(env, j.file_id);
+  if (!fp) return json({ error: 'too_big_or_missing' }, 404);
+  const r = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${fp}`);
+  return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/octet-stream' } });
+}
 
 /* ---------- timelapses: built by the bridge after each print, kept in Telegram ---------- */
 const MAX_TL = 45 * 1024 * 1024;
@@ -869,7 +963,7 @@ async function operatorPhoto(env, origin, id, fileId, say) {
 async function onCallback(env, q, origin) {
   let [act, id] = String(q.data || '').split(/:(.+)/);
   let pid = null;
-  if (act === 'sp') [pid, id] = String(id).split('|');
+  if (act === 'sp' || act === 'ap') [pid, id] = String(id).split('|');
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
@@ -887,6 +981,7 @@ async function onCallback(env, q, origin) {
     return answer('');
   }
   if (!allowed) return answer('Нет доступа');
+  if (act === 'ag' || act === 'ax') { const r = await jobDecide(env, +id, act === 'ag', q.from.first_name); return answer(r.error || r.note); }
   const o = await getOrder(env, id);
   if (!o) return answer('Заказ не найден');
   if (act === 'm' || act === 'pl') {
@@ -897,6 +992,17 @@ async function onCallback(env, q, origin) {
     await refreshOperatorMsg(env, n);
     return answer(`Цена: ${n.price} AZN`);
   }
+  if (act === 'a' && o.status === 'queue') {
+    const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
+    const rows = PRINTERS.filter((p) => p.auto).map((p) => {
+      const b = busy.results.find((r) => r.id === p.id);
+      return [{ text: `🤖 ${p.name}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `ap:${p.id}|${o.id}` }];
+    });
+    rows.push([{ text: '↩︎ Назад', callback_data: `bk:${o.id}` }]);
+    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    return answer('На каком принтере печатать?');
+  }
+  if (act === 'bk') { await refreshOperatorMsg(env, o); return answer(''); }
   if (act === 's' && o.status === 'queue') {
     const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
     const rows = PRINTERS.map((p) => {
@@ -922,6 +1028,11 @@ async function opAction(env, origin, o, act, x = {}) {
     n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
     await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(x.pid, id, now()).run();
     await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(x.pid)}`;
+  }
+  else if (act === 'ap' && o.status === 'queue') {
+    const r = await jobCreate(env, o, x.pid);
+    if (r.error) return r;
+    note = r.note;
   }
   else if (act === 'd' && ['printing', 'post'].includes(o.status)) {
     n = await setStatus(env, id, { status: 'post' });
@@ -1195,6 +1306,8 @@ export default {
       if (p === '/api/tl/week') return tlWeek(env);
       let tlm = p.match(/^\/api\/tl\/(\d+)\/(video|poster)$/);
       if (tlm) return tlMedia(env, req, url, +tlm[1], tlm[2]);
+      tlm = p.match(/^\/api\/bridge\/job(file)?\/(\d+)$/);
+      if (tlm) { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return tlm[1] ? bridgeJobFile(env, +tlm[2]) : bridgeJob(env, req, origin, +tlm[2]); }
       tlm = p.match(/^\/api\/bridge\/tl\/([a-z0-9-]+)$/);
       if (tlm && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeTl(env, req, url, tlm[1]); }
       let b = p.match(/^\/api\/cam\/([a-z0-9-]+)$/);
