@@ -746,7 +746,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
       <div class="seg" id="seg-k"><button type="button" data-v="file" data-i="k_file"></button><button type="button" data-v="link" data-i="k_link"></button><button type="button" data-v="photo" data-i="k_photo"></button></div>
       <div id="file-block" class="form">
         <label class="drop" id="drop" for="file">
-          <input type="file" id="file" accept=".stl,.3mf,.obj,.step,.stp">
+          <input type="file" id="file">
           <svg class="up-ico" viewBox="0 0 52 44" aria-hidden="true"><defs><linearGradient id="upg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B83FF"/><stop offset="1" stop-color="#FF9A32"/></linearGradient></defs>
             <path d="M14 34H12a10 10 0 0 1-1.4-19.9A14 14 0 0 1 38 11a11 11 0 0 1 2 22.7H38" fill="none" stroke="url(#upg)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M26 41V21m-7.5 7.5L26 21l7.5 7.5" fill="none" stroke="#FF9A32" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1135,6 +1135,7 @@ drop_s:['Ölçü və həcm brauzerdə hesablanır. 3MF, OBJ, STEP-i operator hes
 ph_t:['Detalın fotolarını əlavə edin','Добавьте фото детали','Додайте фото деталі','Add photos of the part'],
 ph_s:['2–5 foto müxtəlif tərəfdən, yanında xətkeş olsa yaxşıdır','2–5 фото с разных сторон, лучше с линейкой рядом','2–5 фото з різних боків, краще з лінійкою поруч','2–5 photos from different sides, ideally with a ruler'],
 f_dims:['Əsas ölçülər','Основные размеры','Основні розміри','Key measurements'],
+bad_ext:['Bu fayl modelə oxşamır. STL, 3MF, OBJ və ya STEP seçin.','Это не похоже на модель. Выберите STL, 3MF, OBJ или STEP.','Це не схоже на модель. Оберіть STL, 3MF, OBJ або STEP.','This does not look like a model. Choose STL, 3MF, OBJ or STEP.'],
 drag:['fırlat · yaxınlaşdır','вращайте · приближайте','обертайте · наближайте','drag · zoom'],
 v_over:['Asılı yerlər','Нависания','Нависання','Overhangs'],
 v_sup:['Dəstək lazımdır: səthin ~{p}% asılıdır (narıncı)','Нужны поддержки: ~{p}% поверхности нависает (оранжевым)','Потрібні підтримки: ~{p}% поверхні нависає (помаранчевим)','Needs supports: ~{p}% of the surface overhangs (orange)'],
@@ -2120,6 +2121,8 @@ function parseSTL(buf){
 }
 function loadFile(f){
   if (!f) return;
+  // iPhone greys out .stl when the picker is limited by type, so any file can be picked and checked here
+  if (!/\.(stl|3mf|obj|step|stp)$/i.test(f.name)){ $('drop-title').textContent = f.name; $('drop-sub').textContent = t('bad_ext'); $('file').value = ''; return; }
   form.modelFile = f; // the original file, uploaded to the operators after the order is created
   if (!/\.stl$/i.test(f.name)){
     form.model = {file:f.name, manual:true}; $('drop-title').textContent = f.name; $('drop-sub').textContent = t('manual_quote');
