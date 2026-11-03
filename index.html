@@ -130,6 +130,15 @@ textarea{min-height:70px;resize:vertical}
 .viewer{aspect-ratio:16/10;border-radius:12px;background:var(--bg);border:1px solid var(--line);position:relative;overflow:hidden;cursor:grab;touch-action:none}
 .viewer canvas{width:100%;height:100%;display:block}
 .viewer .vhint{position:absolute;bottom:8px;right:10px;font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.viewer .vdims{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;font:600 11.5px var(--f-mono)}
+.viewer .vdims span{padding:3px 7px;border-radius:7px;background:rgba(10,14,30,.72);color:#E9EDF6;border:1px solid rgba(255,255,255,.1)}
+.viewer .vdims i{font-style:normal;margin-right:4px}
+.viewer .vwarn{position:absolute;left:10px;bottom:30px;right:10px;display:grid;gap:4px;justify-items:start;pointer-events:none}
+.viewer .vwarn span{padding:4px 9px;border-radius:8px;font-size:12px;background:rgba(10,14,30,.8);color:#FFD28A;border:1px solid rgba(255,170,80,.35)}
+.viewer .vwarn span.ok{color:#7EE2A8;border-color:rgba(92,208,142,.35)}
+.viewer .vtools{position:absolute;right:10px;top:10px;display:flex;gap:6px}
+.viewer .vtools button{min-height:0;height:30px;padding:0 10px;border-radius:9px;font-size:12px;background:rgba(10,14,30,.72);color:#E9EDF6;border:1px solid rgba(255,255,255,.14)}
+.viewer .vtools button[aria-pressed="true"]{border-color:#FF9A2E;color:#FFB35C}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);padding:0;position:relative}
 .sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
@@ -744,7 +753,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
           <strong id="drop-title" data-i="drop_t"></strong>
           <span class="note" id="drop-sub" data-i="drop_s"></span>
         </label>
-        <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><span class="vhint" data-i="drag"></span></div>
+        <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><div class="vdims" id="v-dims"></div><div class="vwarn" id="v-warn"></div><div class="vtools"><button type="button" id="v-over" aria-pressed="true" hidden data-i="v_over"></button><button type="button" id="v-reset" aria-label="Reset">⟲</button></div><span class="vhint" data-i="drag"></span></div>
         <button type="button" class="btn-ghost" id="sample-btn" data-i="sample_btn"></button>
       </div>
       <div id="link-block" class="form" hidden>
@@ -765,7 +774,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
       <div class="row adv">
         <div class="field"><label for="f-mat" data-i="f_mat"></label>
           <select id="f-mat"><option value="PLA">PLA</option><option value="PETG">PETG</option><option value="ABS">ABS / ASA</option><option value="TPU">TPU</option></select></div>
-        <div class="field"><label for="f-qty" data-i="f_qty"></label><div class="qty-step"><button type="button" data-d="-1" aria-label="−">−</button><input type="number" id="f-qty" min="1" max="50" value="1"><button type="button" data-d="1" aria-label="+">+</button></div></div>
+        <div class="field"><label for="f-qty" data-i="f_qty"></label><div class="qty-step"><button type="button" data-d="-1" aria-label="−">−</button><input type="number" id="f-qty" min="1" max="500" value="1"><button type="button" data-d="1" aria-label="+">+</button></div></div>
       </div>
       <div class="field adv"><span class="flabel"><span data-i="f_color"></span>: <span id="color-name"></span></span><div class="swatches" id="swatches"></div><span class="note" data-i="stock_note"></span></div>
       <div class="field adv" id="q-field"><span class="flabel" data-i="f_quality"></span>
@@ -1126,7 +1135,13 @@ drop_s:['Ölçü və həcm brauzerdə hesablanır. 3MF, OBJ, STEP-i operator hes
 ph_t:['Detalın fotolarını əlavə edin','Добавьте фото детали','Додайте фото деталі','Add photos of the part'],
 ph_s:['2–5 foto müxtəlif tərəfdən, yanında xətkeş olsa yaxşıdır','2–5 фото с разных сторон, лучше с линейкой рядом','2–5 фото з різних боків, краще з лінійкою поруч','2–5 photos from different sides, ideally with a ruler'],
 f_dims:['Əsas ölçülər','Основные размеры','Основні розміри','Key measurements'],
-drag:['fırlatmaq üçün sürüşdürün','тяните, чтобы вращать','тягніть, щоб обертати','drag to rotate'],
+drag:['fırlat · yaxınlaşdır','вращайте · приближайте','обертайте · наближайте','drag · zoom'],
+v_over:['Asılı yerlər','Нависания','Нависання','Overhangs'],
+v_sup:['Dəstək lazımdır: səthin ~{p}% asılıdır (narıncı)','Нужны поддержки: ~{p}% поверхности нависает (оранжевым)','Потрібні підтримки: ~{p}% поверхні нависає (помаранчевим)','Needs supports: ~{p}% of the surface overhangs (orange)'],
+v_k2:['A1 masasından böyükdür — K2 Plus-da çap edəcəyik','Больше стола A1 — напечатаем на K2 Plus','Більше столу A1 — надрукуємо на K2 Plus','Larger than the A1 bed — we will print on the K2 Plus'],
+v_big:['{n} mm — ən böyük masamızdan böyükdür, hissələrə bölmək lazımdır','{n} мм — больше нашего самого большого стола, нужно разрезать на части','{n} мм — більше нашого найбільшого столу, треба розрізати на частини','{n} mm — larger than our biggest bed, needs to be split'],
+v_thin:['Çox nazik divar: 1,2 mm-dən az','Очень тонко: меньше 1,2 мм','Дуже тонко: менше 1,2 мм','Very thin: under 1.2 mm'],
+v_ok:['Model çapa hazırdır','Модель готова к печати','Модель готова до друку','Model is ready to print'],
 sample_btn:['Fayl yoxdur? Nümunə: masa üstü saksı','Нет файла? Пример: настольное кашпо','Немає файлу? Приклад: настільне кашпо','No file? Try a sample: desk planter'],
 f_name:['Detalın adı','Название детали','Назва деталі','Part name'],
 f_name_ph:['məs., pult qapağı','например, крышка для пульта','наприклад, кришка для пульта','e.g. remote battery cover'],
@@ -1198,6 +1213,13 @@ sp_time:['Çap, 1 əd.','Печать, 1 шт.','Друк, 1 шт.','Print time,
 sp_ready:['Hazır olacaq','Готово','Готово','Ready'],
 ready_n:['2–3 günə','через 2–3 дня','за 2–3 дні','in 2–3 days'],
 ready_f:['24 saata','за 24 часа','за 24 години','within 24 h'],
+sp_tier:['Tiraj endirimi','Скидка за тираж','Знижка за тираж','Volume discount'],
+tier_hint:['10 ədəddən −10%, 25-dən −15%, 50-dən −20%','от 10 шт −10%, от 25 −15%, от 50 −20%','від 10 шт −10%, від 25 −15%, від 50 −20%','10+ pcs −10%, 25+ −15%, 50+ −20%'],
+sp_sup:['Dəstəklər','Поддержки','Підтримки','Supports'],
+eta_today:['bu gün {t}-dək','сегодня до {t}','сьогодні до {t}','today by {t}'],
+eta_tom:['sabah {t}-dək','завтра до {t}','завтра до {t}','tomorrow by {t}'],
+eta_day:['{d}, {t}-dək','{d}, до {t}','{d}, до {t}','{d} by {t}'],
+eta_note:['növbəyə görə','с учётом очереди','з урахуванням черги','based on the queue'],
 d_loyal:['Hər 5-ci sifariş','Каждый 5-й заказ','Кожне 5-те замовлення','Every 5th order'],
 d_student:['Tələbə','Студент','Студент','Student'],
 d_promo:['Kod {c}','Код {c}','Код {c}','Code {c}'],
@@ -1451,6 +1473,9 @@ const t = (k, v={}) => { const row = T[k]; let s = row ? (row[LANGS.indexOf(lang
 const COLORS = [['col_black','#2A2D31'],['col_white','#ECECE6'],['col_grey','#8C9198'],['col_orange','#E2702F'],['col_blue','#2F5FD0'],['col_green','#3E9B5A'],['col_red','#C8372D']];
 const MATS = ['PLA','PETG','ABS','TPU'];
 const K_MAT = {PLA:1, PETG:1.2, ABS:1.4, TPU:1.8};
+// volume discount on the printing part (setup is paid once per order)
+const QTY_TIERS = [[50, 20], [25, 15], [10, 10]], QTY_MAX = 500;
+const qtyTier = q => (QTY_TIERS.find(([n]) => q >= n) || [0, 0])[1];
 const DENS = {PLA:1.24, PETG:1.27, ABS:1.05, TPU:1.21};
 const FILL = {15:.42, 30:.55, 60:.75};
 const QTIME = {draft:.75, std:1, fine:1.45};
@@ -1757,7 +1782,7 @@ setInterval(() => {
   if (r === 'live' || r === 'home' || r === 'free') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
 }, 2500);
 let LIVE = [];
-async function loadLive(){ if (!SERVER) return; loadTlWeek(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
+async function loadLive(){ if (!SERVER) return; loadTlWeek(); loadEta(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
 setInterval(loadLive, 5000);
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
@@ -1773,7 +1798,7 @@ async function detectServer(){
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
   qty:o.qty, grams:o.grams, hours:o.hours, layers:o.layers, lo:o.lo, hi:o.hi, check:o.check, comment:o.comment, pub:o.pub, copy:o.copy,
-  gift:o.gift && o.gift.to, urgent:o.urgent, student:o.student, kids:o.kids, disc:o.discName || '', discPct:o.disc || 0, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
+  gift:o.gift && o.gift.to, sup:!!o.sup, urgent:o.urgent, student:o.student, kids:o.kids, disc:o.discName || '', discPct:o.disc || 0, deliv:o.deliv, kind:o.kind, file:o.file, link:o.link, lang}, extra || {});
 // Upload a file to the order (model, reference photo or receipt) with progress; the server forwards it to the operators.
 function uploadToOrder(o, path, file, onProgress){
   return new Promise((resolve) => {
@@ -1970,13 +1995,15 @@ function discounts(){
 
 /* ---------- pricing ---------- */
 function compute(m){
-  const st = S.settings, mat = $('f-mat').value, qty = Math.max(1, Math.min(50, Math.round(+$('f-qty').value || 1)));
+  const st = S.settings, mat = $('f-mat').value, qty = Math.max(1, Math.min(QTY_MAX, Math.round(+$('f-qty').value || 1)));
   const max = Math.max(m.x, m.y, m.z), base = Math.min(m.x, m.y);
   const type = (max <= 256 && mat !== 'ABS') ? 'A1' : 'K2';
-  const grams = m.volCm3 * DENS[mat] * FILL[form.infill];
+  const sup = m.support ? 1.12 : 1; // support material and time
+  const grams = m.volCm3 * DENS[mat] * FILL[form.infill] * sup;
   const hours = Math.max(.3, grams / (type === 'K2' ? 14 : 11)) * QTIME[form.quality];
   const urg = form.urgent === '1' ? 1.5 : 1, d = discounts();
-  const raw = (grams * st.cg * K_MAT[mat] + hours * (type === 'K2' ? st.k2 : st.a1)) * qty + st.setup;
+  const vol = qtyTier(qty);
+  const raw = (grams * st.cg * K_MAT[mat] + hours * (type === 'K2' ? st.k2 : st.a1)) * qty * (1 - vol / 100) + st.setup;
   const atMin = raw * urg * (1 - d.total/100) < st.min;
   const p = Math.max(st.min, raw * urg * (1 - d.total/100)) + (form.deliv === '1' ? st.cour : 0);
   const reasons = [];
@@ -1986,7 +2013,8 @@ function compute(m){
   if (m.volCm3 < .5) reasons.push('r_tiny');
   if (m.tris > 400000) reasons.push('r_dense');
   if (!available(mat, form.color)) reasons.push('r_nostock');
-  return {atMin, mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.floor(p*.9), hi:Math.ceil(p*1.2), reasons, max, d};
+  const floor = st.min + (form.deliv === '1' ? st.cour : 0);
+  return {atMin, vol, sup: m.support, mat, qty, type, tooBig:max > 345, grams, hours, urg, p, lo:Math.max(floor, Math.floor(p*.9)), hi:Math.max(floor, Math.ceil(p*1.2)), reasons, max, d};
 }
 const discHtml = d => d.list.length ? `<div class="disc">${d.list.map(it => `<div class="${it === d.best ? '' : 'off'}"><span>${esc(it[0])}</span><span class="mono">−${it[1]}%</span></div>`).join('')}${d.list.length > 1 ? `<p class="note">${t('d_rule')}</p>` : ''}</div>` : '';
 const placeHtml = () => `<p class="err" id="place-err" hidden></p><button type="button" class="btn-primary" id="place">${t('place')}</button><p class="note">${t('place_note')}</p>${form.kind !== 'photo' ? `<p class="note" style="font-size:12px">${t('rights_by_send', {b: t('place')})}</p>` : ''}`;
@@ -2027,9 +2055,11 @@ function renderQuote(){
       <dt>${t('sp_mass')}</dt><dd>≈ ${q.grams.toFixed(0)} g</dd>
       <dt>${t('sp_time')}</dt><dd>≈ ${fmtH(q.hours)}</dd>
       <dt>${t('o_printer')}</dt><dd>${q.type === 'K2' ? 'Creality K2 Plus' : 'Bambu Lab A1'}</dd>
-      <dt>${t('sp_ready')}</dt><dd>${form.urgent === '1' ? t('ready_f') : t('ready_n')}</dd>
+      <dt>${t('sp_ready')}</dt><dd>${etaText(q.hours * q.qty, form.urgent === '1', q.reasons.length > 0)}</dd>
+      ${q.vol ? `<dt>${t('sp_tier')}</dt><dd class="good">−${q.vol}%</dd>` : q.qty > 1 ? `<dt>${t('sp_tier')}</dt><dd class="note">${t('tier_hint')}</dd>` : ''}
+      ${q.sup ? `<dt>${t('sp_sup')}</dt><dd>+12%</dd>` : ''}
     </dl>${discHtml(q.d)}${placeHtml()}
-    <div class="formula">(${(q.grams*q.qty).toFixed(0)} g × ${S.settings.cg} × ${K_MAT[q.mat]} + ${(q.hours*q.qty).toFixed(1)} h × ${q.type==='K2'?S.settings.k2:S.settings.a1} + ${S.settings.setup})${q.urg>1?' × 1.5':''}${q.d.total?` × ${(1-q.d.total/100).toFixed(2)}`:''}${form.deliv==='1'?' + '+S.settings.cour:''} ≈ ${q.p.toFixed(1)} AZN</div>${q.atMin?`<p class="note">${t('min_note',{m:S.settings.min})}</p>`:''}`;
+    <div class="formula">(${(q.grams*q.qty).toFixed(0)} g × ${S.settings.cg} × ${K_MAT[q.mat]} + ${(q.hours*q.qty).toFixed(1)} h × ${q.type==='K2'?S.settings.k2:S.settings.a1}${q.vol?` × ${(1-q.vol/100).toFixed(2)}`:''} + ${S.settings.setup})${q.urg>1?' × 1.5':''}${q.d.total?` × ${(1-q.d.total/100).toFixed(2)}`:''}${form.deliv==='1'?' + '+S.settings.cour:''} ≈ ${q.p.toFixed(1)} AZN</div>${q.atMin?`<p class="note">${t('min_note',{m:S.settings.min})}</p>`:''}`;
   bindPlace(q);
 }
 const contactOk = v => v.replace(/\D/g,'').length >= 7;
@@ -2050,7 +2080,7 @@ function bindPlace(q){
       client: $('f-cname').value.trim().slice(0,16), contact: $('f-phone').value.trim(), ch: form.notify, email: form.notify === 'email' ? $('f-email').value.trim() : undefined,
       mat: $('f-mat').value, color: form.color, qty: q ? q.qty : Math.max(1, +$('f-qty').value || 1),
       grams: q ? q.grams*q.qty : 60, hours: q ? q.hours*q.qty : 3, layers: Math.max(60, Math.round((m.z||40)/({draft:.28,std:.2,fine:.12})[form.quality])),
-      lo: q ? q.lo : null, hi: q ? q.hi : null, status:'review', progress:0, deliv:+form.deliv, mine:true,
+      lo: q ? q.lo : null, hi: q ? q.hi : null, sup: q ? !!q.sup : false, status:'review', progress:0, deliv:+form.deliv, mine:true,
       pub: form.vis === 'public', copy: form.vis === 'public' && $('f-copy').checked, gift, urgent: form.urgent === '1',
       student: $('f-student').checked, kids: $('f-kids').checked, disc: d.total, discName: d.best ? d.best[0] : '', kind: form.kind,
       check: li ? `${t('r_link')} · ${li.site}` : form.kind === 'photo' ? `${t('r_model')} · ${form.photos.length} foto · ${$('f-dims').value}` : q ? (q.reasons.length ? q.reasons.map(r=>t(r)).join(', ') : 'OK') : t('r_manual'),
@@ -2107,24 +2137,56 @@ function loadFile(f){
   r.readAsArrayBuffer(f);
 }
 
-/* ---------- 3D viewer ---------- */
+/* ---------- 3D viewer: orbit, zoom, real size, overhangs that need supports ---------- */
 let V = null;
+const OVER_COS = Math.cos(45 * Math.PI / 180); // faces steeper than 45° from vertical need supports
 function initViewer(){
   if (V || !window.THREE) return V;
   const renderer = new THREE.WebGLRenderer({canvas:$('v-canvas'), antialias:true, alpha:true});
   renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 1.6, 1, 5000);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, .9));
-  const dl = new THREE.DirectionalLight(0xffffff, .8); dl.position.set(200, 400, 300); scene.add(dl);
-  const grid = new THREE.GridHelper(256, 16, 0x9a8f7a, 0x9aa19b); grid.material.opacity = .35; grid.material.transparent = true; scene.add(grid);
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 1.6, 1, 8000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445066, .95));
+  const dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(200, 400, 300); scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0x8a80ff, .25); dl2.position.set(-300, 100, -200); scene.add(dl2);
+  const grid = new THREE.GridHelper(256, 16, 0x6b74a6, 0x3a4268); grid.material.opacity = .45; grid.material.transparent = true; scene.add(grid);
   const holder = new THREE.Group(); scene.add(holder);
-  const mat = new THREE.MeshStandardMaterial({color:0x2a2d31, roughness:.55, metalness:.05});
-  V = {renderer, scene, cam, holder, mat, mesh:null, rot:.6, drag:false, lastX:0, idle:0, dist:300, h:50};
+  const mat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:.55, metalness:.05, vertexColors:true});
+  V = {renderer, scene, cam, holder, mat, mesh:null, yaw:.6, pitch:.42, zoom:1, drag:false, lx:0, ly:0, idle:0, dist:300, h:50, over:true, pts:new Map(), pinch:0};
   const vw = $('viewer');
-  vw.addEventListener('pointerdown', e => { V.drag = true; V.lastX = e.clientX; vw.setPointerCapture(e.pointerId); vw.style.cursor = 'grabbing'; });
-  vw.addEventListener('pointermove', e => { if (!V.drag) return; V.rot += (e.clientX - V.lastX) * .01; V.lastX = e.clientX; V.idle = performance.now(); });
-  vw.addEventListener('pointerup', () => { V.drag = false; vw.style.cursor = 'grab'; });
+  vw.addEventListener('pointerdown', e => { V.pts.set(e.pointerId, [e.clientX, e.clientY]); V.drag = V.pts.size === 1; V.lx = e.clientX; V.ly = e.clientY; vw.setPointerCapture(e.pointerId); vw.style.cursor = 'grabbing'; V.idle = performance.now(); });
+  vw.addEventListener('pointermove', e => {
+    if (!V.pts.has(e.pointerId)) return; V.pts.set(e.pointerId, [e.clientX, e.clientY]); V.idle = performance.now();
+    if (V.pts.size === 2){ const [a, b] = [...V.pts.values()], d = Math.hypot(a[0]-b[0], a[1]-b[1]); if (V.pinch) V.zoom = Math.max(.35, Math.min(3, V.zoom * V.pinch / d)); V.pinch = d; return; }
+    if (!V.drag) return;
+    V.yaw += (e.clientX - V.lx) * .01; V.pitch = Math.max(-.2, Math.min(1.45, V.pitch + (e.clientY - V.ly) * .008)); V.lx = e.clientX; V.ly = e.clientY;
+  });
+  const up = e => { V.pts.delete(e.pointerId); if (V.pts.size < 2) V.pinch = 0; V.drag = false; vw.style.cursor = 'grab'; };
+  vw.addEventListener('pointerup', up); vw.addEventListener('pointercancel', up);
+  vw.addEventListener('wheel', e => { e.preventDefault(); V.zoom = Math.max(.35, Math.min(3, V.zoom * (e.deltaY > 0 ? 1.1 : .9))); V.idle = performance.now(); }, {passive:false});
+  vw.addEventListener('dblclick', () => { V.yaw = .6; V.pitch = .42; V.zoom = 1; });
+  $('v-reset').onclick = e => { e.stopPropagation(); V.yaw = .6; V.pitch = .42; V.zoom = 1; };
+  $('v-over').onclick = e => { e.stopPropagation(); V.over = !V.over; $('v-over').setAttribute('aria-pressed', V.over); paintModel(); };
+  ['pointerdown'].forEach(ev => { $('v-reset').addEventListener(ev, e => e.stopPropagation()); $('v-over').addEventListener(ev, e => e.stopPropagation()); });
   return V;
+}
+// colour every face: the chosen filament colour, overhangs in orange
+function paintModel(){
+  if (!V || !V.mesh) return;
+  const g = V.mesh.geometry, col = g.getAttribute('color'), base = new THREE.Color(COLORS[form.color][1]), hot = new THREE.Color('#FF7A2E'), flags = V.mesh.userData.over;
+  for (let i = 0; i < col.count; i++){ const c = V.over && flags && flags[(i / 3) | 0] ? hot : base; col.setXYZ(i, c.r, c.g, c.b); }
+  col.needsUpdate = true;
+}
+// overhang faces: pointing down more than 45° and not lying on the bed
+function overhangs(pos){
+  const n = pos.length / 9, flags = new Uint8Array(n); let area = 0, over = 0;
+  for (let t = 0; t < n; t++){
+    const o = t * 9, ax = pos[o], ay = pos[o+1], az = pos[o+2], ux = pos[o+3]-ax, uy = pos[o+4]-ay, uz = pos[o+5]-az, vx = pos[o+6]-ax, vy = pos[o+7]-ay, vz = pos[o+8]-az;
+    const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, len = Math.hypot(nx, ny, nz); if (!len) continue;
+    const a = len / 2; area += a;
+    const minY = Math.min(ay, pos[o+4], pos[o+7]);
+    if (ny / len < -OVER_COS && minY > .4){ flags[t] = 1; over += a; }
+  }
+  return {flags, ratio: area ? over / area : 0, area: over};
 }
 function showModel(m){
   $('viewer').hidden = false;
@@ -2132,26 +2194,41 @@ function showModel(m){
   let geo;
   if (m.lathe){
     const pts = [new THREE.Vector2(0,0)]; for (let i=0;i<=40;i++){ const k = i/40; pts.push(new THREE.Vector2(m.x/2*profile(k,'pot')/.5, k*m.z)); }
-    geo = new THREE.LatheGeometry(pts, 72);
+    geo = new THREE.LatheGeometry(pts, 72).toNonIndexed();
   } else {
-    geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
+    geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(m.pos.slice(), 3));
     if (m.zUp) geo.rotateX(-Math.PI/2);
     geo.computeBoundingBox(); const b = geo.boundingBox; geo.translate(-(b.min.x+b.max.x)/2, -b.min.y, -(b.min.z+b.max.z)/2);
   }
   geo.computeVertexNormals();
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.getAttribute('position').count * 3), 3));
   if (V.mesh){ V.holder.remove(V.mesh); V.mesh.geometry.dispose(); }
   V.mesh = new THREE.Mesh(geo, V.mat); V.holder.add(V.mesh);
+  const oh = m.lathe ? {flags:null, ratio:0, area:0} : overhangs(geo.getAttribute('position').array);
+  V.mesh.userData.over = oh.flags; m.support = oh.area > 25 && oh.ratio > .01; m.overRatio = oh.ratio;
   geo.computeBoundingSphere();
-  V.h = Math.max(m.z, 20); V.dist = Math.max(160, geo.boundingSphere.radius * 3.2);
-  V.mat.color.set(COLORS[form.color][1]);
+  V.h = Math.max(m.z, 20); V.dist = Math.max(160, geo.boundingSphere.radius * 3.2); V.yaw = .6; V.pitch = .42; V.zoom = 1;
+  $('v-over').hidden = !m.support;
+  paintModel(); viewerInfo(m);
+}
+function viewerInfo(m){
+  $('v-dims').innerHTML = `<span><i style="color:#FF6B6B">X</i>${m.x.toFixed(1)}</span><span><i style="color:#5CD08E">Y</i>${m.y.toFixed(1)}</span><span><i style="color:#7FA3FF">Z</i>${m.z.toFixed(1)} mm</span>`;
+  const w = [], max = Math.max(m.x, m.y, m.z);
+  if (max > 345) w.push(t('v_big', {n: max.toFixed(0)}));
+  else if (max > 256) w.push(t('v_k2'));
+  if (Math.min(m.x, m.y, m.z) < 1.2) w.push(t('v_thin'));
+  if (m.volCm3 < .5) w.push(t('r_tiny'));
+  if (m.support) w.push(t('v_sup', {p: Math.max(1, Math.round(m.overRatio * 100))}));
+  $('v-warn').innerHTML = w.length ? w.map(x => `<span>⚠ ${x}</span>`).join('') : m.lathe ? '' : `<span class="ok">✓ ${t('v_ok')}</span>`;
 }
 function drawViewer(now){
   if (!V || $('viewer').hidden || form.kind !== 'file') return;
   const cv = $('v-canvas'), w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
   if (cv.width !== Math.round(w*V.renderer.getPixelRatio())){ V.renderer.setSize(w, h, false); V.cam.aspect = w/h; V.cam.updateProjectionMatrix(); }
-  if (!V.drag && now - V.idle > 1500 && !reduce) V.rot += .006;
-  V.holder.rotation.y = V.rot;
-  V.cam.position.set(0, V.h*.55 + V.dist*.35, V.dist); V.cam.lookAt(0, V.h*.4, 0);
+  if (!V.drag && !V.pts.size && now - V.idle > 2500 && !reduce) V.yaw += .005;
+  V.holder.rotation.y = V.yaw;
+  const d = V.dist * V.zoom, cy = V.h * .4;
+  V.cam.position.set(0, cy + Math.sin(V.pitch) * d, Math.cos(V.pitch) * d); V.cam.lookAt(0, cy, 0);
   V.renderer.render(V.scene, V.cam);
 }
 
@@ -2163,7 +2240,7 @@ function renderSwatches(){
     const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = c;
     b.title = colorName(i); b.setAttribute('aria-label', colorName(i)); b.setAttribute('aria-pressed', i === form.color);
     b.disabled = !available(mat, i);
-    b.onclick = () => { form.color = i; renderSwatches(); if (V) V.mat.color.set(c); renderQuote(); };
+    b.onclick = () => { form.color = i; renderSwatches(); paintModel(); renderQuote(); };
     $('swatches').appendChild(b);
   });
   $('color-name').textContent = colorName(form.color) + (available(mat, form.color) ? '' : ' · ' + t('r_nostock'));
@@ -2385,6 +2462,22 @@ const srvCard = (x) => `<div class="lcard"><div class="screen">${x.cam ? `<img d
   <div class="body"><div class="meta"><b>${esc(x.name || x.id)}</b><span class="mono" data-lp="${x.id}">${x.percent}%</span></div>
   <div class="meta"><span class="note" data-ll="${x.id}">${t('o_layer')} ${x.layer}/${x.layers}</span><span class="note mono" data-lr="${x.id}">${fmtH((x.remaining || 0) / 60)}</span></div></div></div>`;
 let liveShape = '';
+/* estimated ready time: queue of the workshop + this print; printers run day and night, hand-over 10:00–21:00 */
+let ETA = {backlog: 0, printers: 4}, etaAt = 0;
+async function loadEta(){ if (!SERVER || Date.now() - etaAt < 60000) return; etaAt = Date.now(); try { ETA = await api('/api/eta'); if (route() === 'new') renderQuote(); } catch(e){} }
+function etaText(hours, urgent, review){
+  const wait = urgent ? 0 : (ETA.backlog || 0) / Math.max(1, ETA.printers || 1);
+  let t0 = Date.now() + (review ? 2 : 1) * 3600e3 + (wait + hours + .5) * 3600e3;
+  // Baku wall clock: ready parts are handed over 10:00–21:00
+  let b = new Date(t0 + BAKU_MS), hh = b.getUTCHours() + b.getUTCMinutes() / 60;
+  if (hh >= 21) { b = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate() + 1, 12)); }
+  else if (hh < 10) { b = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate(), 12)); }
+  else b = new Date(Math.ceil(b.getTime() / 3600e3) * 3600e3);
+  const now = new Date(Date.now() + BAKU_MS), day = (x) => Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
+  const dd = Math.round((day(b) - day(now)) / 864e5), tm = String(b.getUTCHours()).padStart(2, '0') + ':00';
+  const txt = dd <= 0 ? t('eta_today', {t: tm}) : dd === 1 ? t('eta_tom', {t: tm}) : t('eta_day', {t: tm, d: b.toLocaleDateString(LOCALE[lang] || 'ru', {weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC'})});
+  return `≈ ${txt}${SERVER ? ` <span class="note">· ${t('eta_note')}</span>` : ''}`;
+}
 /* real timelapses: built by the workshop bridge after each print */
 let TLW = [], tlwAt = 0;
 async function loadTlWeek(){ if (!SERVER || Date.now() - tlwAt < 60000) return; tlwAt = Date.now(); try { const r = await api('/api/tl/week'); const ch = JSON.stringify(r) !== JSON.stringify(TLW); TLW = r; if (ch){ liveShape = ''; if (route() === 'live') renderLive(); } } catch(e){} }

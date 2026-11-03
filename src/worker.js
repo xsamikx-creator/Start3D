@@ -156,6 +156,7 @@ function opText(o) {
     d.comment ? `Комментарий: «${esc(d.comment)}»` : '',
     d.files?.length ? `📎 Файлы: ${d.files.map((f) => esc(f.name)).join(', ')} (ниже в чате)` : '',
     d.receipt ? '🧾 Чек приложен (ниже в чате)' : '',
+    d.sup ? '🧩 По модели нужны поддержки (сайт заложил +12% пластика)' : '',
     d.deliv ? '🚚 Курьер по Баку: +3 AZN (входит в цену)' : '🏠 Самовывоз',
     d.free ? '🎁 <b>Бесплатная печать дня</b> — цена 0, лимит 105 г / 4 ч, PLA' : '',
     d.disc ? `Скидка на сайте: −${d.discPct || 0}% (${esc(d.disc)})` : '',
@@ -225,7 +226,7 @@ async function createOrder(env, req, origin) {
   const seq = await env.DB.prepare("INSERT INTO kv(k,v) VALUES('seq','1031') ON CONFLICT(k) DO UPDATE SET v=CAST(v AS INTEGER)+1 RETURNING v").first();
   const id = 'S3D-' + seq.v, code = rnd(6), t = now();
   const data = {
-    name: clip(b.name, 80), mat: clip(b.mat, 8), colorName: clip(b.colorName, 20), color: Math.max(0, Math.min(6, +b.color || 0)), layers: Math.max(1, Math.min(5000, +b.layers || 200)), qty: Math.max(1, Math.min(50, +b.qty || 1)),
+    name: clip(b.name, 80), mat: clip(b.mat, 8), colorName: clip(b.colorName, 20), color: Math.max(0, Math.min(6, +b.color || 0)), layers: Math.max(1, Math.min(5000, +b.layers || 200)), qty: Math.max(1, Math.min(500, +b.qty || 1)), sup: !!b.sup,
     grams: +b.grams || 0, hours: +b.hours || 0, check: clip(b.check, 200), comment: clip(b.comment, 500),
     pub: !!b.pub, copy: !!b.copy, gift: b.gift ? clip(b.gift, 16) : null, urgent: !!b.urgent, student: !!b.student, kids: !!b.kids,
     disc: clip(b.disc, 120) || null, discPct: Math.max(0, Math.min(30, Math.round(+b.discPct || 0))), phone9: normPhone(contact),
@@ -946,6 +947,15 @@ async function tlMedia(env, req, url, tid, kind) {
   return new Response(buf.slice(a0, a1 + 1), { status: 206, headers: { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a0}-${a1}/${size}`, 'content-length': String(a1 - a0 + 1), 'cache-control': cache } });
 }
 // The public reel: finished public and free prints of the last 7 days.
+// Hours of printing waiting in the workshop (paid or about to be paid, plus what is still printing).
+async function etaInfo(env) {
+  const rs = await env.DB.prepare("SELECT id, status, data FROM orders WHERE status IN ('pay','paycheck','queue','printing') AND updated_at > ?").bind(now() - 14 * 864e5).all();
+  const pr = await env.DB.prepare('SELECT order_id, status FROM printers WHERE order_id IS NOT NULL').all();
+  const left = Object.fromEntries(pr.results.map((r) => [r.order_id, (JSON.parse(r.status || '{}').remaining || 0) / 60]));
+  let backlog = 0;
+  for (const r of rs.results) { const d = JSON.parse(r.data || '{}'); backlog += r.status === 'printing' ? (left[r.id] ?? (+d.hours || 0) / 2) : (+d.hours || 0); }
+  return new Response(JSON.stringify({ backlog: Math.round(backlog * 10) / 10, printers: PRINTERS.length }), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' } });
+}
 async function tlWeek(env) {
   const rs = await env.DB.prepare("SELECT t.id, t.pid, t.dur, t.created_at, t.ended, t.started, t.thumb_id, o.id AS oid, o.client, o.data FROM timelapses t JOIN orders o ON o.id = t.order_id WHERE t.state='FINISH' AND t.file_id IS NOT NULL AND t.created_at > ? ORDER BY t.id DESC LIMIT 40").bind(now() - 7 * 864e5).all();
   const out = [], seen = new Set();
@@ -1332,6 +1342,7 @@ export default {
       if (seenOrigin !== origin){ seenOrigin = origin; ctx.waitUntil(kvSet(env, 'origin', origin)); }
       if (p === '/api/live') return liveList(env);
       if (p === '/api/tl/week') return tlWeek(env);
+      if (p === '/api/eta') return etaInfo(env);
       let tlm = p.match(/^\/api\/tl\/(\d+)\/(video|poster)$/);
       if (tlm) return tlMedia(env, req, url, +tlm[1], tlm[2]);
       tlm = p.match(/^\/api\/bridge\/job(file)?\/(\d+)$/);
