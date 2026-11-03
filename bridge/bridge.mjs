@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
+import dgram from 'node:dgram';
 import mqtt from 'mqtt';
 
 const cfgPath = new URL('./config.json', import.meta.url);
@@ -267,6 +268,30 @@ function videoStreamer(p) {
     if (want) { idle = 0; if (!ff) start(); }
     else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
   }, 2000);
+}
+
+/* ---------- printer IP changed (router gave a new address): find it by serial number and restart ---------- */
+// Bambu printers announce themselves on the local network (SSDP on UDP 2021) with their serial number and IP,
+// the same way Bambu Studio finds them. When a printer shows up with a new IP, the bridge saves it to config.json and restarts.
+function watchPrinterIps() {
+  const bambu = (cfg.printers || []).filter((p) => p.type === 'bambu' && p.serial);
+  if (!bambu.length) return;
+  const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  sock.on('error', (e) => log('сеть', 'поиск принтеров недоступен:', e.message));
+  sock.on('message', (msg, rinfo) => {
+    const t = msg.toString();
+    const usn = (t.match(/^USN:\s*(\S+)/im) || [])[1], loc = (t.match(/^Location:\s*([\d.]+)/im) || [])[1] || rinfo.address;
+    const p = bambu.find((x) => x.serial === usn);
+    if (!p || !loc || loc === p.ip) return;
+    log(p.id, `принтер теперь по адресу ${loc} (был ${p.ip}) — сохраняю в config.json и перезапускаю мост`);
+    try {
+      const raw = fs.readFileSync(cfgPath, 'utf8');
+      const fixed = raw.split(`"${p.ip}"`).join(`"${loc}"`); // only the "ip" value; a separate camera keeps its own address
+      fs.writeFileSync(cfgPath, fixed);
+    } catch (e) { log(p.id, 'не смог записать config.json:', e.message); return; }
+    setTimeout(() => process.exit(0), 500);
+  });
+  sock.bind(2021, () => { try { sock.setBroadcast(true); sock.addMembership('239.255.255.250'); } catch {} });
 }
 
 /* ---------- auto print: the operator presses "Печать" → slice with Bambu Studio → upload to the printer → start ---------- */
@@ -585,6 +610,7 @@ function tlCleanup() {
 
 /* ---------- start ---------- */
 console.log(`Start3D мост → ${SERVER}`);
+watchPrinterIps();
 pollBusy(); setInterval(pollBusy, 5000);
 for (const p of cfg.printers || []) {
   if (!p.id || (!p.ip && !p.video)) continue;
