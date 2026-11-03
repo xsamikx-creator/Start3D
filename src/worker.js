@@ -373,7 +373,26 @@ async function bridgeVSeg(env, req, url, pid) {
 // Camera rotation per printer; operators change it with /rotate in the operators chat.
 const DEFAULT_ROTATE = { 'a1-1': 'ccw' };
 // Which printers have an order that is printing right now (the bridge records video only for those).
-async function bridgeBusy(env) {
+const ago = (t) => { if (!t) return 'никогда'; const s = Math.round((now() - +t) / 1000); return s < 90 ? `${s} с назад` : s < 5400 ? `${Math.round(s / 60)} мин назад` : `${Math.round(s / 3600)} ч назад`; };
+async function bridgeReport(env) {
+  const seen = await kvGet(env, 'bridge_seen'), start = await kvGet(env, 'bridge_start');
+  const online = seen && now() - +seen < 30000;
+  const lines = [online ? `🟢 Мост на связи (${ago(seen)}), запущен ${ago(start)}` : `🔴 Мост не на связи: последний раз ${ago(seen)}.\nПроверьте, что ноутбук не спит, есть интернет и открыто окно start.bat.`];
+  for (const pr of PRINTERS) {
+    const r = await env.DB.prepare('SELECT status, frame_at, updated_at FROM printers WHERE id=?').bind(pr.id).first();
+    const v = await env.DB.prepare('SELECT MAX(at) AS at FROM vid_seg WHERE pid=?').bind(pr.id).first();
+    if (!r && !v?.at) continue;
+    const st = JSON.parse(r?.status || '{}');
+    lines.push(`${pr.name}: ${st.state || '—'} (статус ${ago(st.at || r?.updated_at)}), кадр ${ago(r?.frame_at)}${v?.at ? `, видео ${ago(v.at)}` : ''}`);
+  }
+  if (online) lines.push('Перезапустить мост: /bridge restart');
+  return lines.join('\n');
+}
+async function bridgeBusy(env, req) {
+  await kvSet(env, 'bridge_seen', now());
+  // a new bridge instance: remember when the server first saw it (server clock, the laptop's clock may differ)
+  const bs = req?.headers.get('x-bridge-start') || '';
+  if (bs && bs !== (await kvGet(env, 'bridge_inst'))) { await kvSet(env, 'bridge_inst', bs); await kvSet(env, 'bridge_start', now()); }
   const rs = await env.DB.prepare("SELECT p.id, p.order_id FROM printers p JOIN orders o ON o.id = p.order_id WHERE o.status='printing'").all();
   const orders = Object.fromEntries(rs.results.map((r) => [r.id, r.order_id]));
   const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
@@ -381,7 +400,7 @@ async function bridgeBusy(env) {
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
   const rotate = {};
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
-  return json({ busy: [...busy], rotate, orders, jobs: await jobsForBridge(env) });
+  return json({ busy: [...busy], rotate, orders, jobs: await jobsForBridge(env), restart: +((await kvGet(env, 'bridge_restart')) || 0) > +((await kvGet(env, 'bridge_start')) || 0) });
 }
 const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
@@ -587,13 +606,19 @@ async function onUpdate(env, u, origin) {
     await kvSet(env, 'operator_chat', chat.id);
     await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: chat.id }, commands: [
       { command: 'panel', description: 'Вход в панель оператора на сайте' }, { command: 'cam', description: 'Камеры принтеров' },
-      { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' }, { command: 'rotate', description: 'Поворот камеры' } ] });
+      { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' }, { command: 'rotate', description: 'Поворот камеры' }, { command: 'bridge', description: 'Мост: состояние и перезапуск' } ] });
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
   if (/^\/draw(@\w+)?$/.test(text)) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const r = await drawFree(env, origin, bakuDay(now()), true);
     return r.posted ? undefined : say(r.msg);
+  }
+  const br = text.match(/^\/bridge(?:@\w+)?(?:\s+(restart))?$/i);
+  if (br) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    if (br[1]) { await kvSet(env, 'bridge_restart', now()); return say('🔄 Команда отправлена: мост перезапустится в течение 10 секунд и заодно обновится. Проверить: /bridge'); }
+    return say(await bridgeReport(env));
   }
   const rot = text.match(/^\/rotate(?:@\w+)?(?:\s+(\S+))?(?:\s+(0|ccw|cw|180))?$/i);
   if (rot) {
@@ -1319,7 +1344,7 @@ export default {
       if (b) return camChunks(env, url, b[1]);
       b = p.match(/^\/api\/cam\/([a-z0-9-]+)\/chunk\/(\d+)$/);
       if (b) return camChunk(env, url, b[1], +b[2]);
-      if (p === '/api/bridge/busy') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeBusy(env); }
+      if (p === '/api/bridge/busy') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeBusy(env, req); }
       b = p.match(/^\/api\/bridge\/(vinit|vseg)\/([a-z0-9-]+)$/);
       if (b && req.method === 'POST') {
         if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403);

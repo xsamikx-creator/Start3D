@@ -50,12 +50,14 @@ async function post(url, body, type = 'application/json') {
 
 // Printers with an order in "printing" on the site (used for cameras of printers without a status connection).
 const BUSY = new Set();
+const BRIDGE_START = Date.now();
 const ORDERS = {}; // printer id → order printing on it now (from the site)
 const ROTATE = {}; // printer id → '0' | 'ccw' | 'cw' | '180' (set from the bot with /rotate, or "rotate" in config.json)
 async function pollBusy() {
   try {
-    const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}` } });
-    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {}); for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const jb of j.jobs || []) autoJob(jb); }
+    const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}`, 'x-bridge-start': String(BRIDGE_START) } });
+    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {});
+      if (j.restart === true) { console.log(new Date().toLocaleTimeString(), 'Команда из бота: перезапуск моста'); process.exit(0); } for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const jb of j.jobs || []) autoJob(jb); }
   } catch {}
 }
 const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');
