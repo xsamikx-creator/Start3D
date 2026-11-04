@@ -456,7 +456,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .drop strong{color:#fff;font-size:16px}
 .up-ico{width:52px;height:44px;display:none}
 [data-skin="c"] .up-ico{display:block}
-[data-skin="c"] .viewer{background:#0E1428;border-color:var(--line);border-radius:var(--r-lg)}
+[data-skin="c"] .viewer{background:radial-gradient(120% 90% at 50% 30%,#2A3560 0%,#18203C 60%,#111830 100%);border-color:var(--line);border-radius:var(--r-lg)}
 [data-skin="c"] #sample-btn{justify-content:flex-start;gap:10px;background:rgba(18,24,43,.7);border-color:var(--line);color:var(--ink-2);font-weight:500}
 [data-skin="c"] #sample-btn::before{content:"";width:20px;height:20px;flex:none;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF982F' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M12 2 3 7v10l9 5 9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5M12 12v10'/%3E%3C/svg%3E")}
 [data-skin="c"] #sample-btn::after{content:"›";margin-left:auto;font-size:20px;color:var(--ink-2)}
@@ -2148,12 +2148,16 @@ function initViewer(){
   const renderer = new THREE.WebGLRenderer({canvas:$('v-canvas'), antialias:true, alpha:true});
   renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 1.6, 1, 8000);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x445066, .95));
-  const dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(200, 400, 300); scene.add(dl);
-  const dl2 = new THREE.DirectionalLight(0x8a80ff, .25); dl2.position.set(-300, 100, -200); scene.add(dl2);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  // studio light: soft fill all around, a key light that follows the camera, a top light and a warm rim
+  scene.add(new THREE.AmbientLight(0xffffff, .3));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a6280, .7));
+  const key = new THREE.DirectionalLight(0xffffff, 1.25); key.position.set(80, 120, 200); cam.add(key); scene.add(cam);
+  const top = new THREE.DirectionalLight(0xffffff, .6); top.position.set(0, 500, 0); scene.add(top);
+  const rim = new THREE.DirectionalLight(0xffc89a, .45); rim.position.set(-300, 150, -250); scene.add(rim);
   const grid = new THREE.GridHelper(256, 16, 0x6b74a6, 0x3a4268); grid.material.opacity = .45; grid.material.transparent = true; scene.add(grid);
   const holder = new THREE.Group(); scene.add(holder);
-  const mat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:.55, metalness:.05, vertexColors:true});
+  const mat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:.6, metalness:0, vertexColors:true});
   V = {renderer, scene, cam, holder, mat, mesh:null, yaw:.6, pitch:.42, zoom:1, drag:false, lx:0, ly:0, idle:0, dist:300, h:50, over:true, pts:new Map(), pinch:0};
   const vw = $('viewer');
   vw.addEventListener('pointerdown', e => { V.pts.set(e.pointerId, [e.clientX, e.clientY]); V.drag = V.pts.size === 1; V.lx = e.clientX; V.ly = e.clientY; vw.setPointerCapture(e.pointerId); vw.style.cursor = 'grabbing'; V.idle = performance.now(); });
@@ -2176,6 +2180,8 @@ function initViewer(){
 function paintModel(){
   if (!V || !V.mesh) return;
   const g = V.mesh.geometry, col = g.getAttribute('color'), base = new THREE.Color(COLORS[form.color][1]), hot = new THREE.Color('#FF7A2E'), flags = V.mesh.userData.over;
+  const hsl = {}; base.getHSL(hsl); if (hsl.l < .3) base.setHSL(hsl.h, hsl.s, .3); // black PLA would be a silhouette
+  base.convertSRGBToLinear(); hot.convertSRGBToLinear();
   for (let i = 0; i < col.count; i++){ const c = V.over && flags && flags[(i / 3) | 0] ? hot : base; col.setXYZ(i, c.r, c.g, c.b); }
   col.needsUpdate = true;
 }
