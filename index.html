@@ -137,6 +137,10 @@ textarea{min-height:70px;resize:vertical}
 .viewer .vwarn span{padding:4px 9px;border-radius:8px;font-size:12px;background:rgba(10,14,30,.8);color:#FFD28A;border:1px solid rgba(255,170,80,.35)}
 .viewer .vwarn span.ok{color:#7EE2A8;border-color:rgba(92,208,142,.35)}
 .viewer .vtools{position:absolute;right:10px;top:10px;display:flex;gap:6px}
+/* viewer backdrops: studio (light, default), dusk, night */
+[data-skin] .viewer[data-bg="studio"]{background:radial-gradient(120% 95% at 50% 25%,#F4F6FB 0%,#D9DFEB 55%,#B9C2D4 100%)}
+[data-skin] .viewer[data-bg="dusk"]{background:radial-gradient(120% 95% at 50% 25%,#5A6690 0%,#3A4470 55%,#262E52 100%)}
+.viewer[data-bg="studio"] .vhint{color:#5A6380}
 .viewer .vtools button{min-height:0;height:30px;padding:0 10px;border-radius:9px;font-size:12px;background:rgba(10,14,30,.72);color:#E9EDF6;border:1px solid rgba(255,255,255,.14)}
 .viewer .vtools button[aria-pressed="true"]{border-color:#FF9A2E;color:#FFB35C}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
@@ -456,7 +460,7 @@ video.camimg{object-fit:contain;background:#0A0C0F} /* show the whole frame, als
 [data-skin="c"] .drop strong{color:#fff;font-size:16px}
 .up-ico{width:52px;height:44px;display:none}
 [data-skin="c"] .up-ico{display:block}
-[data-skin="c"] .viewer{background:radial-gradient(120% 90% at 50% 30%,#2A3560 0%,#18203C 60%,#111830 100%);border-color:var(--line);border-radius:var(--r-lg)}
+[data-skin="c"] .viewer{background:radial-gradient(120% 90% at 50% 30%,#2A3560 0%,#18203C 60%,#111830 100%);transition:background .3s;border-color:var(--line);border-radius:var(--r-lg)}
 [data-skin="c"] #sample-btn{justify-content:flex-start;gap:10px;background:rgba(18,24,43,.7);border-color:var(--line);color:var(--ink-2);font-weight:500}
 [data-skin="c"] #sample-btn::before{content:"";width:20px;height:20px;flex:none;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF982F' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M12 2 3 7v10l9 5 9-5V7z'/%3E%3Cpath d='M3 7l9 5 9-5M12 12v10'/%3E%3C/svg%3E")}
 [data-skin="c"] #sample-btn::after{content:"›";margin-left:auto;font-size:20px;color:var(--ink-2)}
@@ -753,7 +757,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
           <strong id="drop-title" data-i="drop_t"></strong>
           <span class="note" id="drop-sub" data-i="drop_s"></span>
         </label>
-        <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><div class="vdims" id="v-dims"></div><div class="vwarn" id="v-warn"></div><div class="vtools"><button type="button" id="v-over" aria-pressed="true" hidden data-i="v_over"></button><button type="button" id="v-reset" aria-label="Reset">⟲</button></div><span class="vhint" data-i="drag"></span></div>
+        <div class="viewer" id="viewer" hidden><canvas id="v-canvas"></canvas><div class="vdims" id="v-dims"></div><div class="vwarn" id="v-warn"></div><div class="vtools"><button type="button" id="v-over" aria-pressed="true" hidden data-i="v_over"></button><button type="button" id="v-bg" aria-label="Background" title="Фон"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button><button type="button" id="v-reset" aria-label="Reset">⟲</button></div><span class="vhint" data-i="drag"></span></div>
         <button type="button" class="btn-ghost" id="sample-btn" data-i="sample_btn"></button>
       </div>
       <div id="link-block" class="form" hidden>
@@ -2156,6 +2160,7 @@ function initViewer(){
   const top = new THREE.DirectionalLight(0xffffff, .6); top.position.set(0, 500, 0); scene.add(top);
   const rim = new THREE.DirectionalLight(0xffc89a, .45); rim.position.set(-300, 150, -250); scene.add(rim);
   const grid = new THREE.GridHelper(256, 16, 0x6b74a6, 0x3a4268); grid.material.opacity = .45; grid.material.transparent = true; scene.add(grid);
+  const bgs = ['studio', 'dusk', 'night'], setBg = (b) => { V.bg = b; $('viewer').dataset.bg = b; const light = b === 'studio'; grid.material.opacity = light ? .7 : .45; grid.material.color.set(light ? 0x8f98b0 : 0x3a4268); try { localStorage.setItem('s3d-vbg', b); } catch(e){} };
   const holder = new THREE.Group(); scene.add(holder);
   const mat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:.6, metalness:0, vertexColors:true});
   V = {renderer, scene, cam, holder, mat, mesh:null, yaw:.6, pitch:.42, zoom:1, drag:false, lx:0, ly:0, idle:0, dist:300, h:50, over:true, pts:new Map(), pinch:0};
@@ -2174,6 +2179,10 @@ function initViewer(){
   $('v-reset').onclick = e => { e.stopPropagation(); V.yaw = .6; V.pitch = .42; V.zoom = 1; };
   $('v-over').onclick = e => { e.stopPropagation(); V.over = !V.over; $('v-over').setAttribute('aria-pressed', V.over); paintModel(); };
   ['pointerdown'].forEach(ev => { $('v-reset').addEventListener(ev, e => e.stopPropagation()); $('v-over').addEventListener(ev, e => e.stopPropagation()); });
+  let bg0 = 'studio'; try { bg0 = localStorage.getItem('s3d-vbg') || 'studio'; } catch(e){}
+  setBg(bgs.includes(bg0) ? bg0 : 'studio');
+  $('v-bg').onclick = e => { e.stopPropagation(); setBg(bgs[(bgs.indexOf(V.bg) + 1) % bgs.length]); };
+  $('v-bg').addEventListener('pointerdown', e => e.stopPropagation());
   return V;
 }
 // colour every face: the chosen filament colour, overhangs in orange
