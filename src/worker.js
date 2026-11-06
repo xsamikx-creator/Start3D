@@ -343,7 +343,11 @@ async function bridgeChunk(env, req, url, pid) {
    The bridge uploads an init segment per ffmpeg session and ~4 s media segments. Viewers only see segments
    that arrived at least DELAY ago, so playback always has footage ready and stays smooth. */
 const delayOf = (env, preview) => preview ? 6000 : Number(env.STREAM_DELAY_MS) || STREAM_DELAY_MS;
+// The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
+const CAM_HOME = 'a1-1';
+async function camSrc(env, pid) { return (await kvGet(env, 'camsrc:' + pid)) || pid; }
 async function videoState(env, pid, preview) {
+  pid = await camSrc(env, pid); if (pid === '-') return { on: false };
   const r = await env.DB.prepare('SELECT MIN(at) AS first, MAX(at) AS last FROM vid_seg WHERE pid=?').bind(pid).first();
   if (!r?.last || now() - r.last > 30000) return { on: false };
   const d = delayOf(env, preview);
@@ -399,11 +403,14 @@ async function bridgeBusy(env, req) {
   const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
   const busy = new Set(rs.results.map((r) => r.id));
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
+  for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-' && busy.has(pr.id)) { busy.add(src); if (orders[pr.id]) orders[src] = orders[pr.id]; } }
   const rotate = {};
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
+  // the moved camera keeps the rotation set for the printer it now films
+  for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-') { const r = await kvGet(env, 'rotate:' + pr.id); if (r) rotate[src] = r; } }
   return json({ busy: [...busy], rotate, orders, jobs: await jobsForBridge(env), restart: +((await kvGet(env, 'bridge_restart')) || 0) > +((await kvGet(env, 'bridge_start')) || 0) });
 }
-const visibleSegs = (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(pid, since, now() - delayOf(env, preview)).all();
+const visibleSegs = async (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(await camSrc(env, pid), since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
   const rs = await visibleSegs(env, pid, Math.round(+url.searchParams.get('since') || 0), a.preview);
@@ -411,13 +418,13 @@ async function camVList(env, url, pid) {
 }
 async function camVInit(env, url, pid, sess) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
-  const r = await env.DB.prepare('SELECT data FROM vid_init WHERE pid=? AND sess=?').bind(pid, sess).first();
+  const r = await env.DB.prepare('SELECT data FROM vid_init WHERE pid=? AND sess=?').bind(await camSrc(env, pid), sess).first();
   if (!r) return new Response('gone', { status: 404 });
   return new Response(new Uint8Array(r.data), { headers: { 'content-type': 'video/mp4', 'cache-control': 'private, max-age=3600' } });
 }
 async function camVSeg(env, url, pid, n) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
-  const r = await env.DB.prepare('SELECT data FROM vid_seg WHERE pid=? AND n=?').bind(pid, n).first();
+  const r = await env.DB.prepare('SELECT data FROM vid_seg WHERE pid=? AND n=?').bind(await camSrc(env, pid), n).first();
   if (!r) return new Response('gone', { status: 404 });
   return new Response(new Uint8Array(r.data), { headers: { 'content-type': 'video/iso.segment', 'cache-control': 'private, max-age=600' } });
 }
@@ -614,6 +621,15 @@ async function onUpdate(env, u, origin) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const r = await drawFree(env, origin, bakuDay(now()), true);
     return r.posted ? undefined : say(r.msg);
+  }
+  const ct = text.match(/^\/camto(?:@\w+)?(?:\s+(\S+))?$/i);
+  if (ct) {
+    if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
+    const arg = String(ct[1] || '').toLowerCase().replace(/\s/g, ''), pr = PRINTERS.find((x) => x.id === arg || x.name.toLowerCase().replace(/[\s#]/g, '') === arg.replace('#', ''));
+    if (!pr) return say(`IP-камера сейчас у: ${await (async () => { for (const x of PRINTERS) if ((await camSrc(env, x.id)) === CAM_HOME && x.id !== CAM_HOME) return x.name; return printerName(CAM_HOME); })()}\nПеренести: /camto k2 · /camto a1-2 · вернуть: /camto a1-1`);
+    for (const x of PRINTERS) await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('camsrc:' + x.id).run();
+    if (pr.id !== CAM_HOME) { await kvSet(env, 'camsrc:' + pr.id, CAM_HOME); await kvSet(env, 'camsrc:' + CAM_HOME, '-'); }
+    return say(pr.id === CAM_HOME ? `📷 IP-камера снова снимает ${pr.name}.` : `📷 IP-камера теперь показывает ${pr.name}: клиент заказа на ${pr.name} увидит видео, когда заказ «Печатается».\nПоставьте камеру на ${pr.name}; поворот картинки: /rotate ${pr.id} …\nВернуть: /camto ${CAM_HOME}`);
   }
   const br = text.match(/^\/bridge(?:@\w+)?(?:\s+(restart))?$/i);
   if (br) {
@@ -879,7 +895,7 @@ async function bridgeTl(env, req, url, pid) {
   const started = +q('started') || 0, ended = +q('ended') || now(), state = clip(q('state') || 'FINISH', 12), task = clip(q('task'), 80), dur = +q('dur') || null;
   // Which order was on this printer: the one the bridge saw while printing, else the printer's current order, else the latest one sent to it.
   let o = null; const want = clip(q('order'), 20);
-  if (want){ const x = await getOrder(env, want); if (x && JSON.parse(x.data || '{}').printer === pid) o = x; }
+  if (want){ const x = await getOrder(env, want), xp = x && JSON.parse(x.data || '{}').printer; if (x && (xp === pid || (xp && (await camSrc(env, xp)) === pid))) o = x; }
   if (!o){ const pr = await env.DB.prepare('SELECT order_id FROM printers WHERE id=?').bind(pid).first(); if (pr?.order_id) o = await getOrder(env, pr.order_id); }
   if (!o && started) o = await env.DB.prepare("SELECT * FROM orders WHERE json_extract(data,'$.printer')=? AND status IN ('printing','post','ready','done') AND updated_at >= ? ORDER BY updated_at DESC LIMIT 1").bind(pid, started - 3600e3).first();
   const mins = started ? Math.round((ended - started) / 60000) : 0;
