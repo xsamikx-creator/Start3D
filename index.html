@@ -3479,7 +3479,12 @@ if (TG){
   TG.on('back_button_pressed', () => { if (history.length > 1) history.back(); else location.hash = 'home'; });
   // links to other sites open outside the Mini App; t.me links open right in Telegram
   document.addEventListener('click', e => {
-    const a = e.target.closest('a[href^="http"]'); if (!a || a.host === location.host) return;
+    const a = e.target.closest('a[href]'); if (!a || a.hasAttribute('download') || a.dataset.dl) return;
+    if (!/^https?:$/.test(a.protocol)) return; // tel:, mailto: as usual
+    if (a.host === location.host){ // our own pages (e.g. «Как у клиента») stay inside the Mini App; «Назад» returns
+      if (a.target === '_blank'){ e.preventDefault(); location.href = a.href; }
+      return;
+    }
     e.preventDefault();
     if (/^(www\.)?t\.me$/.test(a.host)) TG.post('web_app_open_tg_link', {path_full: a.pathname + a.search});
     else TG.post('web_app_open_link', {url: a.href});
