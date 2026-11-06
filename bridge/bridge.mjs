@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import dgram from 'node:dgram';
+import net from 'node:net';
 import mqtt from 'mqtt';
 
 const cfgPath = new URL('./config.json', import.meta.url);
@@ -268,6 +269,90 @@ function videoStreamer(p) {
     if (want) { idle = 0; if (!ff) start(); }
     else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
   }, 2000);
+}
+
+/* ---------- Creality K2 Plus / K1 (Creality OS): status over the printer's WebSocket on port 9999 ---------- */
+// A tiny WebSocket client (text frames, ping/pong) so no extra package is needed.
+function wsOpen(host, port, onText, onOpen, onClose) {
+  const sock = net.connect({ host, port, timeout: 15000 });
+  const key = crypto.randomBytes(16).toString('base64');
+  let buf = Buffer.alloc(0), open = false, closed = false;
+  const close = (why) => { if (closed) return; closed = true; try { sock.destroy(); } catch {} onClose(why); };
+  const frame = (op, payload) => {
+    const mask = crypto.randomBytes(4), n = payload.length;
+    const head = n < 126 ? Buffer.from([0x80 | op, 0x80 | n]) : n < 65536 ? Buffer.from([0x80 | op, 0x80 | 126, n >> 8, n & 255]) : null;
+    if (!head) return;
+    const body = Buffer.from(payload); for (let i = 0; i < n; i++) body[i] ^= mask[i & 3];
+    sock.write(Buffer.concat([head, mask, body]));
+  };
+  const send = (text) => { if (open) frame(1, Buffer.from(text)); };
+  sock.on('connect', () => sock.write(`GET / HTTP/1.1\r\nHost: ${host}:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`));
+  sock.on('timeout', () => { if (!open) close('нет ответа'); });
+  sock.on('error', (e) => close(e.message));
+  sock.on('close', () => close('соединение закрыто'));
+  sock.on('data', (d) => {
+    buf = Buffer.concat([buf, d]);
+    if (!open) {
+      const i = buf.indexOf('\r\n\r\n'); if (i < 0) return;
+      if (!/^HTTP\/1\.1 101/.test(buf.toString('latin1', 0, 12))) return close('принтер не принял WebSocket');
+      buf = buf.subarray(i + 4); open = true; sock.setTimeout(0); onOpen(send);
+    }
+    while (buf.length >= 2) {
+      const op = buf[0] & 15; let n = buf[1] & 127, off = 2;
+      if (n === 126) { if (buf.length < 4) return; n = buf.readUInt16BE(2); off = 4; }
+      else if (n === 127) { if (buf.length < 10) return; n = Number(buf.readBigUInt64BE(2)); off = 10; }
+      const masked = buf[1] & 128; if (masked) off += 4;
+      if (buf.length < off + n) return;
+      let pl = buf.subarray(off, off + n);
+      if (masked) { const m = buf.subarray(off - 4, off); pl = Buffer.from(pl); for (let i = 0; i < n; i++) pl[i] ^= m[i & 3]; }
+      buf = buf.subarray(off + n);
+      if (op === 1) onText(pl.toString('utf8')); else if (op === 9) frame(10, pl); else if (op === 8) return close('принтер закрыл соединение');
+    }
+  });
+  return { close: () => close('stop') };
+}
+// Creality "state" codes → the same states the Bambu printers report (the site and timelapses understand those)
+const CR_STATE = { 0: 'IDLE', 1: 'RUNNING', 2: 'FINISH', 3: 'FAILED', 4: 'FAILED', 5: 'PAUSE' };
+function crealityStatus(p) {
+  const state = {}; p._state = state;
+  let lastSent = '', lastAt = 0, seenKeys = false, alive = 0;
+  const connect = () => {
+    wsOpen(p.ip, p.wsPort || 9999, (text) => {
+      if (text === 'ok') return;
+      let j; try { j = JSON.parse(text); } catch { return; }
+      alive = Date.now();
+      if (j.ModeCode === 'heart_beat') { ws.send?.('ok'); return; }
+      if (!seenKeys && Object.keys(j).length > 3) { seenKeys = true; log(p.id, 'данные принтера:', Object.keys(j).slice(0, 40).join(', ')); }
+      const prog = j.printProgress ?? j.dProgress, layer = j.layer ?? j.curLayer, total = j.TotalLayer ?? j.totalLayer, left = j.printLeftTime;
+      if (prog !== undefined) state.mc_percent = Math.round(+prog);
+      if (layer !== undefined) state.layer_num = +layer;
+      if (total !== undefined) state.total_layer_num = +total;
+      if (left !== undefined) state.mc_remaining_time = Math.round(+left / 60);
+      if (j.printFileName) state.subtask_name = String(j.printFileName).split('/').pop().replace(/\.gcode$/i, '');
+      if (j.state !== undefined) state.gcode_state = CR_STATE[j.state] || (+j.state > 0 ? 'RUNNING' : 'IDLE');
+      else if (!state.gcode_state && prog !== undefined) state.gcode_state = +prog > 0 && +prog < 100 ? 'RUNNING' : 'IDLE';
+      if (j.err && j.err.errcode) state.print_error = j.err.errcode;
+    }, (send) => {
+      ws.send = send; log(p.id, 'Creality подключён (порт ' + (p.wsPort || 9999) + ')');
+      send(JSON.stringify({ method: 'get', params: { ReqPrinterPara: 1 } }));
+    }, (why) => {
+      ws.send = null; if (why !== 'stop') { log(p.id, 'Creality: ' + why + ', переподключаюсь…'); setTimeout(connect, 5000); }
+    });
+  };
+  const ws = {}; connect();
+  setInterval(() => { if (ws.send && Date.now() - alive > 20000) ws.send(JSON.stringify({ method: 'get', params: { ReqPrinterPara: 1 } })); }, 10000);
+  setInterval(async () => {
+    if (!state.gcode_state) return;
+    const body = { state: state.gcode_state, percent: state.mc_percent ?? 0, layer: state.layer_num ?? 0, layers: state.total_layer_num ?? 0,
+      remaining: state.mc_remaining_time ?? 0, task: state.subtask_name || '', error: state.print_error ? String(state.print_error) : null };
+    const sig = JSON.stringify(body);
+    if (sig === lastSent && Date.now() - lastAt < 30000) return;
+    try {
+      await post(`/api/bridge/status/${p.id}`, body);
+      if (sig !== lastSent) log(p.id, `${body.state} ${body.percent}% слой ${body.layer}/${body.layers}, осталось ${body.remaining} мин`);
+      lastSent = sig; lastAt = Date.now();
+    } catch (e) { log(p.id, 'не отправил статус:', e.message); }
+  }, 3000);
 }
 
 /* ---------- printer IP changed (router gave a new address): find it by serial number and restart ---------- */
@@ -616,10 +701,11 @@ for (const p of cfg.printers || []) {
   if (!p.id || (!p.ip && !p.video)) continue;
   log(p.id, [p.ip && `${p.type || 'bambu'} ${p.ip}`, p.video && 'видеокамера'].filter(Boolean).join(' + '));
   if (p.ip && p.type === 'bambu') bambuStatus(p);
+  if (p.ip && p.type === 'creality') crealityStatus(p);
   if (p.video) videoStreamer(p);
   // a printer with a separate video camera uses only that camera (stills too); the built-in one is ignored
   if (p.video) p.rtsp = p.video;
-  if (p.timelapse !== false && p.camera !== 'off') timelapse(p);
+  if (p.timelapse !== false && p.camera !== 'off' && (p.type === 'bambu' || p.rtsp)) timelapse(p); // needs a camera of its own
   camera(p);
 }
 setInterval(tlUploadPending, 60000); setTimeout(tlUploadPending, 5000); tlCleanup();
