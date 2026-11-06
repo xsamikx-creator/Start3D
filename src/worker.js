@@ -345,7 +345,15 @@ async function bridgeChunk(env, req, url, pid) {
 const delayOf = (env, preview) => preview || env.STREAM_DELAY_MS === undefined || env.STREAM_DELAY_MS === '' ? STREAM_DELAY_MS : Number(env.STREAM_DELAY_MS) || 0;
 // The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
 const CAM_HOME = 'a1-1';
-async function camSrc(env, pid) { return (await kvGet(env, 'camsrc:' + pid)) || pid; }
+// Where the IP camera stands now (default: on the K2 Plus); /camto in the operators chat changes it.
+const CAM_AT_DEFAULT = 'k2';
+async function camSrc(env, pid) {
+  const v = await kvGet(env, 'camsrc:' + pid);
+  if (v) return v;
+  if (pid === CAM_AT_DEFAULT && pid !== CAM_HOME) return CAM_HOME; // the camera films this printer
+  if (pid === CAM_HOME && CAM_AT_DEFAULT !== CAM_HOME) return '-'; // …so A1 #1 has no video of its own
+  return pid;
+}
 async function videoState(env, pid, preview) {
   pid = await camSrc(env, pid); if (pid === '-') return { on: false };
   const r = await env.DB.prepare('SELECT MIN(at) AS first, MAX(at) AS last FROM vid_seg WHERE pid=?').bind(pid).first();
@@ -627,8 +635,7 @@ async function onUpdate(env, u, origin) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const arg = String(ct[1] || '').toLowerCase().replace(/\s/g, ''), pr = PRINTERS.find((x) => x.id === arg || x.name.toLowerCase().replace(/[\s#]/g, '') === arg.replace('#', ''));
     if (!pr) return say(`IP-камера сейчас у: ${await (async () => { for (const x of PRINTERS) if ((await camSrc(env, x.id)) === CAM_HOME && x.id !== CAM_HOME) return x.name; return printerName(CAM_HOME); })()}\nПеренести: /camto k2 · /camto a1-2 · вернуть: /camto a1-1`);
-    for (const x of PRINTERS) await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('camsrc:' + x.id).run();
-    if (pr.id !== CAM_HOME) { await kvSet(env, 'camsrc:' + pr.id, CAM_HOME); await kvSet(env, 'camsrc:' + CAM_HOME, '-'); }
+    for (const x of PRINTERS) await kvSet(env, 'camsrc:' + x.id, x.id === pr.id ? CAM_HOME : x.id === CAM_HOME ? '-' : x.id);
     return say(pr.id === CAM_HOME ? `📷 IP-камера снова снимает ${pr.name}.` : `📷 IP-камера теперь показывает ${pr.name}: клиент заказа на ${pr.name} увидит видео, когда заказ «Печатается».\nПоставьте камеру на ${pr.name}; поворот картинки: /rotate ${pr.id} …\nВернуть: /camto ${CAM_HOME}`);
   }
   const br = text.match(/^\/bridge(?:@\w+)?(?:\s+(restart))?$/i);
