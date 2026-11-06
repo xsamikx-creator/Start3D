@@ -619,14 +619,13 @@ async function onUpdate(env, u, origin) {
     const cur = await adminId(env);
     if (cur && String(cur) !== String(from.id)) return say('Владелец уже назначен.');
     if (!cur) await kvSet(env, 'admin', from.id);
+    await botCommands(env);
     return say('✅ Вы владелец Start3D.\nТеперь создайте группу для операторов, добавьте туда бота и напишите в группе /operator');
   }
   if (/^\/operator(@\w+)?$/.test(text)) {
     if (String(from.id) !== String(await adminId(env))) return say('Только владелец может назначить операторский чат. Сначала напишите боту в личку /admin');
     await kvSet(env, 'operator_chat', chat.id);
-    await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: chat.id }, commands: [
-      { command: 'panel', description: 'Вход в панель оператора на сайте' }, { command: 'cam', description: 'Камеры принтеров' },
-      { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' }, { command: 'rotate', description: 'Поворот камеры' }, { command: 'bridge', description: 'Мост: состояние и перезапуск' } ] });
+    await botCommands(env);
     return say('✅ Этот чат теперь операторский. Новые заказы будут приходить сюда.');
   }
   if (/^\/draw(@\w+)?$/.test(text)) {
@@ -1164,16 +1163,34 @@ async function ensureWebhook(env, origin) {
   if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET || origin.includes('localhost')) return;
   // Keyed by origin + bot id, so swapping BOT_TOKEN for a new bot re-registers the webhook.
   const key = `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`;
+  if ((await kvGet(env, 'cmds_v')) !== CMDS_V) { await botCommands(env); await kvSet(env, 'cmds_v', CMDS_V); }
   if ((await kvGet(env, 'webhook')) === key) return;
   const r = await tg(env, 'setWebhook', { url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
   if (!r.ok) return console.error('setWebhook failed', r.description);
-  await tg(env, 'setMyCommands', { commands: [
-    { command: 'orders', description: 'Мои заказы' },
-    { command: 'me', description: 'Мой номер в боте' },
-  ] });
+  await botCommands(env);
   const me = await tg(env, 'getMe', {});
   if (me.ok) await kvSet(env, 'bot_username', me.result.username);
   await kvSet(env, 'webhook', key);
+}
+// The "/" menu: clients see their two commands; the operators' group and the owner's private chat see every command.
+const CMDS_V = '2';
+const CLIENT_CMDS = [{ command: 'orders', description: 'Мои заказы' }, { command: 'me', description: 'Мой номер в боте' }];
+const OP_CMDS = [
+  { command: 'panel', description: 'Вход в панель оператора на сайте' },
+  { command: 'cam', description: 'Камеры принтеров' },
+  { command: 'camto', description: 'Перенести камеру на принтер: /camto k2' },
+  { command: 'rotate', description: 'Поворот камеры: /rotate k2 cw' },
+  { command: 'bridge', description: 'Мост: состояние; /bridge restart — перезапуск' },
+  { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' },
+  { command: 'logout_all', description: 'Выйти из панели на всех устройствах' },
+  { command: 'id', description: 'Telegram ID и ID чата' },
+];
+async function botCommands(env) {
+  const r = await tg(env, 'setMyCommands', { commands: CLIENT_CMDS });
+  const op = await kvGet(env, 'operator_chat'), adm = await adminId(env);
+  if (op) await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: Number(op) }, commands: OP_CMDS });
+  if (adm) await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: Number(adm) }, commands: [...CLIENT_CMDS, ...OP_CMDS] });
+  return r;
 }
 // Owner: ADMIN_TG_ID var, or the first person who sends /admin to the bot.
 async function adminId(env) { return env.ADMIN_TG_ID || (await kvGet(env, 'admin')); }
@@ -1182,10 +1199,7 @@ async function setup(env, origin) {
   const hook = await tg(env, 'setWebhook', {
     url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true,
   });
-  const cmds = await tg(env, 'setMyCommands', { commands: [
-    { command: 'orders', description: 'Мои заказы' },
-    { command: 'id', description: 'Мой Telegram ID' },
-  ] });
+  const cmds = await botCommands(env);
   const me = await tg(env, 'getMe', {});
   return json({ webhook: hook, commands: cmds.ok, bot: me.result ? '@' + me.result.username : me.description, operator_chat: (await kvGet(env, 'operator_chat')) ? 'set' : 'not set' });
 }
