@@ -223,7 +223,7 @@ function videoInput(url) {
 }
 function videoStreamer(p) {
   if (!hasFfmpeg()) { log(p.id, 'видео: нужен ffmpeg — выполните в PowerShell: winget install Gyan.FFmpeg, затем перезапустите мост'); return; }
-  let ff = null, sess = 0, dir = '', idle = 0, initSent = false, done = new Set(), queue = [], busy = false, stopping = false;
+  let ff = null, sess = 0, dir = '', idle = 0, lastSeg = 0, initSent = false, done = new Set(), queue = [], busy = false, stopping = false;
   const pump = async () => {
     if (busy || !queue.length) return;
     busy = true;
@@ -245,12 +245,12 @@ function videoStreamer(p) {
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(/^#EXTINF:([\d.]+)/);
       if (!m || !lines[i + 1] || done.has(lines[i + 1])) continue;
-      done.add(lines[i + 1]); queue.push({ kind: 'vseg', sess, dur: (+m[1]).toFixed(3), file: path.join(dir, lines[i + 1].trim()) });
+      done.add(lines[i + 1]); lastSeg = Date.now(); queue.push({ kind: 'vseg', sess, dur: (+m[1]).toFixed(3), file: path.join(dir, lines[i + 1].trim()) });
     }
     pump();
   };
   const start = () => {
-    sess = Date.now(); initSent = false; done = new Set(); stopping = false;
+    sess = Date.now(); lastSeg = sess; initSent = false; done = new Set(); stopping = false;
     dir = path.join(os.tmpdir(), `start3d-video-${p.id}-${sess}`); fs.mkdirSync(dir, { recursive: true });
     const args = ['-loglevel', 'error', ...videoInput(p.video), '-an',
       // rotate if needed, then fit the long side into videoWidth (portrait keeps the same pixel budget)
@@ -260,13 +260,14 @@ function videoStreamer(p) {
       '-g', String((p.videoFps || 15) * 2), '-keyint_min', String((p.videoFps || 15) * 2), '-sc_threshold', '0',
       '-f', 'hls', '-hls_time', '4', '-hls_list_size', '12', '-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4',
       '-hls_segment_filename', path.join(dir, 's%06d.m4s'), path.join(dir, 'live.m3u8')];
-    ff = spawn('ffmpeg', args, { cwd: dir });
+    const me = spawn('ffmpeg', args, { cwd: dir }); ff = me; const myDir = dir;
     let errText = '';
-    ff.stderr.on('data', (d) => { errText = (errText + d).slice(-400); });
-    ff.on('close', (code) => {
-      const was = ff; ff = null;
+    me.stderr.on('data', (d) => { errText = (errText + d).slice(-400); });
+    me.on('close', (code) => {
+      if (ff !== me) return; // already replaced by the watchdog
+      ff = null;
       if (!stopping) log(p.id, `видео: ffmpeg остановился (${code}) ${errText.trim().split('\n').pop() || ''} — перезапуск`);
-      setTimeout(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }, 60000);
+      setTimeout(() => { try { fs.rmSync(myDir, { recursive: true, force: true }); } catch {} }, 60000);
     });
     log(p.id, 'видео: запись началась');
   };
@@ -276,6 +277,8 @@ function videoStreamer(p) {
     const want = isPrinting(p);
     if (ff && rotOf(p) !== rotAt) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: поворот изменён, перезапускаю запись'); }
     if (!ff) rotAt = rotOf(p);
+    // ffmpeg can hang without exiting when the camera stream drops (after a print error, Wi‑Fi blip): restart it
+    if (ff && Date.now() - lastSeg > 25000) { const f = ff, d0 = dir; ff = null; log(p.id, 'видео: камера не присылает картинку 25 с — перезапускаю запись'); try { f.kill('SIGKILL'); } catch {} setTimeout(() => { try { fs.rmSync(d0, { recursive: true, force: true }); } catch {} }, 60000); }
     if (want) { idle = 0; if (!ff) start(); }
     else if (ff && ++idle > 30) { stopping = true; ff.kill('SIGINT'); log(p.id, 'видео: печати нет, запись остановлена'); }
   }, 2000);
