@@ -565,6 +565,17 @@ header.open .logo .mark i:nth-child(3){transform:translateY(-6px) rotate(-45deg)
 .ops-list{display:grid;gap:12px}
 .opc{display:grid;gap:8px}
 .opc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ops-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ops-filters .cnt{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:rgba(255,154,46,.2);color:var(--accent);font-size:11px}
+.ops-more{border-top:1px dashed var(--line);padding-top:8px}
+.ops-more a.btn-sm{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:600}
+.ops-more a.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
+.ops-edit input,.ops-edit select{width:100%;box-sizing:border-box;height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font:inherit;font-size:14px}
+.ops-edit input:focus,.ops-edit select:focus{outline:none;border-color:var(--accent)}
+.ops-edit{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.ops-edit label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.ops-edit .wide{grid-column:1/-1}
+.ops-edit .acts{grid-column:1/-1}
 .opc-h b{font-family:var(--f-mono)}
 .opc .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .opc .acts input,.opc .acts select{width:auto;min-width:0;padding:7px 10px;font-size:14px}
@@ -2888,7 +2899,12 @@ $('free-form').addEventListener('submit', async e => {
 
 /* ---------- operator panel ---------- */
 let OPTOK = ''; try { OPTOK = localStorage.getItem('s3d-op') || ''; } catch(e){}
-let OPS = null, opsTab = 'orders', opsAll = false, opsLoadedAt = 0, opsDrawArm = false;
+let OPS = null, opsTab = 'orders', opsAll = false, opsLoadedAt = 0, opsDrawArm = false, opsFilter = 'active', opsEdit = null;
+// order filters in the operator panel
+const OPS_FILTERS = [['active', 'Активные', o => !['done','rejected'].includes(o.status)], ['review', 'На проверке', o => o.status === 'review'],
+  ['pay', 'Оплата', o => ['pay','paycheck'].includes(o.status)], ['queue', 'В очереди', o => o.status === 'queue'],
+  ['printing', 'В печати', o => ['printing','post'].includes(o.status)], ['ready', 'Готовы', o => o.status === 'ready'],
+  ['archive', 'Архив 14 дней', o => ['done','rejected'].includes(o.status)]];
 const opsApi = async (path, body) => {
   const r = await fetch(path, body ? {method:'POST', headers:{'content-type':'application/json', 'x-op': OPTOK}, body: JSON.stringify(body)} : {headers:{'x-op': OPTOK}, cache:'no-store'});
   const j = await r.json().catch(() => ({}));
@@ -2927,7 +2943,22 @@ function opsOrderCard(o){
     ${o.link ? `<div class="note">🔗 <a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.link)}</a> — проверьте лицензию</div>` : ''}
     ${files ? `<div class="files">${files}</div>` : (o.kind === 'file' ? '<div class="note">Файл не загружен — запросите у клиента</div>' : '')}
     ${pr ? `<div class="note">🖨 ${pr.name}${pr.state ? ` · ${pr.state} ${pr.percent}% · слой ${pr.layer}/${pr.layers} · осталось ${fmtH((pr.remaining || 0) / 60)}` : ''}</div>` : ''}
+    ${o.note ? `<div class="note">📝 ${esc(o.note)}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
+    <div class="acts ops-more">
+      <a class="btn-sm" href="#track-${o.id}-${o.code}" target="_blank" rel="noopener" title="Страница заказа так, как её видит клиент: статус, слои, камера">👁 Как у клиента</a>
+      <button type="button" class="btn-sm" data-pub="${o.id}" data-v="${o.pub ? '0' : '1'}" title="Публичные заказы видны всем в «Эфире» и в «Таймлапсах недели»">${o.pub ? '🔒 Скрыть из эфира' : '🌐 Сделать публичным'}</button>
+      ${!['done','rejected'].includes(o.status) ? `<button type="button" class="btn-sm" data-edit="${o.id}" aria-pressed="${opsEdit === o.id}">✏️ Изменить</button>` : ''}
+    </div>
+    ${opsEdit === o.id ? `<div class="ops-edit">
+      <label>Название <input name="name" value="${esc(o.name || '')}" maxlength="80"></label>
+      <label>Материал <select name="mat">${['PLA','PETG','ABS','TPU'].map(m => `<option${m === o.mat ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label>Цвет <input name="colorName" value="${esc(o.colorName || '')}" maxlength="30"></label>
+      <label>Кол-во <input name="qty" type="number" min="1" max="500" value="${o.qty || 1}"></label>
+      ${['review','pay','paycheck'].includes(o.status) ? `<label>Цена, AZN <input name="price" type="number" min="1" value="${o.price || mid}"></label>` : ''}
+      <label class="wide">Заметка для операторов <input name="note" value="${esc(o.note || '')}" maxlength="300" placeholder="видно только в панели"></label>
+      <div class="acts"><button type="button" class="btn-sm btn-primary" data-save="${o.id}">💾 Сохранить</button><button type="button" class="btn-sm" data-edit="${o.id}">Отмена</button></div>
+    </div>` : ''}
   </div>`;
 }
 function renderOps(){
@@ -2941,9 +2972,10 @@ function renderOps(){
     .map(([k, l]) => `<button type="button" class="btn-sm" data-tab="${k}" aria-pressed="${opsTab === k}">${l}</button>`).join('');
   let html = '';
   if (opsTab === 'orders'){
-    const list = (opsAll ? OPS.orders : active).slice().sort((a, b) => OPS_ORDER.indexOf(a.status) - OPS_ORDER.indexOf(b.status) || b.created - a.created);
-    html = `<div class="row" style="margin-bottom:12px"><label class="check"><input type="checkbox" id="ops-all" ${opsAll ? 'checked' : ''}> показывать выданные и отклонённые за 3 дня</label></div>
-      <div class="ops-list">${list.length ? list.map(opsOrderCard).join('') : '<div class="panel empty">Активных заказов нет</div>'}</div>`;
+    const f = OPS_FILTERS.find(x => x[0] === opsFilter) || OPS_FILTERS[0];
+    const list = OPS.orders.filter(f[2]).sort((a, b) => OPS_ORDER.indexOf(a.status) - OPS_ORDER.indexOf(b.status) || b.created - a.created);
+    html = `<div class="ops-filters">${OPS_FILTERS.map(([k, l, fn]) => { const n = OPS.orders.filter(fn).length; return `<button type="button" class="btn-sm" data-of="${k}" aria-pressed="${opsFilter === k}">${l}${n ? ` <span class="cnt">${n}</span>` : ''}</button>`; }).join('')}</div>
+      <div class="ops-list">${list.length ? list.map(opsOrderCard).join('') : `<div class="panel empty">Здесь пока пусто: «${f[1]}»</div>`}</div>`;
   } else if (opsTab === 'printers'){
     html = `<div class="ops-grid">${OPS.printers.map(p => {
       const online = p.seen && Date.now() - p.seen < 120000;
@@ -2971,6 +3003,23 @@ function renderOps(){
 }
 $('ops-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; opsTab = b.dataset.tab; opsDrawArm = false; renderOps(); });
 $('ops-body').addEventListener('change', e => { if (e.target.id === 'ops-all'){ opsAll = e.target.checked; e.target.blur(); renderOps(); } });
+// filters, client view, public toggle and editing of an order
+$('ops-body').addEventListener('click', async e => {
+  const blur = () => document.activeElement && document.activeElement.blur(); // the panel does not redraw under a focused control
+  const f = e.target.closest('[data-of]'); if (f){ opsFilter = f.dataset.of; opsEdit = null; blur(); renderOps(); return; }
+  const pv = e.target.closest('[data-pub]');
+  if (pv){ pv.disabled = true; try { const r = await opsApi('/api/op/edit', {id: pv.dataset.pub, pub: pv.dataset.v === '1'}); toast(r.note || 'Готово'); } catch(err){ toast(err.message); } blur(); await loadOps(); return; }
+  const ed = e.target.closest('[data-edit]'); if (ed){ opsEdit = opsEdit === ed.dataset.edit ? null : ed.dataset.edit; blur(); renderOps(); return; }
+  const sv = e.target.closest('[data-save]');
+  if (sv){
+    const box = sv.closest('.ops-edit'), val = k => box.querySelector(`[name="${k}"]`)?.value;
+    const body = {id: sv.dataset.save, name: val('name'), mat: val('mat'), colorName: val('colorName'), qty: +val('qty'), note: val('note')};
+    if (box.querySelector('[name="price"]')) body.price = +val('price');
+    sv.disabled = true;
+    try { const r = await opsApi('/api/op/edit', body); toast(r.note || 'Сохранено'); opsEdit = null; } catch(err){ toast(err.message); sv.disabled = false; return; }
+    document.activeElement && document.activeElement.blur(); await loadOps(); return;
+  }
+});
 $('ops-body').addEventListener('click', async e => {
   const dl = e.target.closest('[data-dl]');
   if (dl){ // download with the key in a header (never in the address)

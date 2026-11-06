@@ -1277,14 +1277,14 @@ async function opAuth(env, req, url) {
   return v && v.exp > now() ? v : null;
 }
 async function opState(env) {
-  const rs = await env.DB.prepare("SELECT * FROM orders WHERE status NOT IN ('done','rejected') OR updated_at > ? ORDER BY created_at DESC LIMIT 80").bind(now() - 3 * 864e5).all();
+  const rs = await env.DB.prepare("SELECT * FROM orders WHERE status NOT IN ('done','rejected') OR updated_at > ? ORDER BY created_at DESC LIMIT 150").bind(now() - 14 * 864e5).all();
   const orders = rs.results.map((o) => {
     const d = JSON.parse(o.data || '{}');
     return { id: o.id, status: o.status, client: o.client, contact: o.contact, ch: o.ch, email: o.email, tg: !!o.tg_chat_id, price: o.price, lo: o.lo, hi: o.hi, reason: o.reason,
       name: d.name, mat: d.mat, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
       pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
       printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
-      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code };
+      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup };
   });
   const prs = (await env.DB.prepare('SELECT id, status, order_id, frame_at, updated_at FROM printers').all()).results;
   const printers = [];
@@ -1322,6 +1322,27 @@ async function opApi(env, req, url, origin, p) {
     if (!o) return json({ error: 'Заказ не найден' }, 404);
     const r = await opAction(env, origin, o, String(b.act || ''), { pid: b.pid, price: b.price, reason: b.reason });
     return json(r.error ? { error: r.error } : { ok: true, note: r.note });
+  }
+  if (p === '/api/op/edit') { // operator edits an active order from the web panel
+    const o = await getOrder(env, String(b.id || ''));
+    if (!o) return json({ error: 'Заказ не найден' }, 404);
+    const d = JSON.parse(o.data || '{}'), set = {}, log = [];
+    if (b.pub !== undefined && !!b.pub !== !!d.pub) { d.pub = !!b.pub; log.push(d.pub ? 'публичный' : 'скрыт'); }
+    if (typeof b.name === 'string' && b.name.trim() && b.name.trim() !== d.name) { d.name = clip(b.name.trim(), 80); log.push('название'); }
+    if (typeof b.mat === 'string' && ['PLA', 'PETG', 'ABS', 'TPU'].includes(b.mat) && b.mat !== d.mat) { d.mat = b.mat; log.push('материал ' + b.mat); }
+    if (typeof b.colorName === 'string' && b.colorName.trim() && b.colorName.trim() !== d.colorName) { d.colorName = clip(b.colorName.trim(), 30); log.push('цвет ' + d.colorName); }
+    if (b.qty !== undefined && Number.isFinite(+b.qty) && +b.qty >= 1 && +b.qty <= 500 && +b.qty !== (d.qty || 1)) { d.qty = Math.round(+b.qty); log.push(d.qty + ' шт'); }
+    if (typeof b.note === 'string' && b.note !== (d.opNote || '')) { d.opNote = clip(b.note, 300); log.push('заметка'); }
+    if (b.price !== undefined && Number.isFinite(+b.price) && +b.price > 0 && +b.price !== o.price) {
+      if (!['review', 'pay', 'paycheck'].includes(o.status)) return json({ error: 'Цену можно менять только до оплаты' }, 400);
+      set.price = Math.max(d.free ? 0 : MIN_ORDER, Math.round(+b.price)); log.push('цена ' + set.price + ' AZN');
+    }
+    if (!log.length) return json({ ok: true, note: 'Без изменений' });
+    const n = await setStatus(env, o.id, { ...set, data: JSON.stringify(d) });
+    await refreshOperatorMsg(env, n);
+    const chat = await kvGet(env, 'operator_chat');
+    if (chat) await tg(env, 'sendMessage', { chat_id: Number(chat), text: `✏️ ${who.name || 'Оператор'} изменил ${o.id}: ${log.join(', ')}`, reply_parameters: o.op_msg_id ? { message_id: o.op_msg_id, allow_sending_without_reply: true } : undefined });
+    return json({ ok: true, note: 'Сохранено: ' + log.join(', ') });
   }
   if (p === '/api/op/free') { const r = await freeDecide(env, +b.id, !!b.ok, who.name); return json(r.error ? { error: r.error } : r); }
   if (p === '/api/op/draw') { const r = await drawFree(env, origin, bakuDay(now()), true); return json({ ok: r.msg === 'ok', note: r.msg === 'ok' ? 'Победитель выбран — смотрите группу операторов' : r.msg }); }
