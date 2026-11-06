@@ -10,7 +10,7 @@ if not exist config.json goto noconfig
 
 :loop
 echo Проверяю обновление моста...
-del bridge.new start.new >nul 2>nul
+del bridge-new.mjs start.new >nul 2>nul
 curl.exe -fsSL --max-time 15 -o start.new "https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/start.bat?t=%RANDOM%%RANDOM%" >nul 2>nul
 if not exist start.new goto nostart
 fc /b start.new start.bat >nul 2>nul
@@ -21,17 +21,17 @@ echo Обновляю start.bat и перезапускаюсь...
 copy /y start.new start.bat >nul & del start.new >nul 2>nul & start "" "%~f0" & exit
 :nostart
 del start.new >nul 2>nul
-curl.exe -fsSL --max-time 15 -o bridge.new "https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/bridge.mjs?t=%RANDOM%%RANDOM%" >nul 2>nul
-if not exist bridge.new goto run
-node --check bridge.new >nul 2>nul
+curl.exe -fsSL --max-time 15 -o bridge-new.mjs "https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/bridge.mjs?t=%RANDOM%%RANDOM%" >nul 2>nul
+if not exist bridge-new.mjs goto run
+node --check bridge-new.mjs >nul 2>nul
 if errorlevel 1 goto dropnew
-fc /b bridge.new bridge.mjs >nul 2>nul
+fc /b bridge-new.mjs bridge.mjs >nul 2>nul
 if errorlevel 1 (
-  copy /y bridge.new bridge.mjs >nul
+  copy /y bridge-new.mjs bridge.mjs >nul
   echo Мост обновлён.
 )
 :dropnew
-del bridge.new >nul 2>nul
+del bridge-new.mjs >nul 2>nul
 
 :run
 echo Запускаю мост...
