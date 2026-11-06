@@ -1139,6 +1139,8 @@ drop_s:['Ölçü və həcm brauzerdə hesablanır. 3MF, OBJ, STEP-i operator hes
 ph_t:['Detalın fotolarını əlavə edin','Добавьте фото детали','Додайте фото деталі','Add photos of the part'],
 ph_s:['2–5 foto müxtəlif tərəfdən, yanında xətkeş olsa yaxşıdır','2–5 фото с разных сторон, лучше с линейкой рядом','2–5 фото з різних боків, краще з лінійкою поруч','2–5 photos from different sides, ideally with a ruler'],
 f_dims:['Əsas ölçülər','Основные размеры','Основні розміри','Key measurements'],
+reading:['Oxunur…','Читаю файл…','Читаю файл…','Reading…'],
+read_err:['Fayl oxunmadı. iCloud-dadırsa, əvvəlcə «Fayllar»da yükləyin (bulud işarəsi).','Не удалось прочитать файл. Если он в iCloud, сначала скачайте его в «Файлах» (значок облака).','Не вдалося прочитати файл. Якщо він в iCloud, спершу завантажте його у «Файлах» (значок хмари).','Could not read the file. If it is in iCloud, download it in Files first (cloud icon).'],
 bad_ext:['Bu fayl modelə oxşamır. STL, 3MF, OBJ və ya STEP seçin.','Это не похоже на модель. Выберите STL, 3MF, OBJ или STEP.','Це не схоже на модель. Оберіть STL, 3MF, OBJ або STEP.','This does not look like a model. Choose STL, 3MF, OBJ or STEP.'],
 drag:['fırlat · yaxınlaşdır','вращайте · приближайте','обертайте · наближайте','drag · zoom'],
 v_over:['Asılı yerlər','Нависания','Нависання','Overhangs'],
@@ -2125,21 +2127,28 @@ function parseSTL(buf){
 }
 function loadFile(f){
   if (!f) return;
-  // iPhone greys out .stl when the picker is limited by type, so any file can be picked and checked here
-  if (!/\.(stl|3mf|obj|step|stp)$/i.test(f.name)){ $('drop-title').textContent = f.name; $('drop-sub').textContent = t('bad_ext'); $('file').value = ''; return; }
-  form.modelFile = f; // the original file, uploaded to the operators after the order is created
-  if (!/\.stl$/i.test(f.name)){
-    form.model = {file:f.name, manual:true}; $('drop-title').textContent = f.name; $('drop-sub').textContent = t('manual_quote');
-    $('viewer').hidden = true; renderQuote(); return;
-  }
+  const say = (title, sub) => { $('drop-title').textContent = title; $('drop-sub').textContent = sub; };
+  say(f.name, t('reading'));
+  // iPhone greys out .stl when the picker is limited by type, so any file can be picked; the type is checked here,
+  // also by content: iOS sometimes saves models as "model.stl.txt" or without an extension.
   const r = new FileReader();
+  r.onerror = () => { say(f.name, t('read_err')); $('file').value = ''; };
   r.onload = () => {
+    $('file').value = ''; // picking the same file again must fire "change"
+    const buf = r.result, u8 = new Uint8Array(buf, 0, Math.min(buf.byteLength, 512)), head = new TextDecoder().decode(u8).toLowerCase();
+    const n = buf.byteLength >= 84 ? new DataView(buf).getUint32(80, true) : -1;
+    const looksStl = /\.stl(\.txt)?$/i.test(f.name) || buf.byteLength === 84 + n * 50 || (head.trimStart().startsWith('solid') && head.includes('facet'));
+    const other = /\.(3mf|obj|step|stp)$/i.test(f.name) || (u8[0] === 0x50 && u8[1] === 0x4b) || head.includes('iso-10303');
+    if (!looksStl && !other){ say(f.name, t('bad_ext')); return; }
+    // the original file, uploaded to the operators after the order is created (an STL always keeps a .stl name)
+    form.modelFile = looksStl && !/\.stl$/i.test(f.name) ? new File([f], f.name.replace(/\.txt$/i, '').replace(/(\.stl)?$/i, '.stl'), {type: f.type}) : f;
+    if (!looksStl){ form.model = {file:f.name, manual:true}; say(f.name, t('manual_quote')); $('viewer').hidden = true; renderQuote(); return; }
     try {
-      const m = parseSTL(r.result); m.file = f.name; form.model = m;
-      $('drop-title').textContent = f.name; $('drop-sub').textContent = `${m.tris.toLocaleString()} △ · ${m.volCm3.toFixed(1)} cm³`;
-      if (!$('f-name').value) $('f-name').value = f.name.replace(/\.stl$/i,'');
+      const m = parseSTL(buf); m.file = f.name; form.model = m;
+      say(f.name, `${m.tris.toLocaleString()} △ · ${m.volCm3.toFixed(1)} cm³`);
+      if (!$('f-name').value) $('f-name').value = f.name.replace(/\.stl(\.txt)?$/i,'');
       showModel(m); renderQuote();
-    } catch(e){ toast(t('t_bad_file')); }
+    } catch(e){ say(f.name, t('t_bad_file')); toast(t('t_bad_file')); }
   };
   r.readAsArrayBuffer(f);
 }
