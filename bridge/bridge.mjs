@@ -703,7 +703,7 @@ function tlCleanup() {
 /* ---------- start ---------- */
 console.log(`Start3D мост → ${SERVER}`);
 watchPrinterIps();
-pollBusy(); setInterval(pollBusy, 5000);
+pollBusy(); setInterval(pollBusy, 10000); // each request counts against the Cloudflare daily limit
 for (const p of cfg.printers || []) {
   if (!p.id || (!p.ip && !p.video)) continue;
   log(p.id, [p.ip && `${p.type || 'bambu'} ${p.ip}`, p.video && 'видеокамера'].filter(Boolean).join(' + '));

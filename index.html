@@ -1682,7 +1682,7 @@ function makeVPlayer(v, pid, qs){
     v.disableRemotePlayback = true; P.ms = new M(); P.url = URL.createObjectURL(P.ms); v.src = P.url;
     P.ms.addEventListener('sourceopen', () => { try { P.sb = P.ms.addSourceBuffer(VMIME); P.sb.mode = 'sequence'; P.sb.addEventListener('updateend', pump); pump(); } catch(e){} }, {once:true});
   }
-  P.tick = () => { if (!P.native && Date.now() - P.listAt > 2000) list(); if (P.started && v.paused && v.isConnected) v.play().catch(() => {}); };
+  P.tick = () => { if (document.hidden) return; if (!P.native && Date.now() - P.listAt > 3500) list(); if (P.started && v.paused && v.isConnected) v.play().catch(() => {}); };
   P.destroy = () => { try { v.pause(); } catch(e){} v.removeAttribute('src'); try { v.load(); } catch(e){} if (P.url) URL.revokeObjectURL(P.url); v.remove(); };
   return P;
 }
@@ -1704,7 +1704,7 @@ function liveVideoTick(){
 function videoTick(o, pid){ return videoTickG(o.id + '|' + pid, pid, chunkQs(o), o.live.video.wait || 0); }
 function videoTickG(key, pid, qs, srvWait){
   if (VP.key !== key){ vpReset(); Object.assign(VP, {key, pid, qs}); vpStart(); }
-  if (!VP.native && Date.now() - VP.listAt > 2000) vpList();
+  if (!VP.native && !document.hidden && Date.now() - VP.listAt > 3500) vpList();
   const buf = $('cam-buf'), wait = VP.native ? srvWait : (VP.started ? 0 : (VP.wait ?? srvWait ?? 0));
   if (!VP.started && !VP.native || wait > 0){
     buf.hidden = false;
@@ -1788,10 +1788,11 @@ setInterval(() => {
   const r = route();
   if (r === 'track'){ const o = O(trackId); if (o && o.live && o.live.cam && !$('cam-img').hidden && !PLAYER.playing) refreshImg($('cam-img'), camUrl(o.live.printer || o.printer_srv, o)); }
   if (r === 'live' || r === 'home' || r === 'free') document.querySelectorAll('img[data-cam]').forEach(img => { const v = img.parentElement.querySelector('video'); if (!v || v.hidden) refreshImg(img, camUrl(img.dataset.cam)); });
-}, 2500);
+}, 6000);
 let LIVE = [];
-async function loadLive(){ if (!SERVER) return; loadTlWeek(); loadEta(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
-setInterval(loadLive, 5000);
+async function loadLive(){ if (!SERVER || document.hidden || !['live','home','new','free'].includes(route())) return; loadTlWeek(); loadEta(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
+setInterval(loadLive, 15000); // every request counts against the Cloudflare limit
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadLive(); });
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
   try { const j = await api('/api/health'); if (j.ok) {
@@ -3362,7 +3363,7 @@ function frame(now){
 window.addEventListener('hashchange', show);
 applyLang(); show(); badges(); lpPrint(lang);
 detectServer();
-setInterval(() => { if (route() === 'track'){ const o = O(trackId); if (o) syncOrder(o); } else if (route() === 'orders') S.orders.filter(o => o.server && !['done','rejected'].includes(o.status)).slice(0,5).forEach(syncOrder); }, 4000);
+setInterval(() => { if (document.hidden) return; if (route() === 'track'){ const o = O(trackId); if (o) syncOrder(o); } else if (route() === 'orders') S.orders.filter(o => o.server && !['done','rejected'].includes(o.status)).slice(0,5).forEach(syncOrder); }, 8000);
 setInterval(tick, 1000);
 requestAnimationFrame(frame);
 })();
