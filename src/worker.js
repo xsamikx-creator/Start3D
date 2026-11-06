@@ -275,7 +275,7 @@ async function readOrder(env, id, code) {
 // Frames arrive about once a minute while nobody watches, so a frame counts as live for 2.5 minutes.
 const CAM_FRESH_MS = 150000;
 // Delayed stream: the site plays recorded chunks this far behind real time; chunks are kept a bit longer than that.
-const STREAM_DELAY_MS = 15000, STREAM_KEEP_MS = 120000;
+const STREAM_DELAY_MS = 0, STREAM_KEEP_MS = 120000, CHUNK_DELAY_MS = 3000; // video is shown as it arrives
 async function liveFor(env, o) {
   const pid = JSON.parse(o.data || '{}').printer;
   if (!pid || o.status !== 'printing') return null;
@@ -284,7 +284,7 @@ async function liveFor(env, o) {
   const st = JSON.parse(r.status || '{}');
   const sc = await env.DB.prepare('SELECT MAX(at) AS at FROM cam_chunks WHERE pid=?').bind(pid).first();
   const vd = await videoState(env, pid);
-  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, stream: !vd.on && !!sc?.at && now() - sc.at < 30000, delay: STREAM_DELAY_MS, video: vd.on ? vd : null };
+  return { ...st, frameAt: r.frame_at, cam: !!r.frame_at && now() - r.frame_at < CAM_FRESH_MS, stream: !vd.on && !!sc?.at && now() - sc.at < 30000, delay: CHUNK_DELAY_MS, video: vd.on ? vd : null };
 }
 
 /* ---------- workshop bridge ---------- */
@@ -342,7 +342,7 @@ async function bridgeChunk(env, req, url, pid) {
 /* ---------- real video (IP camera → ffmpeg → fragmented MP4 segments) ----------
    The bridge uploads an init segment per ffmpeg session and ~4 s media segments. Viewers only see segments
    that arrived at least DELAY ago, so playback always has footage ready and stays smooth. */
-const delayOf = (env, preview) => preview ? 6000 : Number(env.STREAM_DELAY_MS) || STREAM_DELAY_MS;
+const delayOf = (env, preview) => preview || env.STREAM_DELAY_MS === undefined || env.STREAM_DELAY_MS === '' ? STREAM_DELAY_MS : Number(env.STREAM_DELAY_MS) || 0;
 // The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
 const CAM_HOME = 'a1-1';
 async function camSrc(env, pid) { return (await kvGet(env, 'camsrc:' + pid)) || pid; }
@@ -431,7 +431,7 @@ async function camVSeg(env, url, pid, n) {
 // HLS playlist for Safari / iPhone (native player); same delayed segments.
 async function camM3u8(env, url, pid) {
   const a = await camAccess(env, url, pid); if (a.deny) return a.deny;
-  const segs = (await visibleSegs(env, pid, 0, a.preview)).results.slice(-8);
+  const segs = (await visibleSegs(env, pid, 0, a.preview)).results.slice(-3); // iPhone starts near the live edge
   const sp = url.searchParams, q = sp.get('tok') ? `?tok=${encodeURIComponent(sp.get('tok'))}` : sp.get('order') ? `?order=${encodeURIComponent(sp.get('order'))}&code=${encodeURIComponent(sp.get('code') || '')}` : '';
   const out = ['#EXTM3U', '#EXT-X-VERSION:7', `#EXT-X-TARGETDURATION:${Math.ceil(Math.max(4, ...segs.map((x) => x.dur)))}`, `#EXT-X-MEDIA-SEQUENCE:${segs[0]?.n || 0}`, `#EXT-X-DISCONTINUITY-SEQUENCE:${segs[0]?.disc || 0}`];
   let sess = null;
@@ -468,7 +468,7 @@ async function camChunks(env, url, pid) {
   if (a.deny) return a.deny;
   const since = Math.round(+url.searchParams.get('since') || 0);
   const rs = await env.DB.prepare('SELECT t0, dur FROM cam_chunks WHERE pid=? AND t0 > ? ORDER BY t0').bind(pid, since).all();
-  return json({ delay: STREAM_DELAY_MS, chunks: rs.results });
+  return json({ delay: CHUNK_DELAY_MS, chunks: rs.results });
 }
 async function camChunk(env, url, pid, t0) {
   const a = await camAccess(env, url, pid);

@@ -1295,7 +1295,7 @@ o_paid:['ödənilib','оплачено','сплачено','paid'],
 assign_later:['operator təyin edəcək','назначит оператор','призначить оператор','assigned by operator'],
 cam_buf:['Yayın toplanır — tam axın kimi göstərmək üçün','Копим эфир, чтобы показать его плавно','Накопичуємо ефір, щоб показати його плавно','Buffering so the stream plays smoothly'],
 cam_buf_in:['başlayacaq','начнётся через','почнеться через','starts in'],
-cam_delay:['~15 san gecikmə','задержка ~15 с','затримка ~15 с','~15 s delay'],
+cam_delay:['canlı','в реальном времени','у реальному часі','live'],
 pc_label:['Kamera · yalnız komanda üçün','Камера · только для команды','Камера · лише для команди','Camera · team only'],
 pc_note:['Video ~10 san gecikmə ilə. Kamera açılır — ilk görüntü 20–30 saniyəyə. Link 2 saat işləyir, müştərilərə göndərməyin.','Видео с задержкой ~10 с. Камера включается — первая картинка через 20–30 секунд. Ссылка действует 2 часа, клиентам не пересылайте.','Відео із затримкою ~10 с. Камера вмикається — перша картинка через 20–30 секунд. Посилання діє 2 години, клієнтам не пересилайте.','Video ~10 s behind. The camera is starting — first picture in 20–30 seconds. The link works for 2 hours; do not share it with clients.'],
 pc_expired:['Link köhnəlib. Operator qrupunda yenidən /cam yazın.','Ссылка устарела. Напишите /cam в группе операторов ещё раз.','Посилання застаріло. Напишіть /cam у групі операторів ще раз.','The link has expired. Send /cam in the operators group again.'],
@@ -1574,7 +1574,7 @@ async function playerList(pid, o){
   PLAYER.listAt = Date.now();
   try {
     const j = await api(`/api/cam/${pid}/chunks?${chunkQs(o)}since=${PLAYER.since}`);
-    PLAYER.delay = j.delay || 15000;
+    PLAYER.delay = j.delay ?? 3000;
     for (const c of j.chunks){ if (!PLAYER.chunks.has(c.t0)) PLAYER.chunks.set(c.t0, c); PLAYER.since = Math.max(PLAYER.since, c.t0); }
     const all = [...PLAYER.chunks.values()];
     if (all.length){
@@ -1645,7 +1645,7 @@ async function vpList(){
     const j = await api(`/api/cam/${VP.pid}/vlist?${VP.qs}since=${Math.max(0, VP.next)}`);
     VP.wait = j.wait || 0; VP.on = !!j.on;
     let segs = j.segs || [];
-    if (VP.next < 0) segs = segs.slice(-3); // join near the (delayed) live edge
+    if (VP.next < 0) segs = segs.slice(-1); // join at the live edge
     for (const x of segs){ VP.queue.push(x); VP.next = Math.max(VP.next, x.n); }
     vpPump();
   } catch(e){}
@@ -1672,7 +1672,7 @@ function makeVPlayer(v, pid, qs){
     P.listAt = Date.now();
     try {
       const j = await api(`/api/cam/${pid}/vlist?${qs}since=${Math.max(0, P.next)}`);
-      let segs = j.segs || []; if (P.next < 0) segs = segs.slice(-3);
+      let segs = j.segs || []; if (P.next < 0) segs = segs.slice(-1);
       for (const x of segs){ P.queue.push(x); P.next = Math.max(P.next, x.n); }
       pump();
     } catch(e){}
