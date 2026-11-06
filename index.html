@@ -1007,19 +1007,21 @@ const $ = id => document.getElementById(id);
    Telegram opens the site with #tgWebAppData=… in the address; we keep the signed launch data (it proves who the
    client is, so their orders appear and new orders link to the bot) and put the site's own route back in the hash.
    No Telegram script is loaded: these few events are all the site needs. */
-let TGINIT = '';
+let TGINIT = '', TGSTART = '';
 const TG = (() => {
   let init = '', inTg = false;
   try {
     const hp = new URLSearchParams(location.hash.slice(1));
     if (hp.get('tgWebAppData')){ init = hp.get('tgWebAppData'); inTg = true; }
+    TGSTART = hp.get('tgWebAppStartParam') || new URLSearchParams(init).get('start_param') || '';
+    if (new URLSearchParams(location.search).get('ops')) TGSTART = 'ops';
     else if (hp.get('tgWebAppPlatform') || window.TelegramWebviewProxy) inTg = true;
     if (init) sessionStorage.setItem('s3d-tginit', init); else init = sessionStorage.getItem('s3d-tginit') || '';
     if (init) inTg = true;
     const qt = new URLSearchParams(location.search).get('t');
-    if (/tgWebApp/.test(location.hash) || qt){
+    if (/tgWebApp/.test(location.hash) || qt || TGSTART === 'ops'){
       const first = location.hash.slice(1).split('&')[0];
-      const keep = qt && /^S3D-\d+-[a-z0-9]+$/i.test(qt) ? 'track-' + qt : (first && !first.includes('=') ? first : '');
+      const keep = TGSTART === 'ops' ? 'ops' : qt && /^S3D-\d+-[a-z0-9]+$/i.test(qt) ? 'track-' + qt : (first && !first.includes('=') ? first : '');
       history.replaceState(null, '', location.pathname + (keep ? '#' + keep : ''));
     }
   } catch(e){}
@@ -1851,6 +1853,15 @@ async function tgOrders(){
   if (!TGINIT) return;
   try { const j = await api('/api/tg/orders', {init: TGINIT}); for (const x of j.orders || []) if (!O(x.id)) await adoptOrder(x.id, x.code); } catch(e){}
 }
+// Panel opened from the operators' button in Telegram: log in with the Telegram account, no link needed.
+async function tgOps(){
+  if (!TGINIT || (TGSTART !== 'ops' && route() !== 'ops') || OPTOK) return;
+  try {
+    const j = await api('/api/tg/opauth', {init: TGINIT});
+    OPTOK = j.tok; try { localStorage.setItem('s3d-op', OPTOK); } catch(e){}
+    $('nav-ops').hidden = false; location.hash = 'ops'; loadOps(); full();
+  } catch(e){ toast(e.message === 'bad_init' ? 'Откройте панель заново кнопкой в Telegram' : e.message); }
+}
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
   try { const j = await api('/api/health'); if (j.ok) {
@@ -1860,7 +1871,7 @@ async function detectServer(){
     if (S.orders.length !== n) save();
     if (route() === 'admin') location.hash = 'home';
     $('nav-ops').hidden = !OPTOK; if (OPTOK) loadOps();
-    full(); badges(); loadLive(); tgOrders();
+    full(); badges(); loadLive(); tgOrders(); tgOps();
   } } catch(e){}
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),

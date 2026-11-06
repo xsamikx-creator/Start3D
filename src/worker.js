@@ -135,6 +135,27 @@ async function tgInitUser(env, init) {
   if (sig !== hash || now() / 1000 - (+q.get('auth_date') || 0) > 86400) return null;
   try { const u = JSON.parse(q.get('user') || 'null'); return u?.id ? u : null; } catch { return null; }
 }
+async function isOpMember(env, uid) {
+  if (String(uid) === String(await adminId(env))) return true;
+  const opChat = await kvGet(env, 'operator_chat');
+  if (!opChat) return false;
+  const cm = await tg(env, 'getChatMember', { chat_id: Number(opChat), user_id: uid });
+  return cm.ok && ['creator', 'administrator', 'member'].includes(cm.result.status);
+}
+async function newOpToken(env, u) {
+  await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'optok:%' AND json_extract(v,'$.exp') < ?").bind(now()).run();
+  const tok = rnd(24);
+  await kvSet(env, 'optok:' + tok, JSON.stringify({ name: clip(u.first_name || 'Оператор', 30), uid: u.id, exp: now() + 30 * 864e5 }));
+  return tok;
+}
+// The panel opened as a Mini App: Telegram vouches for the user, the operators group decides access.
+async function tgOpAuth(env, req) {
+  const b = await req.json().catch(() => ({}));
+  const u = await tgInitUser(env, b.init);
+  if (!u) return json({ error: 'bad_init' }, 403);
+  if (!(await isOpMember(env, u.id))) return json({ error: 'Панель доступна только участникам группы операторов' }, 403);
+  return json({ ok: true, tok: await newOpToken(env, u), name: u.first_name || '' });
+}
 async function tgMyOrders(env, req) {
   const b = await req.json().catch(() => ({}));
   const u = await tgInitUser(env, b.init);
@@ -684,18 +705,19 @@ async function onUpdate(env, u, origin) {
   }
   if (/^\/panel(@\w+)?$/.test(text)) {
     // Only members of the operators group (or the owner) get a link, and only in a private chat with the bot.
-    const opChat = await kvGet(env, 'operator_chat'), owner = String(from.id) === String(await adminId(env));
-    let member = owner;
-    if (!member && opChat) { const cm = await tg(env, 'getChatMember', { chat_id: Number(opChat), user_id: from.id }); member = cm.ok && ['creator', 'administrator', 'member'].includes(cm.result.status); }
-    if (!member) return chat.type === 'private' ? say('Панель доступна только участникам группы операторов.') : undefined;
-    await env.DB.prepare("DELETE FROM kv WHERE k LIKE 'optok:%' AND json_extract(v,'$.exp') < ?").bind(now()).run();
-    const tok = rnd(24);
-    await kvSet(env, 'optok:' + tok, JSON.stringify({ name: clip(from.first_name || 'Оператор', 30), uid: from.id, exp: now() + 30 * 864e5 }));
+    if (!(await isOpMember(env, from.id))) return chat.type === 'private' ? say('Панель доступна только участникам группы операторов.') : undefined;
+    if (chat.type !== 'private') { // one tap in the group opens the panel inside Telegram (needs the bot's Mini App switched on in @BotFather)
+      const bu = (await kvGet(env, 'bot_username')) || env.BOT_USERNAME;
+      await say('🖥 Панель оператора — нажмите, она откроется прямо в Telegram. Закрепите это сообщение, чтобы кнопка всегда была под рукой.', { reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть панель', url: `https://t.me/${bu}?startapp=ops` }]] } });
+    }
+    const tok = await newOpToken(env, from);
+    // in the operator's private chat the button next to the message field opens the panel
+    await tg(env, 'setChatMenuButton', { chat_id: from.id, menu_button: { type: 'web_app', text: 'Панель', web_app: { url: `${origin}/?ops=1` } } });
     const dm = await tg(env, 'sendMessage', { chat_id: from.id,
-      text: `🔐 Ваш личный вход в панель оператора. Ссылка действует 30 дней и запоминается в браузере. Никому её не пересылайте — по ней открываются все заказы.\nЗакрыть все входы: /logout_all (только владелец).`,
-      reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть панель', url: `${origin}/#op-${tok}` }]] } });
-    if (!dm.ok) { await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('optok:' + tok).run(); return say(`${from.first_name || ''}, сначала откройте личный чат с ботом (@${(await kvGet(env, 'bot_username')) || env.BOT_USERNAME}) и нажмите «Старт», потом снова /panel.`); }
-    return chat.type === 'private' ? undefined : say(`🔐 ${from.first_name || 'Оператор'}, ссылка на панель отправлена вам в личные сообщения.`);
+      text: `🔐 Ваш вход в панель оператора: кнопка ниже открывает её прямо в Telegram (и кнопка «Панель» слева от поля ввода). Вторая — для браузера на компьютере, ссылка действует 30 дней, никому её не пересылайте.\nЗакрыть все входы: /logout_all (только владелец).`,
+      reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть в Telegram', web_app: { url: `${origin}/?ops=1` } }], [{ text: '🌐 Ссылка для браузера', url: `${origin}/#op-${tok}` }]] } });
+    if (!dm.ok) { await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('optok:' + tok).run(); if (chat.type !== 'private') return; return say(`${from.first_name || ''}, сначала откройте личный чат с ботом (@${(await kvGet(env, 'bot_username')) || env.BOT_USERNAME}) и нажмите «Старт», потом снова /panel.`); }
+    return;
   }
   if (/^\/logout_all(@\w+)?$/.test(text)) {
     if (String(from.id) !== String(await adminId(env))) return;
@@ -1462,6 +1484,7 @@ export default {
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
       if (p === '/api/tg/orders' && req.method === 'POST') return tgMyOrders(env, req);
+      if (p === '/api/tg/opauth' && req.method === 'POST') return tgOpAuth(env, req);
       if (p.startsWith('/api/op/')) return opApi(env, req, url, origin, p);
       let fp = p.match(/^\/api\/free\/photo\/(S3D-\d+)\/(\d)$/);
       if (fp) return freePhoto(env, fp[1], +fp[2]);
