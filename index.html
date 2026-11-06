@@ -726,7 +726,8 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
       <tbody>
         <tr><td><span class="mat-dot" style="background:#E2702F"></span><b>PLA</b></td><td data-i="m_pla"></td><td class="mono">× 1,0</td><td>A1, Ender, K2 Plus</td></tr>
         <tr><td><span class="mat-dot" style="background:#2F5FD0"></span><b>PETG</b></td><td data-i="m_petg"></td><td class="mono">× 1,2</td><td>A1, Ender, K2 Plus</td></tr>
-        <tr><td><span class="mat-dot" style="background:#2A2D31"></span><b>ABS / ASA</b></td><td data-i="m_abs"></td><td class="mono">× 1,4</td><td>K2 Plus</td></tr>
+        <tr><td><span class="mat-dot" style="background:#2A2D31"></span><b>ABS</b></td><td data-i="m_abs"></td><td class="mono">× 1,4</td><td>K2 Plus</td></tr>
+        <tr><td><span class="mat-dot" style="background:#8C9198"></span><b>ASA</b></td><td data-i="m_asa"></td><td class="mono">× 1,5</td><td>K2 Plus</td></tr>
         <tr><td><span class="mat-dot" style="background:#3E9B5A"></span><b>TPU</b></td><td data-i="m_tpu"></td><td class="mono">× 1,8</td><td>A1, Ender</td></tr>
       </tbody>
     </table></div>
@@ -789,7 +790,7 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
       <div class="field adv"><label for="f-name" data-i="f_name"></label><input type="text" id="f-name" data-ip="f_name_ph"></div>
       <div class="row adv">
         <div class="field"><label for="f-mat" data-i="f_mat"></label>
-          <select id="f-mat"><option value="PLA">PLA</option><option value="PETG">PETG</option><option value="ABS">ABS / ASA</option><option value="TPU">TPU</option></select></div>
+          <select id="f-mat"><option value="PLA">PLA</option><option value="PETG">PETG</option><option value="ABS">ABS</option><option value="ASA">ASA</option><option value="TPU">TPU</option></select></div>
         <div class="field"><label for="f-qty" data-i="f_qty"></label><div class="qty-step"><button type="button" data-d="-1" aria-label="−">−</button><input type="number" id="f-qty" min="1" max="500" value="1"><button type="button" data-d="1" aria-label="+">+</button></div></div>
       </div>
       <div class="field adv"><span class="flabel"><span data-i="f_color"></span>: <span id="color-name"></span></span><div class="swatches" id="swatches"></div><span class="note" data-i="stock_note"></span></div>
@@ -1086,7 +1087,8 @@ th_k:['Qiymət əmsalı','Коэффициент цены','Коефіцієнт
 th_print:['Printerlər','Принтеры','Принтери','Printers'],
 m_pla:['dekor, korpuslar, prototiplər','декор, корпуса, прототипы','декор, корпуси, прототипи','decor, enclosures, prototypes'],
 m_petg:['möhkəm hissələr, rütubətə davamlı','прочные детали, влагостойкость','міцні деталі, вологостійкість','strong parts, moisture-resistant'],
-m_abs:['istiliyə davamlı, avtomobil üçün','термостойкие детали, для авто','термостійкі деталі, для авто','heat-resistant, automotive'],
+m_abs:['möhkəm və istiliyə davamlı hissələr','прочные термостойкие детали','міцні термостійкі деталі','tough, heat-resistant parts'],
+m_asa:['açıq hava: günəşə və istiyə davamlı, avtomobil üçün','для улицы: не боится солнца и жары, для авто','для вулиці: не боїться сонця і спеки, для авто','outdoor: UV and heat resistant, automotive'],
 m_tpu:['elastik: qapaqlar, amortizatorlar','гибкие: чехлы, амортизаторы','гнучкі: чохли, амортизатори','flexible: cases, dampers'],
 mat_note:['Rəngin anbarda olub-olmadığı sifariş formasında görünür. Olmayan rəng sifarişlə, +2–3 gün.','Наличие цвета видно прямо в форме заказа. Других цветов придётся подождать 2–3 дня.','Наявність кольору видно просто у формі замовлення. Інших кольорів доведеться почекати 2–3 дні.','Colour availability shows right in the order form. Other colours take 2–3 extra days.'],
 cat_h:['Hazır modellər','Готовые модели','Готові моделі','Ready-made models'],
@@ -1490,16 +1492,16 @@ const t = (k, v={}) => { const row = T[k]; let s = row ? (row[LANGS.indexOf(lang
 
 /* ---------- constants ---------- */
 const COLORS = [['col_black','#2A2D31'],['col_white','#ECECE6'],['col_grey','#8C9198'],['col_orange','#E2702F'],['col_blue','#2F5FD0'],['col_green','#3E9B5A'],['col_red','#C8372D']];
-const MATS = ['PLA','PETG','ABS','TPU'];
-const K_MAT = {PLA:1, PETG:1.2, ABS:1.4, TPU:1.8};
+const MATS = ['PLA','PETG','ABS','ASA','TPU'];
+const K_MAT = {PLA:1, PETG:1.2, ABS:1.4, ASA:1.5, TPU:1.8};
 // volume discount on the printing part (setup is paid once per order)
 const QTY_TIERS = [[50, 20], [25, 15], [10, 10]], QTY_MAX = 500;
 const qtyTier = q => (QTY_TIERS.find(([n]) => q >= n) || [0, 0])[1];
-const DENS = {PLA:1.24, PETG:1.27, ABS:1.05, TPU:1.21};
+const DENS = {PLA:1.24, PETG:1.27, ABS:1.05, ASA:1.07, TPU:1.21};
 const FILL = {15:.42, 30:.55, 60:.75};
 const QTIME = {draft:.75, std:1, fine:1.45};
 const PRINTER_DEF = [
-  {id:'P01', name:'Printer 01', model:'Creality K2 Plus', type:'K2', max:350, mats:['PLA','PETG','ABS','TPU'], util:72},
+  {id:'P01', name:'Printer 01', model:'Creality K2 Plus', type:'K2', max:350, mats:['PLA','PETG','ABS','ASA','TPU'], util:72},
   {id:'P02', name:'Printer 02', model:'Bambu Lab A1', type:'A1', max:256, mats:['PLA','PETG','TPU'], util:81},
   {id:'P03', name:'Printer 03', model:'Bambu Lab A1', type:'A1', max:256, mats:['PLA','PETG','TPU'], util:64},
   {id:'P04', name:'Printer 04', model:'Creality Ender 3 V3', type:'E3', max:220, mats:['PLA','PETG','TPU'], util:22}
@@ -1524,7 +1526,7 @@ function seed(){
     seq:1031,
     settings:{cg:.05, a1:2, k2:3, setup:3, min:15, dep:50, cour:3, student:15, kids:15, loyal:30, lube:100, nozzle:300},
     history:{revenue:1840, orders:71, repeat:34},
-    stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
+    stock:{PLA:[3000,2000,1000,1000,1000,1000,0], PETG:[2000,1000,0,0,1000,1000,0], ABS:[1000,0,0,0,0,0,0], ASA:[1000,1000,1000,0,0,0,0], TPU:[1000,0,0,0,0,0,0]},
     printers:[
       {id:'P01', status:'printing', order:'S3D-1021', spool:{mat:'ABS', color:0, g:640}, motor:812, lube:88, nozzle:140},
       {id:'P02', status:'printing', order:'S3D-1027', spool:{mat:'PETG', color:0, g:420}, motor:1240, lube:40, nozzle:292},
@@ -1545,7 +1547,8 @@ function seed(){
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch(e){ S = seed(); }
-Object.assign(S.settings, {min: 15, cour: 3}); // current prices: minimum order 15 AZN, courier 3 AZN
+Object.assign(S.settings, {min: 15, cour: 3});
+if (S.stock && !S.stock.ASA) S.stock.ASA = [1000,1000,1000,0,0,0,0]; // saved state from before ASA existed // current prices: minimum order 15 AZN, courier 3 AZN
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} };
 const P = id => PRINTER_DEF.find(p => p.id === id);
 const PS = id => S.printers.find(p => p.id === id);
@@ -1656,7 +1659,7 @@ async function vpList(){
     const j = await api(`/api/cam/${VP.pid}/vlist?${VP.qs}since=${Math.max(0, VP.next)}`);
     VP.wait = j.wait || 0; VP.on = !!j.on;
     let segs = j.segs || [];
-    if (VP.next < 0) segs = segs.slice(-1); // join at the live edge
+    if (VP.next < 0) segs = segs.slice(-2); // ~5–8 s cushion: smooth playback without stops
     for (const x of segs){ VP.queue.push(x); VP.next = Math.max(VP.next, x.n); }
     vpPump();
   } catch(e){}
@@ -1683,7 +1686,7 @@ function makeVPlayer(v, pid, qs){
     P.listAt = Date.now();
     try {
       const j = await api(`/api/cam/${pid}/vlist?${qs}since=${Math.max(0, P.next)}`);
-      let segs = j.segs || []; if (P.next < 0) segs = segs.slice(-1);
+      let segs = j.segs || []; if (P.next < 0) segs = segs.slice(-2);
       for (const x of segs){ P.queue.push(x); P.next = Math.max(P.next, x.n); }
       pump();
     } catch(e){}
@@ -2017,7 +2020,7 @@ function discounts(){
 function compute(m){
   const st = S.settings, mat = $('f-mat').value, qty = Math.max(1, Math.min(QTY_MAX, Math.round(+$('f-qty').value || 1)));
   const max = Math.max(m.x, m.y, m.z), base = Math.min(m.x, m.y);
-  const type = (max <= 256 && mat !== 'ABS') ? 'A1' : 'K2';
+  const type = (max <= 256 && !['ABS','ASA'].includes(mat)) ? 'A1' : 'K2'; // ABS/ASA need the closed K2
   const sup = m.support ? 1.12 : 1; // support material and time
   const grams = m.volCm3 * DENS[mat] * FILL[form.infill] * sup;
   const hours = Math.max(.3, grams / (type === 'K2' ? 14 : 11)) * QTIME[form.quality];
@@ -2952,7 +2955,7 @@ function opsOrderCard(o){
     </div>
     ${opsEdit === o.id ? `<div class="ops-edit">
       <label>Название <input name="name" value="${esc(o.name || '')}" maxlength="80"></label>
-      <label>Материал <select name="mat">${['PLA','PETG','ABS','TPU'].map(m => `<option${m === o.mat ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label>Материал <select name="mat">${['PLA','PETG','ABS','ASA','TPU'].map(m => `<option${m === o.mat ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
       <label>Цвет <input name="colorName" value="${esc(o.colorName || '')}" maxlength="30"></label>
       <label>Кол-во <input name="qty" type="number" min="1" max="500" value="${o.qty || 1}"></label>
       ${['review','pay','paycheck'].includes(o.status) ? `<label>Цена, AZN <input name="price" type="number" min="1" value="${o.price || mid}"></label>` : ''}

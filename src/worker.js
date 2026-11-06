@@ -1349,7 +1349,7 @@ async function opApi(env, req, url, origin, p) {
     const d = JSON.parse(o.data || '{}'), set = {}, log = [];
     if (b.pub !== undefined && !!b.pub !== !!d.pub) { d.pub = !!b.pub; log.push(d.pub ? 'публичный' : 'скрыт'); }
     if (typeof b.name === 'string' && b.name.trim() && b.name.trim() !== d.name) { d.name = clip(b.name.trim(), 80); log.push('название'); }
-    if (typeof b.mat === 'string' && ['PLA', 'PETG', 'ABS', 'TPU'].includes(b.mat) && b.mat !== d.mat) { d.mat = b.mat; log.push('материал ' + b.mat); }
+    if (typeof b.mat === 'string' && ['PLA', 'PETG', 'ABS', 'ASA', 'TPU'].includes(b.mat) && b.mat !== d.mat) { d.mat = b.mat; log.push('материал ' + b.mat); }
     if (typeof b.colorName === 'string' && b.colorName.trim() && b.colorName.trim() !== d.colorName) { d.colorName = clip(b.colorName.trim(), 30); log.push('цвет ' + d.colorName); }
     if (b.qty !== undefined && Number.isFinite(+b.qty) && +b.qty >= 1 && +b.qty <= 500 && +b.qty !== (d.qty || 1)) { d.qty = Math.round(+b.qty); log.push(d.qty + ' шт'); }
     if (typeof b.note === 'string' && b.note !== (d.opNote || '')) { d.opNote = clip(b.note, 300); log.push('заметка'); }
