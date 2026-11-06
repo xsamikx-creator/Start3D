@@ -186,7 +186,7 @@ function opButtons(o) {
   const b = (text, data) => ({ text, callback_data: `${data}:${o.id}` });
   const p = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
   switch (o.status) {
-    case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('❌ Отклонить', 'r')]];
+    case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('✏️ Своя цена', 'pe'), b('❌ Отклонить', 'r')]];
     case 'pay': case 'paycheck': return [[b('💰 Оплата получена', 'p')]];
     case 'queue': return [[b('🖨 Печать началась', 's')]]; // auto print ('a') is switched off for now
     case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
@@ -693,6 +693,19 @@ async function onUpdate(env, u, origin) {
     const opChat = await kvGet(env, 'operator_chat');
     if (String(chat.id) !== String(opChat)) return;
     if (!m.photo && text && m.reply_to_message) {
+      const pw = await kvGet(env, 'price_wait:' + m.reply_to_message.message_id);
+      if (pw) {
+        const o = await getOrder(env, pw);
+        if (!o) return;
+        if (o.status !== 'review') return say(`Цена для ${o.id} уже подтверждена (${o.price} AZN)`);
+        const v = Math.round(parseFloat(text.replace(',', '.').replace(/[^\d.]/g, '')));
+        if (!Number.isFinite(v) || v <= 0) return say('Не понял цену. Напишите число, например 27');
+        const r = await opAction(env, origin, o, 'c', { price: v });
+        if (r.error) return say('❌ ' + r.error);
+        await env.DB.prepare('DELETE FROM kv WHERE k=?').bind('price_wait:' + m.reply_to_message.message_id).run();
+        const n = await getOrder(env, o.id);
+        return say(`✅ ${o.id}: ${n.price} AZN отправлено клиенту на утверждение${v < MIN_ORDER && !JSON.parse(o.data || '{}').free ? ` (поднято до минимума ${MIN_ORDER} AZN)` : ''}`);
+      }
       const rid = await kvGet(env, 'reply_wait:' + m.reply_to_message.message_id);
       if (!rid) return;
       const o = await getOrder(env, rid);
@@ -1045,6 +1058,13 @@ async function onCallback(env, q, origin) {
   if (act === 'ag' || act === 'ax') { const r = await jobDecide(env, +id, act === 'ag', q.from.first_name); return answer(r.error || r.note); }
   const o = await getOrder(env, id);
   if (!o) return answer('Заказ не найден');
+  if (act === 'pe') { // the operator types the exact price as a reply; it goes to the client right away
+    if (o.status !== 'review') return answer('Цена уже подтверждена');
+    const r = await tg(env, 'sendMessage', { chat_id: q.message.chat.id, text: `✏️ ${o.id}: напишите цену в AZN ответом на это сообщение (например 27). Она сразу уйдёт клиенту на утверждение.`,
+      reply_parameters: { message_id: q.message.message_id, allow_sending_without_reply: true }, reply_markup: { force_reply: true, selective: true, input_field_placeholder: 'Цена, AZN' } });
+    if (r.ok) await kvSet(env, 'price_wait:' + r.result.message_id, o.id);
+    return answer('Напишите цену ответом');
+  }
   if (act === 'm' || act === 'pl') {
     if (o.status !== 'review') return answer('Цена уже подтверждена');
     const base = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
