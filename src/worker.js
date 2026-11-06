@@ -156,6 +156,19 @@ async function tgOpAuth(env, req) {
   if (!(await isOpMember(env, u.id))) return json({ error: 'Панель доступна только участникам группы операторов' }, 403);
   return json({ ok: true, tok: await newOpToken(env, u), name: u.first_name || '' });
 }
+// Operators get a «Панель» button next to the message field in their private chat with the bot (Telegram allows
+// such Mini App buttons only in private chats). Set once per person: when they write in the operators group or to the bot.
+async function opMenuButton(env, origin, chat, from) {
+  if (!from.id || from.is_bot) return;
+  const opChat = await kvGet(env, 'operator_chat');
+  const inGroup = opChat && String(chat.id) === String(opChat);
+  if (!inGroup && chat.type !== 'private') return;
+  const k = 'opmenu:' + from.id, v = +((await kvGet(env, k)) || 0);
+  if (v > 0 || (v < 0 && now() + v < 864e5)) return; // done, or checked within a day and not an operator
+  if (!inGroup && !(await isOpMember(env, from.id))) return kvSet(env, k, -now());
+  const r = await tg(env, 'setChatMenuButton', { chat_id: from.id, menu_button: { type: 'web_app', text: '🖥 Панель', web_app: { url: `${origin}/?ops=1` } } });
+  if (r.ok) await kvSet(env, k, now());
+}
 async function tgMyOrders(env, req) {
   const b = await req.json().catch(() => ({}));
   const u = await tgInitUser(env, b.init);
@@ -658,6 +671,7 @@ async function onUpdate(env, u, origin) {
   const chat = m.chat, from = m.from || {}, lang = langOf(from.language_code);
   const text = (m.text || '').trim();
   const say = (t, extra = {}) => tg(env, 'sendMessage', { chat_id: chat.id, text: t, ...extra });
+  await opMenuButton(env, origin, chat, from);
 
   if (/^\/admin(@\w+)?$/.test(text) && chat.type === 'private') {
     const cur = await adminId(env);
@@ -712,7 +726,7 @@ async function onUpdate(env, u, origin) {
     }
     const tok = await newOpToken(env, from);
     // in the operator's private chat the button next to the message field opens the panel
-    await tg(env, 'setChatMenuButton', { chat_id: from.id, menu_button: { type: 'web_app', text: 'Панель', web_app: { url: `${origin}/?ops=1` } } });
+    await tg(env, 'setChatMenuButton', { chat_id: from.id, menu_button: { type: 'web_app', text: '🖥 Панель', web_app: { url: `${origin}/?ops=1` } } });
     const dm = await tg(env, 'sendMessage', { chat_id: from.id,
       text: `🔐 Ваш вход в панель оператора: кнопка ниже открывает её прямо в Telegram (и кнопка «Панель» слева от поля ввода). Вторая — для браузера на компьютере, ссылка действует 30 дней, никому её не пересылайте.\nЗакрыть все входы: /logout_all (только владелец).`,
       reply_markup: { inline_keyboard: [[{ text: '🖥 Открыть в Telegram', web_app: { url: `${origin}/?ops=1` } }], [{ text: '🌐 Ссылка для браузера', url: `${origin}/#op-${tok}` }]] } });
