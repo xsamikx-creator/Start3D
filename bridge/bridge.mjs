@@ -66,12 +66,15 @@ async function pollBusy() {
   try {
     const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}`, 'x-bridge-start': String(BRIDGE_START) } });
     if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {});
-      if (j.restart === true) { console.log(new Date().toLocaleTimeString(), 'Команда из бота: перезапуск моста'); process.exit(0); } for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const jb of j.jobs || []) autoJob(jb); }
+      if (j.restart === true) { console.log(new Date().toLocaleTimeString(), 'Команда из бота: перезапуск моста'); process.exit(0); } for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const k of Object.keys(CAMFOR)) delete CAMFOR[k]; Object.assign(CAMFOR, j.camfor || {}); for (const jb of j.jobs || []) autoJob(jb); }
   } catch {}
 }
 const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');
 const rotFilter = (p) => ({ ccw: 'transpose=2', cw: 'transpose=1', '180': 'hflip,vflip' })[rotOf(p)] || '';
-const isPrinting = (p) => p.stream === 'always' || PRINTING.includes(p._state?.gcode_state) || BUSY.has(p.id);
+// A camera moved to another printer (/camto k2) follows that printer: its state starts and stops video and timelapses.
+const CAMFOR = {};
+const camState = (p) => (CAMFOR[p.id] && (cfg.printers || []).find((x) => x.id === CAMFOR[p.id])?._state) || p._state;
+const isPrinting = (p) => p.stream === 'always' || PRINTING.includes(camState(p)?.gcode_state) || BUSY.has(p.id);
 
 /* ---------- Bambu Lab: status over MQTT ---------- */
 function bambuStatus(p) {
@@ -599,8 +602,9 @@ function timelapse(p) {
   if (!hasFfmpeg()) { log(p.id, 'таймлапс: нужен ffmpeg (winget install Gyan.FFmpeg)'); return; }
   fs.mkdirSync(TL_DIR, { recursive: true });
   let sess = null, latest = null, grabbing = false, offSince = 0;
-  const printing = () => PRINTING.includes(p._state?.gcode_state) || BUSY.has(p.id);
-  const running = () => p._state?.gcode_state ? p._state.gcode_state === 'RUNNING' : BUSY.has(p.id);
+  const S = () => camState(p) || {};
+  const printing = () => PRINTING.includes(S().gcode_state) || BUSY.has(p.id);
+  const running = () => S().gcode_state ? S().gcode_state === 'RUNNING' && (S().layer_num || 0) > 0 || (S().gcode_state === 'RUNNING' && !CAMFOR[p.id]) : BUSY.has(p.id);
   const save = (img) => {
     if (!sess || !img) return;
     if (sess.n >= TL_MAX_FRAMES) { // very long print: keep every second frame and carry on
@@ -622,7 +626,7 @@ function timelapse(p) {
   };
   p._tl = { feed: (img) => { latest = img; } };
   const begin = () => {
-    const task = p._state?.subtask_name || '', t = Date.now();
+    const task = S().subtask_name || '', t = Date.now();
     // the bridge was restarted mid-print: continue the unfinished recording of the same job
     for (const d of fs.readdirSync(TL_DIR)) {
       const mp = path.join(TL_DIR, d, 'meta.json');
@@ -653,13 +657,13 @@ function timelapse(p) {
     } catch (e) { log(p.id, 'таймлапс: ffmpeg не собрал ролик:', e.message, '— кадры оставлены в', s0.dir); }
   };
   setInterval(() => {
-    const st = p._state?.gcode_state;
+    const st = S().gcode_state;
     if (printing()) {
       offSince = 0;
       if (!sess) begin();
       if (sess && !sess.order && ORDERS[p.id]) sess.order = ORDERS[p.id];
       if (!running()) return;
-      const layer = p._state?.layer_num;
+      const layer = S().layer_num;
       if (layer > 0) { if (layer !== sess.lastLayer && (layer % sess.every === 0 || layer - sess.lastLayer >= sess.every)) { sess.lastLayer = layer; grab(); } }
       else if (Date.now() - sess.lastAt >= TL_EVERY_MS * sess.every) grab();
     } else if (sess) {

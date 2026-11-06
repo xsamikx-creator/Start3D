@@ -411,12 +411,13 @@ async function bridgeBusy(env, req) {
   const pv = await env.DB.prepare("SELECT k, v FROM kv WHERE k LIKE 'campreview:%'").all();
   const busy = new Set(rs.results.map((r) => r.id));
   for (const x of pv.results) if (Number(x.v) > now()) busy.add(x.k.slice(11));
-  for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-' && busy.has(pr.id)) { busy.add(src); if (orders[pr.id]) orders[src] = orders[pr.id]; } }
+  const camfor = {}; // camera id → the printer it films now
+  for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-') { camfor[src] = pr.id; if (busy.has(pr.id)) { busy.add(src); if (orders[pr.id]) orders[src] = orders[pr.id]; } } }
   const rotate = {};
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
   // the moved camera keeps the rotation set for the printer it now films
   for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-') { const r = await kvGet(env, 'rotate:' + pr.id); if (r) rotate[src] = r; } }
-  return json({ busy: [...busy], rotate, orders, jobs: await jobsForBridge(env), restart: +((await kvGet(env, 'bridge_restart')) || 0) > +((await kvGet(env, 'bridge_start')) || 0) });
+  return json({ busy: [...busy], rotate, orders, camfor, jobs: await jobsForBridge(env), restart: +((await kvGet(env, 'bridge_restart')) || 0) > +((await kvGet(env, 'bridge_start')) || 0) });
 }
 const visibleSegs = async (env, pid, since, preview) => env.DB.prepare('SELECT n, sess, disc, dur FROM vid_seg WHERE pid=? AND n > ? AND at <= ? ORDER BY n').bind(await camSrc(env, pid), since, now() - delayOf(env, preview)).all();
 async function camVList(env, url, pid) {
