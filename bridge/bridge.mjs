@@ -18,7 +18,14 @@ if (!fs.existsSync(cfgPath)) {
   console.error('Нет файла config.json. Скопируйте config.example.json в config.json и заполните его.');
   process.exit(1);
 }
-const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+let cfg;
+try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '')); }
+catch (e) {
+  const m = String(e.message).match(/line (\d+)/);
+  console.error(`\nОшибка в config.json${m ? `, строка ${m[1]}` : ''}: ${e.message}`);
+  console.error('Чаще всего не хватает запятой между блоками принтеров: «},» перед следующим «{». Исправьте файл и сохраните — мост перезапустится сам.\n');
+  process.exit(1);
+}
 // The old *.workers.dev address is switched off: use the site's own domain (and fix config.json once).
 if (/workers\.dev/i.test(String(cfg.server || ''))) {
   cfg.server = 'https://start3d.az';
