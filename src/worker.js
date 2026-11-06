@@ -1301,7 +1301,7 @@ async function opState(env) {
   const orders = rs.results.map((o) => {
     const d = JSON.parse(o.data || '{}');
     return { id: o.id, status: o.status, client: o.client, contact: o.contact, ch: o.ch, email: o.email, tg: !!o.tg_chat_id, price: o.price, lo: o.lo, hi: o.hi, reason: o.reason,
-      name: d.name, mat: d.mat, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
+      name: d.name, mat: d.mat, color: d.color ?? 0, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
       pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
       printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
       accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup };
@@ -1350,7 +1350,7 @@ async function opApi(env, req, url, origin, p) {
     if (b.pub !== undefined && !!b.pub !== !!d.pub) { d.pub = !!b.pub; log.push(d.pub ? 'публичный' : 'скрыт'); }
     if (typeof b.name === 'string' && b.name.trim() && b.name.trim() !== d.name) { d.name = clip(b.name.trim(), 80); log.push('название'); }
     if (typeof b.mat === 'string' && ['PLA', 'PETG', 'ABS', 'ASA', 'TPU'].includes(b.mat) && b.mat !== d.mat) { d.mat = b.mat; log.push('материал ' + b.mat); }
-    if (typeof b.colorName === 'string' && b.colorName.trim() && b.colorName.trim() !== d.colorName) { d.colorName = clip(b.colorName.trim(), 30); log.push('цвет ' + d.colorName); }
+    if (b.color !== undefined && Number.isInteger(+b.color) && +b.color >= 0 && +b.color <= 6 && (+b.color !== (d.color ?? 0) || (b.colorName && b.colorName !== d.colorName))) { d.color = +b.color; if (b.colorName) d.colorName = clip(String(b.colorName), 30); log.push('цвет ' + (d.colorName || d.color)); }
     if (b.qty !== undefined && Number.isFinite(+b.qty) && +b.qty >= 1 && +b.qty <= 500 && +b.qty !== (d.qty || 1)) { d.qty = Math.round(+b.qty); log.push(d.qty + ' шт'); }
     if (typeof b.note === 'string' && b.note !== (d.opNote || '')) { d.opNote = clip(b.note, 300); log.push('заметка'); }
     if (b.price !== undefined && Number.isFinite(+b.price) && +b.price > 0 && +b.price !== o.price) {

@@ -572,6 +572,9 @@ header.open .logo .mark i:nth-child(3){transform:translateY(-6px) rotate(-45deg)
 .ops-more a.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
 .ops-edit input,.ops-edit select{width:100%;box-sizing:border-box;height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font:inherit;font-size:14px}
 .ops-edit input:focus,.ops-edit select:focus{outline:none;border-color:var(--accent)}
+.ops-edit select{color-scheme:dark}
+.ops-edit select option{background:#1A2140;color:#E9EDF6}
+select option{background:#1A2140;color:#E9EDF6} /* the opened list of every dropdown stays readable on Windows */
 .ops-edit{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px}
 .ops-edit label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .ops-edit .wide{grid-column:1/-1}
@@ -1866,7 +1869,7 @@ async function syncOrder(o){
     for (const k of ['accept','issueText','answer']) if ((r[k] || null) !== (o[k] || null)){ o[k] = r[k] || null; ch = true; }
     if ((r.card || null) !== (o.card || null)){ o.card = r.card || null; ch = true; }
     if ((r.tl || null) !== (o.tl || null)){ o.tl = r.tl || null; ch = true; }
-    for (const k of ['status','price','lo','hi','tgLinked','reason']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; }
+    for (const k of ['status','price','lo','hi','tgLinked','reason','name','mat','qty','color','pub']) if (r[k] !== undefined && r[k] !== null && o[k] !== r[k]){ o[k] = r[k]; ch = true; } // the operator may have edited the order
     if (r.status === 'printing' && !o.speed) o.speed = 1/120;
     if (['ready','done'].includes(r.status)){ o.progress = 1; o.photos = !!o.srvPhotos; }
     if (r.status === 'post') o.progress = 1;
@@ -2956,7 +2959,7 @@ function opsOrderCard(o){
     ${opsEdit === o.id ? `<div class="ops-edit">
       <label>Название <input name="name" value="${esc(o.name || '')}" maxlength="80"></label>
       <label>Материал <select name="mat">${['PLA','PETG','ABS','ASA','TPU'].map(m => `<option${m === o.mat ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
-      <label>Цвет <input name="colorName" value="${esc(o.colorName || '')}" maxlength="30"></label>
+      <label>Цвет <select name="color">${COLORS.map((c, i) => `<option value="${i}"${i === (o.color ?? 0) ? ' selected' : ''}>${colorName(i)}</option>`).join('')}</select></label>
       <label>Кол-во <input name="qty" type="number" min="1" max="500" value="${o.qty || 1}"></label>
       ${['review','pay','paycheck'].includes(o.status) ? `<label>Цена, AZN <input name="price" type="number" min="1" value="${o.price || mid}"></label>` : ''}
       <label class="wide">Заметка для операторов <input name="note" value="${esc(o.note || '')}" maxlength="300" placeholder="видно только в панели"></label>
@@ -3016,7 +3019,7 @@ $('ops-body').addEventListener('click', async e => {
   const sv = e.target.closest('[data-save]');
   if (sv){
     const box = sv.closest('.ops-edit'), val = k => box.querySelector(`[name="${k}"]`)?.value;
-    const body = {id: sv.dataset.save, name: val('name'), mat: val('mat'), colorName: val('colorName'), qty: +val('qty'), note: val('note')};
+    const ci = +val('color'), body = {id: sv.dataset.save, name: val('name'), mat: val('mat'), color: ci, colorName: colorName(ci), qty: +val('qty'), note: val('note')};
     if (box.querySelector('[name="price"]')) body.price = +val('price');
     sv.disabled = true;
     try { const r = await opsApi('/api/op/edit', body); toast(r.note || 'Сохранено'); opsEdit = null; } catch(err){ toast(err.message); sv.disabled = false; return; }
