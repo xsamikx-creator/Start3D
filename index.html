@@ -1003,6 +1003,41 @@ html .lang-pr .langs button[aria-pressed="true"]{background:rgba(255,255,255,.08
 <script>
 (() => {
 const $ = id => document.getElementById(id);
+/* ---------- Telegram Mini App ----------
+   Telegram opens the site with #tgWebAppData=… in the address; we keep the signed launch data (it proves who the
+   client is, so their orders appear and new orders link to the bot) and put the site's own route back in the hash.
+   No Telegram script is loaded: these few events are all the site needs. */
+let TGINIT = '';
+const TG = (() => {
+  let init = '', inTg = false;
+  try {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    if (hp.get('tgWebAppData')){ init = hp.get('tgWebAppData'); inTg = true; }
+    else if (hp.get('tgWebAppPlatform') || window.TelegramWebviewProxy) inTg = true;
+    if (init) sessionStorage.setItem('s3d-tginit', init); else init = sessionStorage.getItem('s3d-tginit') || '';
+    if (init) inTg = true;
+    const qt = new URLSearchParams(location.search).get('t');
+    if (/tgWebApp/.test(location.hash) || qt){
+      const first = location.hash.slice(1).split('&')[0];
+      const keep = qt && /^S3D-\d+-[a-z0-9]+$/i.test(qt) ? 'track-' + qt : (first && !first.includes('=') ? first : '');
+      history.replaceState(null, '', location.pathname + (keep ? '#' + keep : ''));
+    }
+  } catch(e){}
+  if (!inTg) return null;
+  TGINIT = init;
+  const post = (t, d) => { try {
+    const data = JSON.stringify(d || {});
+    if (window.TelegramWebviewProxy) window.TelegramWebviewProxy.postEvent(t, data);
+    else if (window.external && 'notify' in window.external) window.external.notify(JSON.stringify({eventType:t, eventData:d || {}}));
+    else window.parent.postMessage(JSON.stringify({eventType:t, eventData:d || {}}), '*');
+  } catch(e){} };
+  const handlers = {};
+  const recv = (t, d) => (handlers[t] || []).forEach(f => f(d));
+  window.Telegram = window.Telegram || {}; window.Telegram.WebView = window.Telegram.WebView || {}; window.Telegram.WebView.receiveEvent = recv;
+  window.addEventListener('message', e => { try { const m = JSON.parse(e.data); if (m && m.eventType) recv(m.eventType, m.eventData); } catch(err){} });
+  document.documentElement.classList.add('in-tg');
+  return { post, on: (t, f) => (handlers[t] = handlers[t] || []).push(f) };
+})();
 const LANGS = ['az','ru','uk','en'];
 /* [az, ru, uk, en] */
 const T = {
@@ -1571,7 +1606,7 @@ let SERVER = null; // {bot} when the Start3D server answers on this origin
 const BOT = () => (SERVER && SERVER.bot) || 'Strt3d_bot';
 const linkOf = o => o.code ? `${location.host}/#track-${o.id}-${o.code}` : `start3d.az/#track-${o.id}${o.pub ? '' : '-' + codeOf(o.id)}`;
 async function api(path, body){
-  const r = await fetch(path, body ? {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)} : {cache:'no-store'});
+  const r = await fetch(path, body ? {method:'POST', headers:Object.assign({'content-type':'application/json'}, TGINIT && path === '/api/orders' ? {'x-tg-init': TGINIT} : {}), body:JSON.stringify(body)} : {cache:'no-store'});
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(j.error || 'http_' + r.status), {code:j.error});
   return j;
@@ -1811,6 +1846,11 @@ let LIVE = [];
 async function loadLive(){ if (!SERVER || document.hidden || !['live','home','new','free'].includes(route())) return; loadTlWeek(); loadEta(); try { LIVE = await api('/api/live'); if (['live','home'].includes(route())) renderLive(); } catch(e){} }
 setInterval(loadLive, 15000); // every request counts against the Cloudflare limit
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadLive(); });
+// Inside Telegram: bring in every order this Telegram account has, even ones made in another browser.
+async function tgOrders(){
+  if (!TGINIT) return;
+  try { const j = await api('/api/tg/orders', {init: TGINIT}); for (const x of j.orders || []) if (!O(x.id)) await adoptOrder(x.id, x.code); } catch(e){}
+}
 async function detectServer(){
   if (!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent|github\.io/.test(location.host)) return;
   try { const j = await api('/api/health'); if (j.ok) {
@@ -1820,7 +1860,7 @@ async function detectServer(){
     if (S.orders.length !== n) save();
     if (route() === 'admin') location.hash = 'home';
     $('nav-ops').hidden = !OPTOK; if (OPTOK) loadOps();
-    full(); badges(); loadLive();
+    full(); badges(); loadLive(); tgOrders();
   } } catch(e){}
 }
 const serverBody = (o, extra) => Object.assign({client:o.client, contact:o.contact, ch:o.ch, email:o.email, name:o.name, mat:o.mat, color:o.color, colorName:colorName(o.color),
@@ -3418,6 +3458,22 @@ function frame(now){
 }
 
 window.addEventListener('hashchange', show);
+if (TG){
+  const hex = c => { const m = String(c).match(/\d+/g); return m && m.length >= 3 ? '#' + m.slice(0,3).map(x => (+x).toString(16).padStart(2,'0')).join('') : '#0E1430'; };
+  const v = getComputedStyle(document.body).getPropertyValue('--bg').trim(), bg = /^#[0-9a-f]{6}$/i.test(v) ? v : hex(getComputedStyle(document.body).backgroundColor);
+  TG.post('web_app_set_header_color', {color: bg}); TG.post('web_app_set_background_color', {color: bg});
+  TG.post('web_app_expand'); TG.post('web_app_ready');
+  const back = () => TG.post('web_app_setup_back_button', {is_visible: route() !== 'home'});
+  window.addEventListener('hashchange', back); back();
+  TG.on('back_button_pressed', () => { if (history.length > 1) history.back(); else location.hash = 'home'; });
+  // links to other sites open outside the Mini App; t.me links open right in Telegram
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="http"]'); if (!a || a.host === location.host) return;
+    e.preventDefault();
+    if (/^(www\.)?t\.me$/.test(a.host)) TG.post('web_app_open_tg_link', {path_full: a.pathname + a.search});
+    else TG.post('web_app_open_link', {url: a.href});
+  });
+}
 applyLang(); show(); badges(); lpPrint(lang);
 detectServer();
 setInterval(() => { if (document.hidden) return; if (route() === 'track'){ const o = O(trackId); if (o) syncOrder(o); } else if (route() === 'orders') S.orders.filter(o => o.server && !['done','rejected'].includes(o.status)).slice(0,5).forEach(syncOrder); }, 8000);

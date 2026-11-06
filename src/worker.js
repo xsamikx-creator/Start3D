@@ -122,6 +122,26 @@ async function kvSet(env, k, v) { await env.DB.prepare('INSERT INTO kv(k,v) VALU
 const MIN_ORDER = 15; // AZN, the smallest paid order (courier included)
 const deposit = (env, price) => Math.round((price * (Number(env.DEPOSIT_PCT) || 50)) / 100);
 const orderUrl = (origin, o) => `${origin}/#track-${o.id}-${o.code}`;
+// "Open" buttons in clients' private chats open the site inside Telegram (Mini App); ?t= survives Telegram's own #tgWebAppData hash.
+const openBtn = (origin, o, lang) => ({ text: tx('open', lang ?? o.lang), web_app: { url: `${origin}/?t=${o.id}-${o.code}` } });
+// Telegram Mini App launch data: valid only when signed with our bot token (and not older than a day).
+async function tgInitUser(env, init) {
+  if (!init || !env.BOT_TOKEN) return null;
+  const q = new URLSearchParams(String(init)), hash = q.get('hash'); if (!hash) return null;
+  q.delete('hash');
+  const dcs = [...q.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k}=${v}`).join('\n');
+  const enc = new TextEncoder(), hm = async (key, msg) => new Uint8Array(await crypto.subtle.sign('HMAC', await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']), typeof msg === 'string' ? enc.encode(msg) : msg));
+  const sig = [...(await hm(enc.encode('WebAppData'), env.BOT_TOKEN).then((k) => hm(k, dcs)))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  if (sig !== hash || now() / 1000 - (+q.get('auth_date') || 0) > 86400) return null;
+  try { const u = JSON.parse(q.get('user') || 'null'); return u?.id ? u : null; } catch { return null; }
+}
+async function tgMyOrders(env, req) {
+  const b = await req.json().catch(() => ({}));
+  const u = await tgInitUser(env, b.init);
+  if (!u) return json({ error: 'bad_init' }, 403);
+  const rs = await env.DB.prepare("SELECT id, code FROM orders WHERE tg_chat_id=? AND status!='rejected' ORDER BY created_at DESC LIMIT 20").bind(u.id).all();
+  return json({ ok: true, name: u.first_name || '', orders: rs.results });
+}
 
 async function getOrder(env, id) { return env.DB.prepare('SELECT * FROM orders WHERE id=?').bind(id).first(); }
 async function setStatus(env, id, fields) {
@@ -140,7 +160,7 @@ async function notifyClient(env, origin, o, key, extra = {}) {
   });
   await tg(env, 'sendMessage', {
     chat_id: o.tg_chat_id, text,
-    reply_markup: { inline_keyboard: [[{ text: tx('open', o.lang), url: orderUrl(origin, o) }]] },
+    reply_markup: { inline_keyboard: [[openBtn(origin, o)]] },
   });
 }
 
@@ -247,6 +267,9 @@ async function createOrder(env, req, origin) {
     if (known) await env.DB.prepare('UPDATE orders SET tg_chat_id=? WHERE id=?').bind(known.chat_id, id).run();
     else console.log('order', id, 'phone not linked yet', normPhone(contact).replace(/\d(?=\d{4})/g, '•'));
   }
+  // made inside the Telegram Mini App: the client already talks to the bot, so link the order right away
+  const tu = await tgInitUser(env, req.headers.get('x-tg-init'));
+  if (tu) await env.DB.prepare('UPDATE orders SET tg_chat_id=? WHERE id=?').bind(tu.id, id).run();
   const o = await getOrder(env, id);
   await postToOperators(env, o);
   if (o.tg_chat_id) {
@@ -760,7 +783,7 @@ async function onUpdate(env, u, origin) {
     const n = await setStatus(env, o.id, { tg_chat_id: chat.id });
     await refreshOperatorMsg(env, n);
     await say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }),
-      { reply_markup: { inline_keyboard: [[{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } });
+      { reply_markup: { inline_keyboard: [[openBtn(origin, n)]] } });
     if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
     if (n.status === 'printing') await notifyClient(env, origin, n, 'printing');
     if (!(await hasPhone(env, chat.id))) await say(tx('ask_phone', n.lang), phoneKeyboard(n.lang));
@@ -810,7 +833,7 @@ async function linkByPhone(env, origin, chatId, phone, say) {
   for (const o of rs.results.filter((o) => normPhone(o.contact) === phone)) {
     const x = await setStatus(env, o.id, { tg_chat_id: chatId });
     await refreshOperatorMsg(env, x);
-    await say(tx('linked', x.lang, { id: x.id, st: tx('st_' + x.status, x.lang) }), { reply_markup: { inline_keyboard: [[{ text: tx('open', x.lang), url: orderUrl(origin, x) }]] } });
+    await say(tx('linked', x.lang, { id: x.id, st: tx('st_' + x.status, x.lang) }), { reply_markup: { inline_keyboard: [[openBtn(origin, x)]] } });
     if (x.status === 'pay') await notifyClient(env, origin, x, 'confirmed');
     n++;
   }
@@ -1028,7 +1051,7 @@ async function operatorPhoto(env, origin, id, fileId, say) {
       caption: first ? tx('ready_photo', n.lang, { id: n.id, r: rest }) : n.id,
       reply_markup: first ? { inline_keyboard: [
         [{ text: tx('accept_btn', n.lang), callback_data: `ka:${n.id}` }, { text: tx('question_btn', n.lang), callback_data: `kq:${n.id}` }],
-        [{ text: tx('open', n.lang), url: orderUrl(origin, n) }]] } : undefined,
+        [openBtn(origin, n)]] } : undefined,
     });
   }
   if (first) await tlToClient(env, n);
@@ -1173,7 +1196,7 @@ async function ensureWebhook(env, origin) {
   await kvSet(env, 'webhook', key);
 }
 // The "/" menu: clients see their two commands; the operators' group and the owner's private chat see every command.
-const CMDS_V = '2';
+const CMDS_V = '3';
 const CLIENT_CMDS = [{ command: 'orders', description: 'Мои заказы' }, { command: 'me', description: 'Мой номер в боте' }];
 const OP_CMDS = [
   { command: 'panel', description: 'Вход в панель оператора на сайте' },
@@ -1187,6 +1210,8 @@ const OP_CMDS = [
 ];
 async function botCommands(env) {
   const r = await tg(env, 'setMyCommands', { commands: CLIENT_CMDS });
+  // the button next to the message field opens the site as a Mini App
+  await tg(env, 'setChatMenuButton', { menu_button: { type: 'web_app', text: 'Start3D', web_app: { url: env.PUBLIC_ORIGIN || 'https://start3d.az' } } });
   const op = await kvGet(env, 'operator_chat'), adm = await adminId(env);
   if (op) await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: Number(op) }, commands: OP_CMDS });
   if (adm) await tg(env, 'setMyCommands', { scope: { type: 'chat', chat_id: Number(adm) }, commands: [...CLIENT_CMDS, ...OP_CMDS] });
@@ -1436,6 +1461,7 @@ export default {
         return json({ ok: true, bot: bot || env.BOT_USERNAME || null, tg: !!env.BOT_TOKEN, webhook: (await kvGet(env, 'webhook')) === `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`, admin: !!(await adminId(env)), operators: !!(await kvGet(env, 'operator_chat')) });
       }
       if (p === '/api/orders' && req.method === 'POST') return createOrder(env, req, origin);
+      if (p === '/api/tg/orders' && req.method === 'POST') return tgMyOrders(env, req);
       if (p.startsWith('/api/op/')) return opApi(env, req, url, origin, p);
       let fp = p.match(/^\/api\/free\/photo\/(S3D-\d+)\/(\d)$/);
       if (fp) return freePhoto(env, fp[1], +fp[2]);
