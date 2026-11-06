@@ -566,6 +566,7 @@ header.open .logo .mark i:nth-child(3){transform:translateY(-6px) rotate(-45deg)
 .opc{display:grid;gap:8px}
 .opc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ops-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ops-restart{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .ops-filters .cnt{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:rgba(255,154,46,.2);color:var(--accent);font-size:11px}
 .ops-more{border-top:1px dashed var(--line);padding-top:8px}
 .ops-more a.btn-sm{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:600}
@@ -2933,11 +2934,12 @@ function opsOrderCard(o){
   const pr = OPS.printers.find(p => p.id === o.printer);
   const mid = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
   let acts = '';
+  const restart = ['printing','post'].includes(o.status) ? `<div class="ops-restart"><select data-pid="${o.id}" aria-label="Принтер для перезапуска">${OPS.printers.map(p => `<option value="${p.id}"${p.id === o.printer ? ' selected' : ''}>${p.name}${p.id === o.printer ? ' (тот же)' : busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm" data-op="rr" data-id="${o.id}" title="Печать не удалась и вы запустили её заново: заказ и ссылка клиента остаются те же">🔁 Перезапустить печать</button>${o.restarts ? ` <span class="note">перезапусков: ${o.restarts}</span>` : ''}</div>` : '';
   if (o.status === 'review') acts = `<input type="number" min="1" step="1" value="${mid}" data-price="${o.id}" aria-label="Цена"> AZN <button type="button" class="btn-sm btn-primary" data-op="c" data-id="${o.id}">✅ Подтвердить</button> <input type="text" placeholder="причина отказа" data-reason="${o.id}" style="width:160px"> <button type="button" class="btn-sm" data-op="r" data-id="${o.id}">❌ Отклонить</button>`;
   else if (['pay','paycheck'].includes(o.status)) acts = `<button type="button" class="btn-sm btn-primary" data-op="p" data-id="${o.id}">💰 Оплата получена</button>`;
   else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${p.name}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
-  else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
-  else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>`;
+  else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>${restart}`;
+  else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>${restart}`;
   else if (o.status === 'ready') acts = `<button type="button" class="btn-sm btn-primary" data-op="g" data-id="${o.id}">🙏 Выдан</button> <button type="button" class="btn-sm" data-op="rp" data-id="${o.id}">🔁 Перепечатать</button>`;
   const files = o.files.map((f, i) => `<a href="#" data-dl="/api/op/file/${o.id}/${i}" data-name="${esc(f.name)}">📎 ${esc(f.name)} · ${fsize(f.size)}</a>`).join('') + (o.receipt ? `<a href="#" data-dl="/api/op/receipt/${o.id}" data-name="${o.id}-receipt">🧾 чек</a>` : '');
   const price = o.price != null ? `${o.price} AZN` : o.lo ? `${o.lo}–${o.hi} AZN (расчёт)` : 'считает оператор';
@@ -3042,7 +3044,7 @@ $('ops-body').addEventListener('click', async e => {
       const id = b.dataset.id, body = {id, act: b.dataset.op};
       if (body.act === 'c') body.price = +(document.querySelector(`[data-price="${id}"]`) || {}).value;
       if (body.act === 'r') body.reason = (document.querySelector(`[data-reason="${id}"]`) || {}).value || '';
-      if (body.act === 'sp' || body.act === 'ap') body.pid = (document.querySelector(`[data-pid="${id}"]`) || {}).value;
+      if (body.act === 'sp' || body.act === 'ap' || body.act === 'rr') body.pid = (document.querySelector(`[data-pid="${id}"]`) || {}).value;
       b.disabled = true; const r = await opsApi('/api/op/act', body); toast(r.note);
     } else if (b.dataset.fr){ b.disabled = true; const r = await opsApi('/api/op/free', {id: +b.dataset.fr, ok: b.dataset.ok === '1'}); toast(r.note); }
     else if (b.id === 'ops-draw'){ if (!opsDrawArm){ opsDrawArm = true; renderOps(); return; } opsDrawArm = false; const r = await opsApi('/api/op/draw', {}); toast(r.note); }

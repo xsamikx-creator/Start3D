@@ -60,6 +60,7 @@ const TX = {
   no_pay: ['Ödəniş gözləyən sifariş tapılmadı.', 'Не нашёл заказа, который ждёт оплаты.', 'Не знайшов замовлення, яке чекає оплати.', 'No order is waiting for payment.'],
   paid: ['✅ {id}: ödəniş alındı, sifariş növbədədir.', '✅ {id}: оплата получена, заказ в очереди.', '✅ {id}: оплату отримано, замовлення в черзі.', '✅ {id}: payment received, your order is queued.'],
   printing: ['🖨 {id}: çap başladı! Canlı baxın: {link}', '🖨 {id}: печать началась! Смотрите вживую: {link}', '🖨 {id}: друк почався! Дивіться наживо: {link}', '🖨 {id}: printing started! Watch live: {link}'],
+  restarted: ['🔁 {id}: çapı yenidən başlatdıq ki, detal qüsursuz alınsın. Eyni linkdən canlı izləyin: {link}', '🔁 {id}: перезапустили печать, чтобы деталь вышла без брака. Следите вживую по той же ссылке: {link}', '🔁 {id}: перезапустили друк, щоб деталь вийшла без браку. Стежте наживо за тим самим посиланням: {link}', '🔁 {id}: we restarted the print so the part comes out flawless. Watch live at the same link: {link}'],
   ready: ['📦 {id} hazırdır! Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Остаток при получении: {r} AZN.', '📦 {id} готове! Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Balance on collection: {r} AZN.'],
   done: ['🙏 {id} təhvil verildi. Təşəkkür edirik!', '🙏 {id} выдан. Спасибо!', '🙏 {id} видано. Дякуємо!', '🙏 {id} collected. Thank you!'],
   rejected: ['❌ {id} rədd edildi: {w}.', '❌ {id} отклонён: {w}.', '❌ {id} відхилено: {w}.', '❌ {id} rejected: {w}.'],
@@ -189,8 +190,8 @@ function opButtons(o) {
     case 'review': return [[b('−2', 'm'), b(`✅ Подтвердить ${p} AZN`, 'c'), b('+2', 'pl')], [b('✏️ Своя цена', 'pe'), b('❌ Отклонить', 'r')]];
     case 'pay': case 'paycheck': return [[b('💰 Оплата получена', 'p')]];
     case 'queue': return [[b('🖨 Печать началась', 's')]]; // auto print ('a') is switched off for now
-    case 'printing': return [[b('📸 Готово — сделать фото', 'd')]];
-    case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')]];
+    case 'printing': return [[b('📸 Готово — сделать фото', 'd')], [b('🔁 Перезапустить печать', 'rs')]];
+    case 'post': return [[b('📸 Готово — сделать фото', 'd'), b('Без фото', 'dn')], [b('🔁 Перезапустить печать', 'rs')]];
     case 'ready': return [[b('🙏 Выдан', 'g'), b('🔁 Перепечатать', 'rp')]];
     default: return [];
   }
@@ -312,7 +313,9 @@ async function bridgeStatus(env, req, origin, pid) {
         if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, o.id);
         await setStatus(env, o.id, { status: 'post' });
       } else {
-        await tg(env, 'sendMessage', { chat_id: Number(opChat), text: `⚠️ ${printerName(pid)}: печать ${o.id} остановилась с ошибкой${st.error ? ': ' + st.error : ''}. Проверьте принтер.` });
+        await tg(env, 'sendMessage', { chat_id: Number(opChat),
+          text: `⚠️ ${printerName(pid)}: печать ${o.id} остановилась с ошибкой${st.error ? ': ' + st.error : ''}. Проверьте принтер.\nЗапустите печать заново на принтере и нажмите «Перезапустить» — у клиента останется та же ссылка, он увидит новую печать.`,
+          reply_markup: { inline_keyboard: [[{ text: `🔁 Перезапустить на ${printerName(pid)}`, callback_data: `rr:${pid}|${o.id}` }], [{ text: '🖨 На другом принтере', callback_data: `rs:${o.id}` }]] } });
       }
     }
   }
@@ -1037,7 +1040,7 @@ async function operatorPhoto(env, origin, id, fileId, say) {
 async function onCallback(env, q, origin) {
   let [act, id] = String(q.data || '').split(/:(.+)/);
   let pid = null;
-  if (act === 'sp' || act === 'ap') [pid, id] = String(id).split('|');
+  if (act === 'sp' || act === 'ap' || act === 'rr') [pid, id] = String(id).split('|');
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
@@ -1083,7 +1086,7 @@ async function onCallback(env, q, origin) {
     await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
     return answer('На каком принтере печатать?');
   }
-  if (act === 'bk') { await refreshOperatorMsg(env, o); return answer(''); }
+  if (act === 'bk') { await refreshOperatorMsg(env, o); await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: opButtons(o) } }); return answer(''); }
   if (act === 's' && o.status === 'queue') {
     const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
     const rows = PRINTERS.map((p) => {
@@ -1092,6 +1095,17 @@ async function onCallback(env, q, origin) {
     });
     await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
     return answer('На каком принтере?');
+  }
+  if (act === 'rs' && ['printing', 'post'].includes(o.status)) { // restart a failed print: pick the printer, the order and its link stay the same
+    const cur = JSON.parse(o.data || '{}').printer;
+    const busy = await env.DB.prepare('SELECT id, order_id FROM printers WHERE order_id IS NOT NULL').all();
+    const rows = [...PRINTERS].sort((a, c) => (c.id === cur) - (a.id === cur)).map((p) => {
+      const b = busy.results.find((r) => r.id === p.id && r.order_id !== o.id);
+      return [{ text: `🔁 ${p.name}${p.id === cur ? ' (тот же)' : ''}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `rr:${p.id}|${o.id}` }];
+    });
+    rows.push([{ text: '↩︎ Назад', callback_data: `bk:${o.id}` }]);
+    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    return answer('На каком принтере перезапускаете?');
   }
   const r = await opAction(env, origin, o, act, { pid, chatId: q.message?.chat?.id });
   return answer(r.error || r.note);
@@ -1110,6 +1124,14 @@ async function opAction(env, origin, o, act, x = {}) {
     n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
     await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(x.pid, id, now()).run();
     await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(x.pid)}`;
+  }
+  else if (act === 'rr' && ['printing', 'post'].includes(o.status) && PRINTERS.some((p) => p.id === x.pid)) {
+    // Same order, same link: the client keeps watching; live progress starts from zero on the chosen printer.
+    const d = JSON.parse(o.data || '{}'); d.printer = x.pid; d.restarts = (d.restarts || 0) + 1;
+    await freePrinter(env, id);
+    n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
+    await env.DB.prepare("INSERT INTO printers(id, order_id, status, updated_at) VALUES(?,?,'{}',?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id, status='{}'").bind(x.pid, id, now()).run();
+    await notifyClient(env, origin, n, 'restarted'); note = `Перезапуск на ${printerName(x.pid)} · клиенту сообщили`;
   }
   else if (act === 'ap' && o.status === 'queue') {
     const r = await jobCreate(env, o, x.pid);
@@ -1304,7 +1326,7 @@ async function opState(env) {
       name: d.name, mat: d.mat, color: d.color ?? 0, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
       pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
       printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
-      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup };
+      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup, restarts: d.restarts || 0 };
   });
   const prs = (await env.DB.prepare('SELECT id, status, order_id, frame_at, updated_at FROM printers').all()).results;
   const printers = [];
