@@ -60,13 +60,34 @@ async function post(url, body, type = 'application/json') {
 // Printers with an order in "printing" on the site (used for cameras of printers without a status connection).
 const BUSY = new Set();
 const BRIDGE_START = Date.now();
+// Updates: only a version the owner approved in the bot (/bridge update), downloaded at that exact commit and
+// checked against the SHA-256 fingerprints the server computed. start.bat installs the checked files on restart.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const sha256f = (f) => { try { return crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'); } catch { return ''; } };
+const MY_SHA = sha256f(path.join(HERE, 'bridge.mjs'));
+let updTried = '';
+async function applyUpdate(u) {
+  if (!/^[0-9a-f]{40}$/.test(u.sha || '') || updTried === u.sha) return false;
+  updTried = u.sha;
+  const get = async (f) => { const r = await fetch(`https://raw.githubusercontent.com/xsamikx-creator/Start3D/${u.sha}/bridge/${f}`); if (!r.ok) throw new Error(f + ': ' + r.status); return Buffer.from(await r.arrayBuffer()); };
+  try {
+    const b = await get('bridge.mjs'), st = await get('start.bat');
+    const hb = crypto.createHash('sha256').update(b).digest('hex'), hs = crypto.createHash('sha256').update(st).digest('hex');
+    if (hb !== u.hb || hs !== u.hs) { console.log(new Date().toLocaleTimeString(), '⛔ Обновление отклонено: отпечатки файлов не совпали с одобренными'); return false; }
+    fs.writeFileSync(path.join(HERE, 'bridge-new.mjs'), b);
+    if (hs !== sha256f(path.join(HERE, 'start.bat'))) fs.writeFileSync(path.join(HERE, 'start.new'), st);
+    console.log(new Date().toLocaleTimeString(), `Обновление ${u.sha.slice(0, 7)} проверено — устанавливаю`);
+    return true;
+  } catch (e) { console.log(new Date().toLocaleTimeString(), 'Обновление не скачалось:', e.message); return false; }
+}
 const ORDERS = {}; // printer id → order printing on it now (from the site)
 const ROTATE = {}; // printer id → '0' | 'ccw' | 'cw' | '180' (set from the bot with /rotate, or "rotate" in config.json)
 async function pollBusy() {
   try {
-    const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}`, 'x-bridge-start': String(BRIDGE_START) } });
-    if (r.ok){ const j = await r.json(); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {});
-      if (j.restart === true) { console.log(new Date().toLocaleTimeString(), 'Команда из бота: перезапуск моста'); process.exit(0); } for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const k of Object.keys(CAMFOR)) delete CAMFOR[k]; Object.assign(CAMFOR, j.camfor || {}); for (const jb of j.jobs || []) autoJob(jb); }
+    const r = await fetch(SERVER + '/api/bridge/busy', { headers: { authorization: `Bearer ${KEY}`, 'x-bridge-start': String(BRIDGE_START), 'x-bridge-sha': MY_SHA } });
+    if (r.ok){ const j = await r.json();
+      if (j.update && (await applyUpdate(j.update))) process.exit(0); BUSY.clear(); (j.busy || []).forEach((id) => BUSY.add(id)); Object.assign(ROTATE, j.rotate || {});
+      if (j.restart === true) { console.log(new Date().toLocaleTimeString(), 'Команда из бота: перезапуск моста'); process.exit(0); } for (const k of Object.keys(ORDERS)) delete ORDERS[k]; Object.assign(ORDERS, j.orders || {}); for (const k of Object.keys(CAMFOR)) delete CAMFOR[k]; Object.assign(CAMFOR, j.camfor || {}); if (cfg.autoPrint === true) for (const jb of j.jobs || []) autoJob(jb); } // auto print only if switched on in config.json
   } catch {}
 }
 const rotOf = (p) => ROTATE[p.id] && ROTATE[p.id] !== '0' ? ROTATE[p.id] : (p.rotate || '0');

@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-d8O03syRd1WIfh7/Mf/8nDJajXudA3wtsG9rWEhY+H4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script>/* old copies of the site (GitHub Pages, workers.dev) open the real one */ if (/github\.io$|workers\.dev$/i.test(location.hostname)) location.replace("https://start3d.az/" + location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10162B">
@@ -1295,6 +1296,8 @@ need_email:['Düzgün e-poçt ünvanı yazın','Укажите корректн�
 need_rights:['Modeli çap etmək hüququnu təsdiqləyin','Подтвердите право печатать модель','Підтвердьте право друкувати модель','Confirm you have the right to print the model'],
 need_photos:['Ən azı bir foto əlavə edin','Добавьте хотя бы одно фото','Додайте хоча б одне фото','Add at least one photo'],
 server_err:['Server cavab vermir, bir az sonra yenidən cəhd edin','Сервер не отвечает, попробуйте ещё раз через минуту','Сервер не відповідає, спробуйте ще раз за хвилину','The server is not responding; try again in a minute'],
+bad_photo:['Bu şəkil və ya PDF deyil — çekin fotosunu və ya skrinşotunu göndərin','Это не фото и не PDF — пришлите фото или скриншот чека','Це не фото і не PDF — надішліть фото або скриншот чека','This is not a photo or PDF — send a photo or screenshot of the receipt'],
+too_many:['Çox sorğu göndərildi — bir az sonra yenidən cəhd edin','Слишком много заявок подряд — попробуйте чуть позже или напишите нам в Telegram','Забагато заявок поспіль — спробуйте трохи пізніше або напишіть нам у Telegram','Too many requests in a row — try again a bit later or message us on Telegram'],
 cancel:['Ləğv et','Отмена','Скасувати','Cancel'],
 ord_h:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
 ord_p:['Bu brauzerdən verilmiş sifarişlər.','Заказы, оформленные в этом браузере.','Замовлення, оформлені в цьому браузері.','Orders placed from this browser.'],
@@ -1905,7 +1908,7 @@ async function pushOrder(o, extra){
   if (!SERVER) return true;
   try {
     const r = await api('/api/orders', serverBody(o, extra));
-    o.id = r.id; o.code = r.code; o.status = r.status; o.server = true; o.notifs = []; o.tgLinked = !!r.tgLinked;
+    o.id = r.id; o.code = r.code; o.status = r.status; o.server = true; if (r.price) o.price = r.price; o.notifs = []; o.tgLinked = !!r.tgLinked;
     return true;
   } catch(e){ toast(t(e.code && T[e.code] ? e.code : 'server_err')); return false; }
 }
@@ -2539,7 +2542,7 @@ $('m-ok').onclick = async () => {
     if (M.mode === 'repeat' && unit){ o.price = Math.max(S.settings.min, Math.round(unit*qty*loy)); o.status = 'pay'; o.check = 'repeat ' + s.id; }
     else { const p = (s.price || s.hi || 20) * ratio; o.lo = Math.floor(p*.9); o.hi = Math.ceil(p*1.15); o.status = 'review'; o.check = (M.mode === 'copy' ? '= ' : 'repeat ') + s.id; }
   }
-  if (!(await pushOrder(o, o.status === 'pay' ? {catalog:true, price:o.price} : null))) return;
+  if (!(await pushOrder(o, M.mode === 'buy' ? {cat:s.k} : M.mode === 'repeat' && o.status === 'pay' ? {repeat:s.id, repeatCode:s.code} : null))) return;
   S.orders.unshift(o);
   if (!o.server){ S.seq++; clientNotif(o, 'n_received'); if (o.status === 'pay') clientNotif(o, 'n_confirmed', {p:azn(o.price), d:azn(Math.round(o.price*S.settings.dep/100))}); }
   save(); justSent = o.id; location.hash = 'track-' + o.id + (o.code ? '-' + o.code : '');
@@ -2714,7 +2717,7 @@ function renderTrack(){
     if ($('paid')) $('paid').onclick = async () => { const f = $('receipt').files[0]; o.receipt = f ? f.name : null;
       if (o.server){
         $('paid').disabled = true;
-        if (f){ const r = await uploadToOrder(o, 'receipt', f, p => { $('paid').textContent = `${t('uploading')} ${Math.round(p * 100)}%`; }); if (r.error){ $('paid').disabled = false; $('paid').textContent = t('paid_btn'); toast(t('server_err')); return; } }
+        if (f){ const r = await uploadToOrder(o, 'receipt', f, p => { $('paid').textContent = `${t('uploading')} ${Math.round(p * 100)}%`; }); if (r.error){ $('paid').disabled = false; $('paid').textContent = t('paid_btn'); toast(t(r.error === 'bad_photo' || r.error === 'too_many' ? r.error : 'server_err')); return; } }
         else { try { await api(`/api/orders/${o.id}/paid?code=${o.code}`, {}); } catch(e){ $('paid').disabled = false; toast(t('server_err')); return; } }
       }
       o.status = 'paycheck'; save(); toast(t('t_client_paid')); full(); badges(); };
@@ -2811,7 +2814,7 @@ function renderPrinters(){
     } else {
       body = `<p class="note">${t('p_can',{m:p.mats.join(', ')})} · ≤ ${p.max} mm</p>${s.status === 'ready' ? `<span data-oled-p="${p.id}"></span>` : ''}<button type="button" class="btn-sm" data-pm="${p.id}">${s.status==='ready'?t('p_to_maint'):t('p_back')}</button>`;
     }
-    return `<div class="printer ${s.status==='error'?'err':''}"><div class="top"><h3>${p.name}</h3>${pill}</div><div class="model">${p.model}</div>${sp}${body}${maint}</div>`;
+    return `<div class="printer ${s.status==='error'?'err':''}"><div class="top"><h3>${esc(p.name)}</h3>${pill}</div><div class="model">${p.model}</div>${sp}${body}${maint}</div>`;
   }).join('');
   document.querySelectorAll('[data-pm]').forEach(b => b.onclick = () => { const s = PS(b.dataset.pm); s.status = s.status === 'ready' ? 'maintenance' : 'ready'; save(); full(); });
   document.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => { PS(b.dataset.p)[b.dataset.mt] = 0; save(); full(); });
@@ -2860,7 +2863,7 @@ function renderStats(){
   const rev = S.history.revenue + paid.reduce((a,o) => a + o.price, 0), n = S.history.orders + S.orders.length;
   $('stats').innerHTML = [[azn(rev),'s_rev'],[n,'s_orders'],[azn(rev / Math.max(1, S.history.orders + paid.length)),'s_avg'],[S.history.repeat + '%','s_repeat']]
     .map(([v,k]) => `<div class="counter"><b class="mono" style="font-size:22px">${v}</b><span class="muted">${t(k)}</span></div>`).join('');
-  $('util').innerHTML = PRINTER_DEF.map(p => `<div class="hbar"><span>${p.name}</span><div class="bar-line"><i style="width:${p.util}%"></i></div><span class="mono">${p.util}%</span></div>`).join('');
+  $('util').innerHTML = PRINTER_DEF.map(p => `<div class="hbar"><span>${esc(p.name)}</span><div class="bar-line"><i style="width:${p.util}%"></i></div><span class="mono">${p.util}%</span></div>`).join('');
   const g = {}; S.orders.forEach(o => g[o.mat] = (g[o.mat]||0) + (o.grams||0)); const mx = Math.max(1, ...Object.values(g));
   $('matshare').innerHTML = MATS.map(m => `<div class="hbar"><span>${m}</span><div class="bar-line"><i style="width:${(g[m]||0)/mx*100}%"></i></div><span class="mono">${Math.round(g[m]||0)}</span></div>`).join('');
 }
@@ -2985,10 +2988,10 @@ function opsOrderCard(o){
   const pr = OPS.printers.find(p => p.id === o.printer);
   const mid = o.price || (o.lo ? Math.round((o.lo + o.hi) / 2) : 20);
   let acts = '';
-  const restart = ['printing','post'].includes(o.status) ? `<div class="ops-restart"><select data-pid="${o.id}" aria-label="Принтер для перезапуска">${OPS.printers.map(p => `<option value="${p.id}"${p.id === o.printer ? ' selected' : ''}>${p.name}${p.id === o.printer ? ' (тот же)' : busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm" data-op="rr" data-id="${o.id}" title="Печать не удалась и вы запустили её заново: заказ и ссылка клиента остаются те же">🔁 Перезапустить печать</button>${o.restarts ? ` <span class="note">перезапусков: ${o.restarts}</span>` : ''}</div>` : '';
+  const restart = ['printing','post'].includes(o.status) ? `<div class="ops-restart"><select data-pid="${o.id}" aria-label="Принтер для перезапуска">${OPS.printers.map(p => `<option value="${p.id}"${p.id === o.printer ? ' selected' : ''}>${esc(p.name)}${p.id === o.printer ? ' (тот же)' : busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm" data-op="rr" data-id="${o.id}" title="Печать не удалась и вы запустили её заново: заказ и ссылка клиента остаются те же">🔁 Перезапустить печать</button>${o.restarts ? ` <span class="note">перезапусков: ${o.restarts}</span>` : ''}</div>` : '';
   if (o.status === 'review') acts = `<input type="number" min="1" step="1" value="${mid}" data-price="${o.id}" aria-label="Цена"> AZN <button type="button" class="btn-sm btn-primary" data-op="c" data-id="${o.id}">✅ Подтвердить</button> <input type="text" placeholder="причина отказа" data-reason="${o.id}" style="width:160px"> <button type="button" class="btn-sm" data-op="r" data-id="${o.id}">❌ Отклонить</button>`;
   else if (['pay','paycheck'].includes(o.status)) acts = `<button type="button" class="btn-sm btn-primary" data-op="p" data-id="${o.id}">💰 Оплата получена</button>`;
-  else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${p.name}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
+  else if (o.status === 'queue') acts = `<select data-pid="${o.id}">${OPS.printers.map(p => `<option value="${p.id}">${esc(p.name)}${busy[p.id] ? ' · занят ' + busy[p.id] : ''}</option>`).join('')}</select> <button type="button" class="btn-sm btn-primary" data-op="sp" data-id="${o.id}">🖨 Печать началась</button>`;
   else if (o.status === 'printing') acts = `<button type="button" class="btn-sm btn-primary" data-op="d" data-id="${o.id}">📸 Готово — фото в Telegram</button> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>${restart}`;
   else if (o.status === 'post') acts = `<span class="note">Жду фото в Telegram ответом на сообщение бота</span> <button type="button" class="btn-sm" data-op="dn" data-id="${o.id}">Готово без фото</button>${restart}`;
   else if (o.status === 'ready') acts = `<button type="button" class="btn-sm btn-primary" data-op="g" data-id="${o.id}">🙏 Выдан</button> <button type="button" class="btn-sm" data-op="rp" data-id="${o.id}">🔁 Перепечатать</button>`;
@@ -3038,7 +3041,7 @@ function renderOps(){
   } else if (opsTab === 'printers'){
     html = `<div class="ops-grid">${OPS.printers.map(p => {
       const online = p.seen && Date.now() - p.seen < 120000;
-      return `<div class="panel opc"><div class="opc-h"><b>${p.name}</b><span class="pill ${online ? 'good' : 'mut'}">${online ? (p.state || 'на связи') : 'нет связи с мостом'}</span></div>
+      return `<div class="panel opc"><div class="opc-h"><b>${esc(p.name)}</b><span class="pill ${online ? 'good' : 'mut'}">${online ? (p.state || 'на связи') : 'нет связи с мостом'}</span></div>
         ${online && p.state ? `<div class="note">${p.percent}% · слой ${p.layer}/${p.layers} · осталось ${fmtH((p.remaining || 0) / 60)}</div>` : ''}
         ${p.error ? `<div class="note" style="color:var(--bad)">Ошибка: ${esc(p.error)}</div>` : ''}
         <div class="note">${p.order ? `Заказ: <b>${p.order}</b>` : 'Свободен'} · камера: ${p.video ? 'видео' : p.frame ? 'фото' : 'нет'}</div>

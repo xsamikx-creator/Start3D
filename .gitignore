@@ -2,3 +2,4 @@ bridge/config.json
 bridge/node_modules/
 bridge/timelapses/
 bridge/jobs/
+ip.log

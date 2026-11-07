@@ -9,27 +9,20 @@ if not exist node_modules call npm install --no-audit --no-fund
 if not exist config.json goto noconfig
 
 :loop
-echo Проверяю обновление моста...
-del bridge-new.mjs start.new >nul 2>nul
-curl.exe -fsSL --max-time 15 -o start.new "https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/start.bat?t=%RANDOM%%RANDOM%" >nul 2>nul
+rem Updates are never downloaded here: the bridge fetches only a version the owner approved in the bot
+rem (/bridge update), checks its SHA-256 fingerprints and leaves it as start.new / bridge-new.mjs.
 if not exist start.new goto nostart
-fc /b start.new start.bat >nul 2>nul
-if not errorlevel 1 goto nostart
 findstr /c:"Start3D" start.new >nul 2>nul
 if errorlevel 1 goto nostart
-echo Обновляю start.bat и перезапускаюсь...
+echo Устанавливаю проверенный start.bat и перезапускаюсь...
 copy /y start.new start.bat >nul & del start.new >nul 2>nul & start "" "%~f0" & exit
 :nostart
 del start.new >nul 2>nul
-curl.exe -fsSL --max-time 15 -o bridge-new.mjs "https://raw.githubusercontent.com/xsamikx-creator/Start3D/main/bridge/bridge.mjs?t=%RANDOM%%RANDOM%" >nul 2>nul
 if not exist bridge-new.mjs goto run
 node --check bridge-new.mjs >nul 2>nul
 if errorlevel 1 goto dropnew
-fc /b bridge-new.mjs bridge.mjs >nul 2>nul
-if errorlevel 1 (
-  copy /y bridge-new.mjs bridge.mjs >nul
-  echo Мост обновлён.
-)
+copy /y bridge-new.mjs bridge.mjs >nul
+echo Мост обновлён.
 :dropnew
 del bridge-new.mjs >nul 2>nul
 
