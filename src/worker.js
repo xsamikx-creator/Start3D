@@ -1122,6 +1122,34 @@ async function bridgeTl(env, req, url, pid) {
   }
   return json({ ok: true, id, order: o?.id || null });
 }
+// The camera's last frame when a print finishes: operators see how it ended right away (Telegram + the order in the
+// panel) without opening the camera. Stored as a Telegram photo; served to whoever has the order's code.
+async function bridgeShot(env, req, pid) {
+  if (!PRINTERS.some((x) => x.id === pid)) return json({ error: 'unknown_printer' }, 400);
+  const buf = await req.arrayBuffer();
+  if (buf.byteLength < 500 || buf.byteLength > 3e6 || sniffFile(buf, 'photo') !== 'jpg') return json({ error: 'bad_image' }, 400);
+  let o = null; const want = clip(req.headers.get('x-order') || '', 20);
+  if (want) { const x = await getOrder(env, want), xp = x && JSON.parse(x.data || '{}').printer; if (x && (xp === pid || (xp && (await camSrc(env, xp)) === pid))) o = x; }
+  if (!o) { const pr = await env.DB.prepare('SELECT order_id FROM printers WHERE id=?').bind(pid).first(); if (pr?.order_id) o = await getOrder(env, pr.order_id); }
+  if (!o || !['printing', 'post', 'ready', 'done'].includes(o.status)) return json({ ok: true, order: null });
+  const chat = await kvGet(env, 'operator_chat');
+  if (!chat) return json({ error: 'no_chat' }, 503);
+  const d = JSON.parse(o.data || '{}');
+  const r = await tgForm(env, 'sendPhoto', { chat_id: Number(chat), caption: `📷 ${o.id} · ${o.client}: так закончилась печать на ${printerName(d.printer || pid)} (кадр с камеры)` }, 'photo', new Blob([buf], { type: 'image/jpeg' }), `${o.id}-end.jpg`);
+  if (!r.ok) return json({ error: 'telegram' }, 502);
+  const ph = r.result.photo || []; d.shot = ph[ph.length - 1]?.file_id; d.shotAt = now();
+  await setStatus(env, o.id, { data: JSON.stringify(d) });
+  return json({ ok: true, order: o.id });
+}
+async function orderShot(env, id, code) {
+  const o = await getOrder(env, id);
+  const fileId = o && o.code === code && JSON.parse(o.data || '{}').shot;
+  if (!fileId) return json({ error: 'not_found' }, 404);
+  const f = await tg(env, 'getFile', { file_id: fileId });
+  if (!f.ok) return json({ error: 'not_found' }, 404);
+  const img = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${f.result.file_path}`);
+  return new Response(img.body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
+}
 async function tlToClient(env, o) {
   if (!o?.tg_chat_id) return;
   const t = await env.DB.prepare("SELECT id, file_id FROM timelapses WHERE order_id=? AND state='FINISH' AND sent=0 AND file_id IS NOT NULL ORDER BY id DESC LIMIT 1").bind(o.id).first();
@@ -1558,7 +1586,7 @@ async function opState(env) {
       name: d.name, mat: d.mat, color: d.color ?? 0, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
       pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
       printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
-      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup, restarts: d.restarts || 0 };
+      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup, restarts: d.restarts || 0, shot: d.shotAt || 0 };
   });
   const prs = (await env.DB.prepare('SELECT id, status, order_id, frame_at, updated_at FROM printers').all()).results;
   const printers = [];
@@ -1695,6 +1723,8 @@ export default {
       if (b) return b[2] === 'vinit' ? camVInit(env, url, b[1], +b[3]) : camVSeg(env, url, b[1], +b[3]);
       b = p.match(/^\/api\/bridge\/chunk\/([a-z0-9-]+)$/);
       if (b && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeChunk(env, req, url, b[1]); }
+      b = p.match(/^\/api\/bridge\/shot\/([a-z0-9-]+)$/);
+      if (b && req.method === 'POST') { if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403); return bridgeShot(env, req, b[1]); }
       b = p.match(/^\/api\/bridge\/(status|frame)\/([a-z0-9-]+)$/);
       if (b && req.method === 'POST') {
         if (!bridgeOk(env, req)) return json({ error: 'forbidden' }, 403);
@@ -1702,6 +1732,8 @@ export default {
       }
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
+      m = p.match(/^\/api\/orders\/(S3D-\d+)\/shot$/);
+      if (m) return orderShot(env, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/photo\/(\d)$/);
       if (m) return orderPhoto(env, m[1], url.searchParams.get('code'), +m[2]);
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/feedback$/);

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-UYwQmi8CsW1xuB1mJaIMxO87l/cADR+Aj8Tu1lWPDSU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-jEDxl0MZjftC6ttK7hfQetKrjjcQzHfDiV8ohIzYGdg='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script>/* old copies of the site (GitHub Pages, workers.dev) open the real one */ if (/github\.io$|workers\.dev$/i.test(location.hostname)) location.replace("https://start3d.az/" + location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10162B">
@@ -567,6 +567,7 @@ header.open .logo .mark i:nth-child(3){transform:translateY(-6px) rotate(-45deg)
 .opc{display:grid;gap:8px}
 .opc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ops-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.opc-shot{display:flex;gap:10px;align-items:center;margin:8px 0;color:inherit;text-decoration:none}.opc-shot img{width:168px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0006}.opc-shot span{font-size:13px;opacity:.85}
 .ops-restart{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .ops-filters .cnt{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:rgba(255,154,46,.2);color:var(--accent);font-size:11px}
 .ops-more{border-top:1px dashed var(--line);padding-top:8px}
@@ -3005,6 +3006,7 @@ function opsOrderCard(o){
     ${o.link ? `<div class="note">🔗 <a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.link)}</a> — проверьте лицензию</div>` : ''}
     ${files ? `<div class="files">${files}</div>` : (o.kind === 'file' ? '<div class="note">Файл не загружен — запросите у клиента</div>' : '')}
     ${pr ? `<div class="note">🖨 ${pr.name}${pr.state ? ` · ${pr.state} ${pr.percent}% · слой ${pr.layer}/${pr.layers} · осталось ${fmtH((pr.remaining || 0) / 60)}` : ''}</div>` : ''}
+    ${o.shot ? `<a class="opc-shot" href="/api/orders/${o.id}/shot?code=${o.code}&t=${o.shot}" target="_blank" rel="noopener" title="Открыть кадр целиком"><img src="/api/orders/${o.id}/shot?code=${o.code}&t=${o.shot}" alt="Кадр с камеры в конце печати" loading="lazy"><span>📷 Так закончилась печать · ${new Date(o.shot).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}</span></a>` : ''}
     ${o.note ? `<div class="note">📝 ${esc(o.note)}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
     <div class="acts ops-more">
