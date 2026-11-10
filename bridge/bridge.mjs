@@ -611,6 +611,18 @@ const hasSlicer = () => fs.existsSync(SLICER_EXE);
 
 /* ---------- timelapse: a frame per layer while printing → MP4 after the print → server (Telegram) ---------- */
 const TL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'timelapses');
+// Nov 2026 the A1 ids were swapped to match the names (a1-1 = A1 .107, a1-2 = A2 .111). Recordings on disk are named
+// by id, so rename them once — a print that was being recorded keeps its timelapse after the restart.
+try {
+  const mark = path.join(TL_DIR, '.a1-ids-swapped');
+  if (fs.existsSync(TL_DIR) && !fs.existsSync(mark)) {
+    const ents = fs.readdirSync(TL_DIR).filter((f) => /^a1-[12]_/.test(f));
+    for (const f of ents) fs.renameSync(path.join(TL_DIR, f), path.join(TL_DIR, '__' + f));
+    for (const f of ents) fs.renameSync(path.join(TL_DIR, '__' + f), path.join(TL_DIR, f.replace(/^a1-([12])_/, (m, n) => `a1-${n === '1' ? '2' : '1'}_`)));
+    fs.writeFileSync(mark, new Date().toISOString());
+    if (ents.length) console.log('Таймлапсы: переименовал записи под новые номера принтеров (' + ents.length + ')');
+  } else if (!fs.existsSync(TL_DIR)) { fs.mkdirSync(TL_DIR, { recursive: true }); fs.writeFileSync(mark, new Date().toISOString()); }
+} catch (e) { console.log('Таймлапсы: не смог переименовать записи:', e.message); }
 const TL_EVERY_MS = (cfg.timelapseSeconds || 8) * 1000; // fallback when the printer reports no layers
 const TL_MAX_FRAMES = 1500, TL_KEEP_DAYS = cfg.timelapseKeepDays || 30;
 const stamp = (t) => { const d = new Date(t), z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}`; };
