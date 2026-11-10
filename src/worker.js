@@ -250,8 +250,8 @@ function opText(o) {
 }
 // Print farm. Ids must match "id" in bridge/config.json on the workshop computer.
 const PRINTERS = [
-  { id: 'a1-2', name: 'A1', auto: true }, // the new A1 (192.168.0.107), Nov 2026
-  { id: 'a1-1', name: 'A2', auto: true }, // the first A1 (192.168.0.111) — renamed A2; its orders and camera stay
+  { id: 'a1-1', name: 'A1', auto: true }, // 192.168.0.107, own camera 192.168.0.102
+  { id: 'a1-2', name: 'A2', auto: true }, // 192.168.0.111 (the first printer), Imou camera 192.168.0.110
   { id: 'k2', name: 'K2 Plus' },
   { id: 'ender', name: 'Ender 3 V3' },
 ];
@@ -441,10 +441,10 @@ async function bridgeChunk(env, req, url, pid) {
    The bridge uploads an init segment per ffmpeg session and ~4 s media segments. Viewers only see segments
    that arrived at least DELAY ago, so playback always has footage ready and stays smooth. */
 const delayOf = (env, preview) => preview || env.STREAM_DELAY_MS === undefined || env.STREAM_DELAY_MS === '' ? STREAM_DELAY_MS : Number(env.STREAM_DELAY_MS) || 0;
-// The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
-const CAM_HOME = 'a1-1';
+// The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-2.
+const CAM_HOME = 'a1-2'; // the Imou camera that can be moved with /camto
 // Where the IP camera stands now (default: on the K2 Plus); /camto in the operators chat changes it.
-const CAM_AT_DEFAULT = 'a1-1'; // the camera is on A2 (the first A1, id a1-1)
+const CAM_AT_DEFAULT = 'a1-2'; // …and it films A2
 async function camSrc(env, pid) {
   const v = await kvGet(env, 'camsrc2:' + pid);
   if (v) return v;
@@ -482,7 +482,7 @@ async function bridgeVSeg(env, req, url, pid) {
   return json({ ok: true, n });
 }
 // Camera rotation per printer; operators change it with /rotate in the operators chat.
-const DEFAULT_ROTATE = { 'a1-1': 'ccw' };
+const DEFAULT_ROTATE = { 'a1-2': 'ccw' }; // the Imou camera on A2 hangs rotated
 // Which printers have an order that is printing right now (the bridge records video only for those).
 const ago = (t) => { if (!t) return 'никогда'; const s = Math.round((now() - +t) / 1000); return s < 90 ? `${s} с назад` : s < 5400 ? `${Math.round(s / 60)} мин назад` : `${Math.round(s / 3600)} ч назад`; };
 async function bridgeReport(env) {
@@ -515,7 +515,30 @@ async function bridgeUpdateOffer(env) {
   await kvSet(env, 'bridge_upd_pending', JSON.stringify(u));
   return u;
 }
+// Nov 2026: ids now follow the names (a1-1 = A1 .107, a1-2 = A2 .111). Before that the first printer (now A2) was
+// a1-1, so its history is moved over once: orders, timelapses, printer rows, camera rotation.
+async function swapA1Ids(env) {
+  if (await kvGet(env, 'pid_swap_a1')) return;
+  await kvSet(env, 'pid_swap_a1', now());
+  const sw = (col) => `CASE ${col} WHEN 'a1-1' THEN 'a1-2' ELSE 'a1-1' END`;
+  await env.DB.batch([
+    env.DB.prepare("UPDATE printers SET id='__a1' WHERE id='a1-1'"),
+    env.DB.prepare("UPDATE printers SET id='a1-1' WHERE id='a1-2'"),
+    env.DB.prepare("UPDATE printers SET id='a1-2' WHERE id='__a1'"),
+    env.DB.prepare(`UPDATE orders SET data=json_set(data,'$.printer',${sw("json_extract(data,'$.printer')")}) WHERE json_extract(data,'$.printer') IN ('a1-1','a1-2')`),
+    env.DB.prepare(`UPDATE timelapses SET pid=${sw('pid')} WHERE pid IN ('a1-1','a1-2')`),
+    env.DB.prepare(`UPDATE jobs SET pid=${sw('pid')} WHERE pid IN ('a1-1','a1-2')`),
+    env.DB.prepare("DELETE FROM vid_seg WHERE pid IN ('a1-1','a1-2')"),
+    env.DB.prepare("DELETE FROM vid_init WHERE pid IN ('a1-1','a1-2')"),
+    env.DB.prepare("DELETE FROM cam_chunks WHERE pid IN ('a1-1','a1-2')"),
+    env.DB.prepare("DELETE FROM kv WHERE k IN ('vseq:a1-1','vseq:a1-2','vdisc:a1-1','vdisc:a1-2','campreview:a1-1','campreview:a1-2') OR k LIKE 'camsrc2:%'"),
+    env.DB.prepare("UPDATE kv SET k='rotate:__a1' WHERE k='rotate:a1-1'"),
+    env.DB.prepare("UPDATE kv SET k='rotate:a1-1' WHERE k='rotate:a1-2'"),
+    env.DB.prepare("UPDATE kv SET k='rotate:a1-2' WHERE k='rotate:__a1'"),
+  ]);
+}
 async function bridgeBusy(env, req) {
+  await swapA1Ids(env);
   await kvSet(env, 'bridge_seen', now());
   // a new bridge instance: remember when the server first saw it (server clock, the laptop's clock may differ)
   const bs = req?.headers.get('x-bridge-start') || '';
