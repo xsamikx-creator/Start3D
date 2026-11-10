@@ -505,7 +505,15 @@ const REPO = 'xsamikx-creator/Start3D';
 const sha256hex = async (buf) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map((x) => x.toString(16).padStart(2, '0')).join('');
 async function bridgeUpdateOffer(env) {
   const H = { 'user-agent': 'start3d-worker', accept: 'application/vnd.github+json' };
-  const c = await fetch(`https://api.github.com/repos/${REPO}/commits?path=bridge&per_page=1`, { headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  let c = await fetch(`https://api.github.com/repos/${REPO}/commits?path=bridge&per_page=1`, { headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!c?.[0]?.sha) {
+    // GitHub's API often refuses Cloudflare's shared addresses (rate limit): read the public commits feed instead
+    const x = await fetch(`https://github.com/${REPO}/commits/main.atom`, { headers: { 'user-agent': 'start3d-worker' } }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+    const e = x.split('<entry>')[1] || '';
+    const sha = (e.match(/Commit\/([0-9a-f]{40})/) || [])[1];
+    const unx = (t) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    if (sha) c = [{ sha, commit: { message: unx((e.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '').trim(), author: { name: unx((e.match(/<name>([\s\S]*?)<\/name>/) || [])[1] || '?'), date: (e.match(/<updated>([^<]+)/) || [])[1] } } }];
+  }
   if (!c?.[0]?.sha) return { error: 'не удалось узнать последнюю версию на GitHub' };
   const sha = c[0].sha;
   const get = (f) => fetch(`https://raw.githubusercontent.com/${REPO}/${sha}/bridge/${f}`).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
