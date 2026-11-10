@@ -624,6 +624,7 @@ try {
   } else if (!fs.existsSync(TL_DIR)) { fs.mkdirSync(TL_DIR, { recursive: true }); fs.writeFileSync(mark, new Date().toISOString()); }
 } catch (e) { console.log('Таймлапсы: не смог переименовать записи:', e.message); }
 const TL_EVERY_MS = (cfg.timelapseSeconds || 8) * 1000; // fallback when the printer reports no layers
+const TL_SHORT_MIN = cfg.timelapseShortMinutes || 45, TL_SHORT_FRAMES = cfg.timelapseShortFrames || 240;
 const TL_MAX_FRAMES = 1500, TL_KEEP_DAYS = cfg.timelapseKeepDays || 30;
 const stamp = (t) => { const d = new Date(t), z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}`; };
 function ffmpegRun(args) {
@@ -678,7 +679,7 @@ function timelapse(p) {
     // a last look at the finished part once the head has moved away
     if (state === 'FINISH') { await new Promise((r) => setTimeout(r, 8000)); sess = s0; await grab(); sess = null; }
     if (s0.n < 15) { log(p.id, `таймлапс: слишком мало кадров (${s0.n}), ролик не собираю`); fs.rmSync(s0.dir, { recursive: true, force: true }); return; }
-    const fps = Math.max(8, Math.min(30, Math.round(s0.n / 15)));
+    const fps = Math.max(12, Math.min(30, Math.round(s0.n / 15)));
     const name = `${p.id}_${stamp(s0.started)}${s0.order ? '_' + s0.order : ''}`, out = path.join(TL_DIR, name + '.mp4');
     const vf = [!p.video && rotFilter(p), "scale='if(gte(iw,ih),min(1280,iw),-2)':'if(gte(iw,ih),-2,min(1280,ih))'", 'format=yuv420p', 'tpad=stop_mode=clone:stop_duration=2'].filter(Boolean).join(',');
     try {
@@ -700,8 +701,13 @@ function timelapse(p) {
       if (sess && !sess.order && ORDERS[p.id]) sess.order = ORDERS[p.id];
       if (!running()) return;
       const layer = S().layer_num;
-      if (layer > 0) { if (layer !== sess.lastLayer && (layer % sess.every === 0 || layer - sess.lastLayer >= sess.every)) { sess.lastLayer = layer; grab(); } }
-      else if (Date.now() - sess.lastAt >= TL_EVERY_MS * sess.every) grab();
+      // Short prints have few layers, so one frame per layer looks jerky: for a print under ~45 min we also take frames
+      // by time, aiming at ~TL_SHORT_FRAMES frames over the whole print (but not more often than every 3 s).
+      const left = +S().mc_remaining_time || 0, total = (Date.now() - sess.started) / 60e3 + left;
+      const every = left > 0 && total <= TL_SHORT_MIN ? Math.max(3000, (total * 60e3) / TL_SHORT_FRAMES) : 0;
+      if (layer > 0 && layer !== sess.lastLayer && (layer % sess.every === 0 || layer - sess.lastLayer >= sess.every)) { sess.lastLayer = layer; grab(); }
+      else if (every && Date.now() - sess.lastAt >= every) grab();
+      else if (!(layer > 0) && Date.now() - sess.lastAt >= TL_EVERY_MS * sess.every) grab();
     } else if (sess) {
       if (['FINISH', 'FAILED'].includes(st)) finish(st);
       else if (!offSince) offSince = Date.now();
