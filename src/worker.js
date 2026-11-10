@@ -250,8 +250,8 @@ function opText(o) {
 }
 // Print farm. Ids must match "id" in bridge/config.json on the workshop computer.
 const PRINTERS = [
-  { id: 'a1-1', name: 'A1 #1', auto: true },
-  { id: 'a1-2', name: 'A1 #2', auto: true },
+  { id: 'a1-2', name: 'A1', auto: true }, // the new A1 (192.168.0.107), Nov 2026
+  { id: 'a1-1', name: 'A2', auto: true }, // the first A1 (192.168.0.111) — renamed A2; its orders and camera stay
   { id: 'k2', name: 'K2 Plus' },
   { id: 'ender', name: 'Ender 3 V3' },
 ];
@@ -444,12 +444,12 @@ const delayOf = (env, preview) => preview || env.STREAM_DELAY_MS === undefined |
 // The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
 const CAM_HOME = 'a1-1';
 // Where the IP camera stands now (default: on the K2 Plus); /camto in the operators chat changes it.
-const CAM_AT_DEFAULT = 'a1-1'; // the camera is back on A1 #1 (Nov 2026)
+const CAM_AT_DEFAULT = 'a1-1'; // the camera is on A2 (the first A1, id a1-1)
 async function camSrc(env, pid) {
   const v = await kvGet(env, 'camsrc2:' + pid);
   if (v) return v;
   if (pid === CAM_AT_DEFAULT && pid !== CAM_HOME) return CAM_HOME; // the camera films this printer
-  if (pid === CAM_HOME && CAM_AT_DEFAULT !== CAM_HOME) return '-'; // …so A1 #1 has no video of its own
+  if (pid === CAM_HOME && CAM_AT_DEFAULT !== CAM_HOME) return '-'; // …so A2 has no video of its own
   return pid;
 }
 async function videoState(env, pid, preview) {

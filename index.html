@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-d8O03syRd1WIfh7/Mf/8nDJajXudA3wtsG9rWEhY+H4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-VU0AUqk56HjtJlE8fQOURiuAePys2hhkMOuQVHw8E/k='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script>/* old copies of the site (GitHub Pages, workers.dev) open the real one */ if (/github\.io$|workers\.dev$/i.test(location.hostname)) location.replace("https://start3d.az/" + location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10162B">
@@ -1772,7 +1772,7 @@ function videoTickG(key, pid, qs, srvWait){
 }
 let pcStillAt = 0, pcBad = false;
 function camTick(){
-  const p = {name: ({'a1-1':'A1 #1','a1-2':'A1 #2','k2':'K2 Plus','ender':'Ender 3 V3'})[camPid] || camPid}, qs = `tok=${encodeURIComponent(camTok)}&`;
+  const p = {name: ({'a1-1':'A2','a1-2':'A1','k2':'K2 Plus','ender':'Ender 3 V3'})[camPid] || camPid}, qs = `tok=${encodeURIComponent(camTok)}&`;
   $('pc-title').textContent = (p.name || camPid).replace(/^Printer /, '');
   $('pc-note').textContent = pcBad ? t('pc_expired') : t('pc_note');
   $('cam-canvas').style.visibility = 'hidden'; $('cam-banner').hidden = true; $('t-oled').innerHTML = '';
@@ -3426,7 +3426,7 @@ function drawFactory(cv, now){
   g.fillStyle = '#FFA53D'; g.fillRect(bx, bTop, bw, 3 * S);
   g.font = `600 ${Math.round(15 * S)}px "JetBrains Mono", monospace`; g.fillStyle = '#EEF0EA'; const ct = String(FAC.made), cw = g.measureText(ct).width; g.fillText(ct, bx + bw / 2 - cw / 2, bTop + (F.floor - bTop) * .55);
   lab(bx + bw / 2, t('f_ready'));
-  $('hero-hud').textContent = `A1 #1 · ${t('o_layer')} ${FAC.phase === 'print' ? Math.floor(FAC.p * F_L * 4) : F_L * 4}/${F_L * 4} · ✓ ${FAC.made} ${t('f_today')}`;
+  $('hero-hud').textContent = `A1 · ${t('o_layer')} ${FAC.phase === 'print' ? Math.floor(FAC.p * F_L * 4) : F_L * 4}/${F_L * 4} · ✓ ${FAC.made} ${t('f_today')}`;
 }
 (() => { const cv = $('hero-canvas'), art = cv.parentElement;
   art.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); FAC.mx = e.clientX - r.left; FAC.my = e.clientY - r.top; });
