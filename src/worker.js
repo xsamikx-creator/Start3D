@@ -444,9 +444,9 @@ const delayOf = (env, preview) => preview || env.STREAM_DELAY_MS === undefined |
 // The IP camera can be moved to another printer: /camto k2 — viewers of K2 then get the video the bridge sends as a1-1.
 const CAM_HOME = 'a1-1';
 // Where the IP camera stands now (default: on the K2 Plus); /camto in the operators chat changes it.
-const CAM_AT_DEFAULT = 'k2';
+const CAM_AT_DEFAULT = 'a1-1'; // the camera is back on A1 #1 (Nov 2026)
 async function camSrc(env, pid) {
-  const v = await kvGet(env, 'camsrc:' + pid);
+  const v = await kvGet(env, 'camsrc2:' + pid);
   if (v) return v;
   if (pid === CAM_AT_DEFAULT && pid !== CAM_HOME) return CAM_HOME; // the camera films this printer
   if (pid === CAM_HOME && CAM_AT_DEFAULT !== CAM_HOME) return '-'; // …so A1 #1 has no video of its own
@@ -781,7 +781,7 @@ async function onUpdate(env, u, origin) {
     if (String(chat.id) !== String(await kvGet(env, 'operator_chat')) && String(from.id) !== String(await adminId(env))) return;
     const arg = String(ct[1] || '').toLowerCase().replace(/\s/g, ''), pr = PRINTERS.find((x) => x.id === arg || x.name.toLowerCase().replace(/[\s#]/g, '') === arg.replace('#', ''));
     if (!pr) return say(`IP-камера сейчас у: ${await (async () => { for (const x of PRINTERS) if ((await camSrc(env, x.id)) === CAM_HOME && x.id !== CAM_HOME) return x.name; return printerName(CAM_HOME); })()}\nПеренести: /camto k2 · /camto a1-2 · вернуть: /camto a1-1`);
-    for (const x of PRINTERS) await kvSet(env, 'camsrc:' + x.id, x.id === pr.id ? CAM_HOME : x.id === CAM_HOME ? '-' : x.id);
+    for (const x of PRINTERS) await kvSet(env, 'camsrc2:' + x.id, x.id === pr.id ? CAM_HOME : x.id === CAM_HOME ? '-' : x.id);
     return say(pr.id === CAM_HOME ? `📷 IP-камера снова снимает ${pr.name}.` : `📷 IP-камера теперь показывает ${pr.name}: клиент заказа на ${pr.name} увидит видео, когда заказ «Печатается».\nПоставьте камеру на ${pr.name}; поворот картинки: /rotate ${pr.id} …\nВернуть: /camto ${CAM_HOME}`);
   }
   const br = text.match(/^\/bridge(?:@\w+)?(?:\s+(restart|update))?$/i);
