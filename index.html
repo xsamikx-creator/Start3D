@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-jEDxl0MZjftC6ttK7hfQetKrjjcQzHfDiV8ohIzYGdg='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-9a9Iek3CBswFk6w8Le8wrVJPU8x7ahOIy+7Max4S2P0=' 'sha256-ZYgGXmaaThrq+E95TxnkCn59h52XXWtb5cw0rXVdM1k='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script>/* old copies of the site (GitHub Pages, workers.dev) open the real one */ if (/github\.io$|workers\.dev$/i.test(location.hostname)) location.replace("https://start3d.az/" + location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10162B">
@@ -567,7 +567,10 @@ header.open .logo .mark i:nth-child(3){transform:translateY(-6px) rotate(-45deg)
 .opc{display:grid;gap:8px}
 .opc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ops-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.opc-shot{display:flex;gap:10px;align-items:center;margin:8px 0;color:inherit;text-decoration:none}.opc-shot img{width:168px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0006}.opc-shot span{font-size:13px;opacity:.85}
+.opc-shot{display:flex;gap:10px;align-items:center;margin:8px 0;color:inherit;text-decoration:none;background:none;border:0;padding:0;text-align:left;font:inherit;cursor:zoom-in}.opc-shot.fail img{border-color:var(--bad)}
+.shot-lb{position:fixed;inset:0;z-index:90;background:#000d;display:grid;place-items:center;padding:16px;cursor:zoom-out}.shot-lb img{max-width:100%;max-height:100%;border-radius:12px}
+.ops-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.ops-stats .panel{padding:10px 12px;text-align:center}.ops-stats b{display:block;font-size:26px;line-height:1.1}.ops-stats span{font-size:12px;opacity:.75}
+.ops-stats-note{grid-column:1/-1;font-size:12px;opacity:.75;text-align:center}.opc-shot img{width:168px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0006}.opc-shot span{font-size:13px;opacity:.85}
 .ops-restart{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .ops-filters .cnt{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:rgba(255,154,46,.2);color:var(--accent);font-size:11px}
 .ops-more{border-top:1px dashed var(--line);padding-top:8px}
@@ -1298,6 +1301,8 @@ need_rights:['Modeli çap etmək hüququnu təsdiqləyin','Подтвердит�
 need_photos:['Ən azı bir foto əlavə edin','Добавьте хотя бы одно фото','Додайте хоча б одне фото','Add at least one photo'],
 server_err:['Server cavab vermir, bir az sonra yenidən cəhd edin','Сервер не отвечает, попробуйте ещё раз через минуту','Сервер не відповідає, спробуйте ще раз за хвилину','The server is not responding; try again in a minute'],
 bad_photo:['Bu şəkil və ya PDF deyil — çekin fotosunu və ya skrinşotunu göndərin','Это не фото и не PDF — пришлите фото или скриншот чека','Це не фото і не PDF — надішліть фото або скриншот чека','This is not a photo or PDF — send a photo or screenshot of the receipt'],
+shot_h:['Çap bitdi — kameradan kadr','Печать завершена — кадр с камеры','Друк завершено — кадр з камери','Printing done — camera frame'],
+shot_note:['Operator detalı çıxarıb yoxlayır, sonra real fotolar burada olacaq','Оператор снимает деталь и проверяет её — потом здесь будут настоящие фото','Оператор знімає деталь і перевіряє її — потім тут будуть справжні фото','The operator is taking the part off and checking it — real photos will appear here next'],
 too_many:['Çox sorğu göndərildi — bir az sonra yenidən cəhd edin','Слишком много заявок подряд — попробуйте чуть позже или напишите нам в Telegram','Забагато заявок поспіль — спробуйте трохи пізніше або напишіть нам у Telegram','Too many requests in a row — try again a bit later or message us on Telegram'],
 cancel:['Ləğv et','Отмена','Скасувати','Cancel'],
 ord_h:['Sifarişlərim','Мои заказы','Мої замовлення','My orders'],
@@ -1919,6 +1924,7 @@ async function syncOrder(o){
     const r = await api(`/api/orders/${o.id}?code=${o.code}`);
     let ch = false;
     if (r.photos !== undefined && r.photos !== o.srvPhotos){ o.srvPhotos = r.photos; ch = true; }
+    if ((r.shot || 0) !== (o.srvShot || 0)){ o.srvShot = r.shot || 0; ch = true; }
     if ((r.printer || null) !== (o.printer_srv || null)){ o.printer_srv = r.printer || null; o.printerName = r.printerName; ch = true; }
     o.live = r.live ? Object.assign({printer: r.printer}, r.live) : null;
     if (o.live){ o.progress = Math.min(1, (o.live.percent || 0) / 100); if (o.live.layers) o.layers = o.live.layers; live(); }
@@ -2689,6 +2695,9 @@ function renderTrack(){
   $('t-reacts').querySelectorAll('[data-react]').forEach(b => b.onclick = () => { o.react = o.react || {}; o.react[b.dataset.react] = (o.react[b.dataset.react]||0) + 1; save(); live(); });
   // photos + acceptance
   const ph = $('t-photos');
+  if (o.server && !(o.srvPhotos > 0) && o.srvShot && owner){ // the camera's last frame until the operator's photos arrive
+    ph.innerHTML = `<div class="cardbox"><span class="label">${t('shot_h')}</span><a href="/api/orders/${o.id}/shot?code=${o.code}&t=${o.srvShot}" target="_blank" rel="noopener"><img src="/api/orders/${o.id}/shot?code=${o.code}&t=${o.srvShot}" alt="${esc(o.name)}" style="width:100%;border-radius:10px;display:block"></a><span class="note">${t('shot_note')}</span></div>`;
+  } else
   if ((o.server ? o.srvPhotos > 0 : o.photos) && owner){
     const pics = o.server ? [...Array(Math.min(3, o.srvPhotos)).keys()].map(i => `<a href="/api/orders/${o.id}/photo/${i}?code=${o.code}" target="_blank" rel="noopener"><img src="/api/orders/${o.id}/photo/${i}?code=${o.code}" alt="${esc(o.name)} ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block"></a>`).join('')
       : '<canvas data-photo="0"></canvas><canvas data-photo="1"></canvas><canvas data-photo="2"></canvas>';
@@ -3006,7 +3015,7 @@ function opsOrderCard(o){
     ${o.link ? `<div class="note">🔗 <a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.link)}</a> — проверьте лицензию</div>` : ''}
     ${files ? `<div class="files">${files}</div>` : (o.kind === 'file' ? '<div class="note">Файл не загружен — запросите у клиента</div>' : '')}
     ${pr ? `<div class="note">🖨 ${pr.name}${pr.state ? ` · ${pr.state} ${pr.percent}% · слой ${pr.layer}/${pr.layers} · осталось ${fmtH((pr.remaining || 0) / 60)}` : ''}</div>` : ''}
-    ${o.shot ? `<a class="opc-shot" href="/api/orders/${o.id}/shot?code=${o.code}&t=${o.shot}" target="_blank" rel="noopener" title="Открыть кадр целиком"><img src="/api/orders/${o.id}/shot?code=${o.code}&t=${o.shot}" alt="Кадр с камеры в конце печати" loading="lazy"><span>📷 Так закончилась печать · ${new Date(o.shot).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}</span></a>` : ''}
+    ${o.shot ? `<button type="button" class="opc-shot${o.shotFail ? ' fail' : ''}" data-shot="${o.id}|${o.shot}" title="Открыть кадр целиком"><img alt="Кадр с камеры в конце печати"><span>${o.shotFail ? '⚠️ Так выглядела печать в момент ошибки' : '📷 Так закончилась печать'} · ${new Date(o.shot).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}${o.shotPub ? '<br><small>✓ показан клиенту</small>' : ''}</span></button>` : ''}
     ${o.note ? `<div class="note">📝 ${esc(o.note)}</div>` : ''}
     ${acts ? `<div class="acts">${acts}</div>` : ''}
     <div class="acts ops-more">
@@ -3025,6 +3034,16 @@ function opsOrderCard(o){
     </div>` : ''}
   </div>`;
 }
+// End-of-print camera frames are private until shown to the client, so the panel fetches them with its login.
+const SHOTS = {};
+function loadShots(){
+  document.querySelectorAll('[data-shot]').forEach(async b => {
+    const [id, at] = b.dataset.shot.split('|'), key = id + at, img = b.querySelector('img');
+    if (!SHOTS[key]) SHOTS[key] = fetch(`/api/orders/${id}/shot?t=${at}`, {headers:{'x-op': OPTOK}}).then(r => r.ok ? r.blob() : null).then(bl => bl && URL.createObjectURL(bl)).catch(() => null);
+    const u = await SHOTS[key]; if (u) img.src = u;
+    b.onclick = () => { if (!img.src) return; const lb = document.createElement('div'); lb.className = 'shot-lb'; lb.innerHTML = `<img src="${img.src}" alt="">`; lb.onclick = () => lb.remove(); document.body.append(lb); };
+  });
+}
 function renderOps(){
   $('ops-login').hidden = !!OPTOK; $('ops-login').textContent = t('ops_need_login');
   $('ops-refresh').hidden = $('ops-logout').hidden = !OPTOK;
@@ -3035,18 +3054,25 @@ function renderOps(){
   $('ops-tabs').innerHTML = [['orders', `Заказы · ${active.length}`], ['printers', 'Принтеры'], ['free', `Розыгрыш${freeNew ? ' · ' + freeNew + ' новых' : ''}`]]
     .map(([k, l]) => `<button type="button" class="btn-sm" data-tab="${k}" aria-pressed="${opsTab === k}">${l}</button>`).join('');
   let html = '';
+  // print counter: finished prints today / this week / this month / all time
+  const S = OPS.stats || {tot:{d:0,w:0,m:0,a:0,fail:0}, by:{}, orders:0};
+  const statsBar = `<div class="ops-stats">${[['d','сегодня'],['w','неделя'],['m','месяц'],['a','всего']].map(([k, l]) => `<div class="panel"><b class="mono">${S.tot[k]}</b><span>${l}</span></div>`).join('')}
+    <div class="ops-stats-note">🖨 напечатано (закончившихся печатей) · выполнено заказов: ${S.orders}${S.tot.fail ? ` · ⚠️ прервано печатей: ${S.tot.fail}` : ''}</div></div>`;
   if (opsTab === 'orders'){
+    html = statsBar;
     const f = OPS_FILTERS.find(x => x[0] === opsFilter) || OPS_FILTERS[0];
     const list = OPS.orders.filter(f[2]).sort((a, b) => OPS_ORDER.indexOf(a.status) - OPS_ORDER.indexOf(b.status) || b.created - a.created);
-    html = `<div class="ops-filters">${OPS_FILTERS.map(([k, l, fn]) => { const n = OPS.orders.filter(fn).length; return `<button type="button" class="btn-sm" data-of="${k}" aria-pressed="${opsFilter === k}">${l}${n ? ` <span class="cnt">${n}</span>` : ''}</button>`; }).join('')}</div>
+    html += `<div class="ops-filters">${OPS_FILTERS.map(([k, l, fn]) => { const n = OPS.orders.filter(fn).length; return `<button type="button" class="btn-sm" data-of="${k}" aria-pressed="${opsFilter === k}">${l}${n ? ` <span class="cnt">${n}</span>` : ''}</button>`; }).join('')}</div>
       <div class="ops-list">${list.length ? list.map(opsOrderCard).join('') : `<div class="panel empty">Здесь пока пусто: «${f[1]}»</div>`}</div>`;
   } else if (opsTab === 'printers'){
-    html = `<div class="ops-grid">${OPS.printers.map(p => {
+    html = statsBar + `<div class="ops-grid">${OPS.printers.map(p => {
+      const c = S.by[p.id] || {d:0,m:0,a:0,fail:0};
       const online = p.seen && Date.now() - p.seen < 120000;
       return `<div class="panel opc"><div class="opc-h"><b>${esc(p.name)}</b><span class="pill ${online ? 'good' : 'mut'}">${online ? (p.state || 'на связи') : 'нет связи с мостом'}</span></div>
         ${online && p.state ? `<div class="note">${p.percent}% · слой ${p.layer}/${p.layers} · осталось ${fmtH((p.remaining || 0) / 60)}</div>` : ''}
         ${p.error ? `<div class="note" style="color:var(--bad)">Ошибка: ${esc(p.error)}</div>` : ''}
         <div class="note">${p.order ? `Заказ: <b>${p.order}</b>` : 'Свободен'} · камера: ${p.video ? 'видео' : p.frame ? 'фото' : 'нет'}</div>
+        <div class="note">🖨 Печатей: сегодня ${c.d} · за месяц ${c.m} · всего ${c.a}${c.fail ? ` · прервано ${c.fail}` : ''}</div>
         <div class="acts"><button type="button" class="btn-sm" data-cam="${p.id}">📹 Камера</button></div></div>`; }).join('')}</div>`;
   } else {
     const today = OPS.free.filter(a => a.day === OPS.freeDay), older = OPS.free.filter(a => a.day !== OPS.freeDay);
@@ -3063,6 +3089,7 @@ function renderOps(){
   const focused = document.activeElement && document.activeElement.closest('#ops-body') ? true : false;
   if (focused) return; // don't redraw under someone typing
   $('ops-body').innerHTML = html;
+  loadShots();
   document.querySelectorAll('#ops-body [data-price],#ops-body [data-reason],#ops-body [data-pid]').forEach(el => { const k = (el.dataset.price ? 'p' : el.dataset.reason ? 'r' : 's') + (el.dataset.price || el.dataset.reason || el.dataset.pid); if (keep[k] !== undefined) el.value = keep[k]; });
 }
 $('ops-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; opsTab = b.dataset.tab; opsDrawArm = false; renderOps(); });

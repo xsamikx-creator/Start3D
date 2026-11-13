@@ -35,6 +35,7 @@ const SCHEMA = [
      mat TEXT, color TEXT, qty INTEGER, grams REAL, minutes INTEGER, msg TEXT, op_msg_id INTEGER, created_at INTEGER, updated_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS printers (id TEXT PRIMARY KEY, status TEXT, order_id TEXT, frame BLOB, frame_at INTEGER, watched_at INTEGER, updated_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS rl (k TEXT PRIMARY KEY, n INTEGER NOT NULL, exp INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS prints (id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, order_id TEXT, state TEXT, ended INTEGER)`,
 ];
 // Rate limits for what visitors can send (orders, files, applications): per IP address and time window.
 const LIMITS = { order: [[6, 3600e3], [20, 864e5]], file: [[40, 3600e3]], free: [[3, 3600e3]], small: [[20, 3600e3]], tg: [[60, 3600e3]] };
@@ -73,6 +74,7 @@ const TX = {
   no_pay: ['Ödəniş gözləyən sifariş tapılmadı.', 'Не нашёл заказа, который ждёт оплаты.', 'Не знайшов замовлення, яке чекає оплати.', 'No order is waiting for payment.'],
   paid: ['✅ {id}: ödəniş alındı, sifariş növbədədir.', '✅ {id}: оплата получена, заказ в очереди.', '✅ {id}: оплату отримано, замовлення в черзі.', '✅ {id}: payment received, your order is queued.'],
   printing: ['🖨 {id}: çap başladı! Canlı baxın: {link}', '🖨 {id}: печать началась! Смотрите вживую: {link}', '🖨 {id}: друк почався! Дивіться наживо: {link}', '🖨 {id}: printing started! Watch live: {link}'],
+  shot_client: ['📷 {id}: çap bitdi — kameradan son kadr. Operator detalı çıxarıb yoxlayır, tezliklə yazacağıq.', '📷 {id}: печать завершена — последний кадр с камеры. Оператор снимает деталь и проверяет её, скоро напишем.', '📷 {id}: друк завершено — останній кадр з камери. Оператор знімає деталь і перевіряє її, скоро напишемо.', '📷 {id}: printing is done — the camera\'s last frame. The operator is taking the part off and checking it, we will write soon.'],
   restarted: ['🔁 {id}: çapı yenidən başlatdıq ki, detal qüsursuz alınsın. Eyni linkdən canlı izləyin: {link}', '🔁 {id}: перезапустили печать, чтобы деталь вышла без брака. Следите вживую по той же ссылке: {link}', '🔁 {id}: перезапустили друк, щоб деталь вийшла без браку. Стежте наживо за тим самим посиланням: {link}', '🔁 {id}: we restarted the print so the part comes out flawless. Watch live at the same link: {link}'],
   ready: ['📦 {id} hazırdır! Təhvil zamanı qalıq: {r} AZN.', '📦 {id} готов! Остаток при получении: {r} AZN.', '📦 {id} готове! Залишок під час отримання: {r} AZN.', '📦 {id} is ready! Balance on collection: {r} AZN.'],
   done: ['🙏 {id} təhvil verildi. Təşəkkür edirik!', '🙏 {id} выдан. Спасибо!', '🙏 {id} видано. Дякуємо!', '🙏 {id} collected. Thank you!'],
@@ -361,6 +363,7 @@ function publicOrder(env, o, live) {
     pub: !!d.pub, client: o.client, created: o.created_at, photos: (d.photos || []).length,
     card: ['pay', 'paycheck'].includes(o.status) ? (env.CARD_TEXT || null) : null,
     accept: d.accept || null, issueText: d.issueText || null, answer: d.answer || null, tl: d.tl || null,
+    shot: d.shotPub ? d.shotAt : 0,
   };
 }
 async function readOrder(env, id, code) {
@@ -396,6 +399,9 @@ async function bridgeStatus(env, req, origin, pid) {
   await env.DB.prepare('INSERT INTO printers(id, status, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at')
     .bind(pid, JSON.stringify(st), now()).run();
   const was = JSON.parse(prev?.status || '{}').state;
+  // every print that ends (with or without an order) goes into the counter on the operators' page
+  if (was && was !== st.state && ['FINISH', 'FAILED'].includes(st.state) && ['RUNNING', 'PAUSE', 'PREPARE', 'SLICING'].includes(was))
+    await env.DB.prepare('INSERT INTO prints(pid, order_id, state, ended) VALUES(?,?,?,?)').bind(pid, prev?.order_id || null, st.state, now()).run();
   // The print just finished or failed: tell operators, using the order card flow.
   if (prev?.order_id && was && was !== st.state && ['FINISH', 'FAILED'].includes(st.state)) {
     const opChat = await kvGet(env, 'operator_chat');
@@ -1134,16 +1140,21 @@ async function bridgeShot(env, req, pid) {
   if (!o || !['printing', 'post', 'ready', 'done'].includes(o.status)) return json({ ok: true, order: null });
   const chat = await kvGet(env, 'operator_chat');
   if (!chat) return json({ error: 'no_chat' }, 503);
-  const d = JSON.parse(o.data || '{}');
-  const r = await tgForm(env, 'sendPhoto', { chat_id: Number(chat), caption: `📷 ${o.id} · ${o.client}: так закончилась печать на ${printerName(d.printer || pid)} (кадр с камеры)` }, 'photo', new Blob([buf], { type: 'image/jpeg' }), `${o.id}-end.jpg`);
+  const d = JSON.parse(o.data || '{}'), failed = req.headers.get('x-state') === 'FAILED', pn = printerName(d.printer || pid);
+  const r = await tgForm(env, 'sendPhoto', failed
+    ? { chat_id: Number(chat), caption: `⚠️ ${o.id} · ${o.client}: так выглядела печать на ${pn} в момент ошибки (кадр с камеры)`,
+        reply_markup: { inline_keyboard: [[{ text: `🔁 Перезапустить на ${pn}`, callback_data: `rr:${d.printer || pid}|${o.id}` }], [{ text: '🖨 На другом принтере', callback_data: `rs:${o.id}` }]] } }
+    : { chat_id: Number(chat), caption: `📷 ${o.id} · ${o.client}: так закончилась печать на ${pn} (кадр с камеры). Если всё хорошо — можно сразу показать клиенту.`,
+        reply_markup: { inline_keyboard: [[{ text: '✅ Показать клиенту', callback_data: `sv:${o.id}` }]] } },
+    'photo', new Blob([buf], { type: 'image/jpeg' }), `${o.id}-${failed ? 'error' : 'end'}.jpg`);
   if (!r.ok) return json({ error: 'telegram' }, 502);
-  const ph = r.result.photo || []; d.shot = ph[ph.length - 1]?.file_id; d.shotAt = now();
+  const ph = r.result.photo || []; d.shot = ph[ph.length - 1]?.file_id; d.shotAt = now(); d.shotFail = failed; delete d.shotPub;
   await setStatus(env, o.id, { data: JSON.stringify(d) });
   return json({ ok: true, order: o.id });
 }
-async function orderShot(env, id, code) {
-  const o = await getOrder(env, id);
-  const fileId = o && o.code === code && JSON.parse(o.data || '{}').shot;
+async function orderShot(env, req, url, id, code) {
+  const o = await getOrder(env, id), d = JSON.parse(o?.data || '{}');
+  const fileId = o && d.shot && ((o.code === code && d.shotPub) || (await opAuth(env, req, url))) ? d.shot : null;
   if (!fileId) return json({ error: 'not_found' }, 404);
   const f = await tg(env, 'getFile', { file_id: fileId });
   if (!f.ok) return json({ error: 'not_found' }, 404);
@@ -1331,6 +1342,16 @@ async function onCallback(env, q, origin) {
     });
     await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
     return answer('На каком принтере?');
+  }
+  if (act === 'noop') return answer('');
+  if (act === 'sv') { // the end-of-print camera frame goes to the client (page + Telegram)
+    const d = JSON.parse(o.data || '{}');
+    if (!d.shot || d.shotFail) return answer('Кадра нет');
+    if (d.shotPub) return answer('Уже показан клиенту');
+    d.shotPub = true; const n = await setStatus(env, o.id, { data: JSON.stringify(d) });
+    if (n.tg_chat_id) await tg(env, 'sendPhoto', { chat_id: n.tg_chat_id, photo: d.shot, caption: tx('shot_client', n.lang, { id: n.id }), reply_markup: { inline_keyboard: [[openBtn(origin, n)]] } });
+    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [[{ text: '✓ Показано клиенту', callback_data: 'noop:' + o.id }]] } });
+    return answer(n.tg_chat_id ? 'Клиент увидит кадр на странице заказа и в Telegram' : 'Клиент увидит кадр на странице заказа');
   }
   if (act === 'rs' && ['printing', 'post'].includes(o.status)) { // restart a failed print: pick the printer, the order and its link stay the same
     const cur = JSON.parse(o.data || '{}').printer;
@@ -1578,6 +1599,26 @@ async function opAuth(env, req, url) {
   }
   return v;
 }
+// Counter on the operators' page: prints that ended today / this week / this month / all time, per printer.
+// Logged from the printers' own status since Nov 2026; earlier prints are taken from the timelapses once.
+async function printStats(env) {
+  if (!(await kvGet(env, 'prints_seeded'))) {
+    await kvSet(env, 'prints_seeded', now());
+    await env.DB.prepare("INSERT INTO prints(pid, order_id, state, ended) SELECT pid, order_id, state, COALESCE(ended, created_at) FROM timelapses WHERE state IN ('FINISH','FAILED') AND COALESCE(ended, created_at) < ?").bind(now()).run();
+  }
+  const bk = (t) => new Date(t + 4 * 3600e3); // Baku time
+  const d0 = bk(now()); d0.setUTCHours(0, 0, 0, 0);
+  const day = d0.getTime() - 4 * 3600e3, week = day - ((d0.getUTCDay() + 6) % 7) * 864e5, month = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1) - 4 * 3600e3;
+  const rs = (await env.DB.prepare(`SELECT pid, state, SUM(ended >= ?) AS d, SUM(ended >= ?) AS w, SUM(ended >= ?) AS m, COUNT(*) AS a FROM prints GROUP BY pid, state`).bind(day, week, month).all()).results;
+  const z = () => ({ d: 0, w: 0, m: 0, a: 0, fail: 0 }), tot = z(), by = {};
+  for (const r of rs) {
+    const x = (by[r.pid] = by[r.pid] || z());
+    if (r.state === 'FAILED') { x.fail += r.a; tot.fail += r.a; continue; }
+    for (const k of ['d', 'w', 'm', 'a']) { x[k] += r[k] || 0; tot[k] += r[k] || 0; }
+  }
+  const done = (await env.DB.prepare("SELECT COUNT(*) AS c FROM orders WHERE status IN ('ready','done')").first())?.c || 0;
+  return { tot, by, orders: done };
+}
 async function opState(env) {
   const rs = await env.DB.prepare("SELECT * FROM orders WHERE status NOT IN ('done','rejected') OR updated_at > ? ORDER BY created_at DESC LIMIT 150").bind(now() - 14 * 864e5).all();
   const orders = rs.results.map((o) => {
@@ -1586,7 +1627,7 @@ async function opState(env) {
       name: d.name, mat: d.mat, color: d.color ?? 0, colorName: d.colorName, qty: d.qty || 1, grams: d.grams, hours: d.hours, check: d.check, comment: d.comment, link: d.link, kind: d.kind,
       pub: !!d.pub, urgent: !!d.urgent, deliv: !!d.deliv, student: !!d.student, kids: !!d.kids, disc: d.disc, discPct: d.discPct, nth: d.nth, free: !!d.free, gift: d.gift,
       printer: d.printer || null, files: (d.files || []).map((f) => ({ name: f.name, size: f.size, kind: f.kind })), receipt: !!d.receipt, photos: (d.photos || []).length,
-      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup, restarts: d.restarts || 0, shot: d.shotAt || 0 };
+      accept: d.accept, issueText: d.issueText, created: o.created_at, updated: o.updated_at, code: o.code, note: d.opNote || '', sup: !!d.sup, restarts: d.restarts || 0, shot: d.shotAt || 0, shotFail: !!d.shotFail, shotPub: !!d.shotPub };
   });
   const prs = (await env.DB.prepare('SELECT id, status, order_id, frame_at, updated_at FROM printers').all()).results;
   const printers = [];
@@ -1599,7 +1640,7 @@ async function opState(env) {
   const day = entryDay(now());
   const fa = (await env.DB.prepare("SELECT id, day, name, contact, link, idea, status, tg_chat_id, order_id, created_at FROM free_apps WHERE day >= ? ORDER BY id DESC LIMIT 60").bind(bakuDay(now() - 864e5)).all()).results
     .map((a) => ({ ...a, tg: !!a.tg_chat_id, tg_chat_id: undefined }));
-  return json({ orders, printers, free: fa, freeDay: day, drawn: !!(await kvGet(env, 'free_drawn:' + bakuDay(now()))) });
+  return json({ orders, printers, stats: await printStats(env), free: fa, freeDay: day, drawn: !!(await kvGet(env, 'free_drawn:' + bakuDay(now()))) });
 }
 async function opApi(env, req, url, origin, p) {
   const who = await opAuth(env, req, url);
@@ -1733,7 +1774,7 @@ export default {
       let m = p.match(/^\/api\/orders\/(S3D-\d+)$/);
       if (m && req.method === 'GET') return readOrder(env, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/shot$/);
-      if (m) return orderShot(env, m[1], url.searchParams.get('code'));
+      if (m) return orderShot(env, req, url, m[1], url.searchParams.get('code'));
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/photo\/(\d)$/);
       if (m) return orderPhoto(env, m[1], url.searchParams.get('code'), +m[2]);
       m = p.match(/^\/api\/orders\/(S3D-\d+)\/feedback$/);

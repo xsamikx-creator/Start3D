@@ -677,11 +677,13 @@ function timelapse(p) {
   const finish = async (state) => {
     const s0 = sess; sess = null; if (!s0) return;
     // a last look at the finished part once the head has moved away
-    if (state === 'FINISH') {
-      await new Promise((r) => setTimeout(r, 8000)); sess = s0; await grab(); sess = null;
+    if (state === 'FINISH' || state === 'FAILED') {
+      // finished: wait for the head to move away; failed: take the frame right away — it shows what went wrong
+      if (state === 'FINISH') await new Promise((r) => setTimeout(r, 8000));
+      sess = s0; await grab(); sess = null;
       // …and send that frame to the order, so operators see how the print ended without opening the camera
       const lastF = path.join(s0.dir, `f${String(s0.n - 1).padStart(6, '0')}.jpg`);
-      if (s0.n > 0 && fs.existsSync(lastF)) fetch(`${SERVER}/api/bridge/shot/${p.id}`, { method: 'POST', headers: { authorization: `Bearer ${KEY}`, 'content-type': 'image/jpeg', 'x-order': s0.order || ORDERS[p.id] || '' }, body: fs.readFileSync(lastF) })
+      if (s0.n > 0 && fs.existsSync(lastF)) fetch(`${SERVER}/api/bridge/shot/${p.id}`, { method: 'POST', headers: { authorization: `Bearer ${KEY}`, 'content-type': 'image/jpeg', 'x-order': s0.order || ORDERS[p.id] || '', 'x-state': state }, body: fs.readFileSync(lastF) })
         .then(async (r) => { const j = await r.json().catch(() => ({})); if (r.ok && j.order) log(p.id, `кадр конца печати отправлен к заказу ${j.order}`); else if (!r.ok) log(p.id, `кадр конца печати: сервер ответил ${r.status}`); }).catch((e) => log(p.id, 'кадр конца печати не отправлен:', e.message));
     }
     if (s0.n < 15) { log(p.id, `таймлапс: слишком мало кадров (${s0.n}), ролик не собираю`); fs.rmSync(s0.dir, { recursive: true, force: true }); return; }
