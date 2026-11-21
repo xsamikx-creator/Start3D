@@ -151,7 +151,13 @@ async function widgetSend(env, origin, o) {
   const L = WIDGET_L[langOf(o.lang)];
   const r = await tg(env, 'sendWidget', { chat_id: o.tg_chat_id, html: ORDER_WIDGET.replace('__L__', JSON.stringify(L)), allow_queries: true,
     caption: `🖨 ${o.id}: ${L.going} — ${env.PUBLIC_ORIGIN || origin}/?t=${o.id}-${o.code}`, chat_data: await widgetData(env, origin, o) });
-  if (!r.ok) { console.log('sendWidget', o.id, r.description); return; }
+  if (!r.ok) { // tell the owner once per kind of error, so a refusal by Telegram doesn't go unnoticed
+    console.log('sendWidget', o.id, r.description);
+    const adm = await adminId(env), was = await kvGet(env, 'wdg_err');
+    await kvSet(env, 'wdg_err', r.description || '?');
+    if (adm && was !== (r.description || '?')) await tg(env, 'sendMessage', { chat_id: Number(adm), text: `⚠️ Карточка заказа ${o.id} в Telegram не отправилась: ${r.description || r.error_code}\nКлиент получил обычное сообщение со ссылкой. Проверка: /widget` });
+    return;
+  }
   await kvSet(env, 'wdg:' + o.id, JSON.stringify({ c: o.tg_chat_id, m: r.result.message_id, at: now() }));
   await kvSet(env, `wdgm:${o.tg_chat_id}:${r.result.message_id}`, o.id);
 }
@@ -868,6 +874,13 @@ async function onUpdate(env, u, origin) {
     if (!pr) return say(`IP-камера сейчас у: ${await (async () => { for (const x of PRINTERS) if ((await camSrc(env, x.id)) === CAM_HOME && x.id !== CAM_HOME) return x.name; return printerName(CAM_HOME); })()}\nПеренести: /camto k2 · /camto a1-2 · вернуть: /camto a1-1`);
     for (const x of PRINTERS) await kvSet(env, 'camsrc2:' + x.id, x.id === pr.id ? CAM_HOME : x.id === CAM_HOME ? '-' : x.id);
     return say(pr.id === CAM_HOME ? `📷 IP-камера снова снимает ${pr.name}.` : `📷 IP-камера теперь показывает ${pr.name}: клиент заказа на ${pr.name} увидит видео, когда заказ «Печатается».\nПоставьте камеру на ${pr.name}; поворот картинки: /rotate ${pr.id} …\nВернуть: /camto ${CAM_HOME}`);
+  }
+  // /widget (owner): sends a test live card to the owner and shows Telegram's answer
+  if (/^\/widget(@\w+)?$/i.test(text) && String(from.id) === String(await adminId(env))) {
+    const L = WIDGET_L.ru;
+    const data = JSON.stringify({ id: 'S3D-TEST', n: 'Тестовая карточка', m: 'PLA', q: 1, pr: 'A1', u: `${origin}/`, t: now(), s: 'printing', p: 42, l: 84, L: 200, r: 35 });
+    const r = await tg(env, 'sendWidget', { chat_id: chat.id, html: ORDER_WIDGET.replace('__L__', JSON.stringify(L)), chat_data: data, caption: '🖨 Тестовая карточка заказа' });
+    return say(r.ok ? '✅ Telegram принял карточку. Если выше видно только подпись без карточки — ваше приложение Telegram её пока не показывает (обновите его).' : `❌ Telegram не принял карточку: ${r.description || r.error_code}`);
   }
   const br = text.match(/^\/bridge(?:@\w+)?(?:\s+(restart|update))?$/i);
   if (br) {
