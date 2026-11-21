@@ -875,8 +875,8 @@ async function onUpdate(env, u, origin) {
     for (const x of PRINTERS) await kvSet(env, 'camsrc2:' + x.id, x.id === pr.id ? CAM_HOME : x.id === CAM_HOME ? '-' : x.id);
     return say(pr.id === CAM_HOME ? `📷 IP-камера снова снимает ${pr.name}.` : `📷 IP-камера теперь показывает ${pr.name}: клиент заказа на ${pr.name} увидит видео, когда заказ «Печатается».\nПоставьте камеру на ${pr.name}; поворот картинки: /rotate ${pr.id} …\nВернуть: /camto ${CAM_HOME}`);
   }
-  // /widget (owner): sends a test live card to the owner and shows Telegram's answer
-  if (/^\/widget(@\w+)?$/i.test(text) && String(from.id) === String(await adminId(env))) {
+  // /widget (owner and operators): sends a test live card to the owner and shows Telegram's answer
+  if (/^\/widget(@\w+)?\s*$/i.test(text) && (await isOpMember(env, from.id))) {
     const L = WIDGET_L.ru;
     const data = JSON.stringify({ id: 'S3D-TEST', n: 'Тестовая карточка', m: 'PLA', q: 1, pr: 'A1', u: `${origin}/`, t: now(), s: 'printing', p: 42, l: 84, L: 200, r: 35 });
     const r = await tg(env, 'sendWidget', { chat_id: chat.id, html: ORDER_WIDGET.replace('__L__', JSON.stringify(L)), chat_data: data, caption: '🖨 Тестовая карточка заказа' });
@@ -1511,7 +1511,7 @@ async function ensureWebhook(env, origin) {
   await kvSet(env, 'webhook', key);
 }
 // The "/" menu: clients see their two commands; the operators' group and the owner's private chat see every command.
-const CMDS_V = '3';
+const CMDS_V = '4';
 const CLIENT_CMDS = [{ command: 'orders', description: 'Мои заказы' }, { command: 'me', description: 'Мой номер в боте' }];
 const OP_CMDS = [
   { command: 'panel', description: 'Вход в панель оператора на сайте' },
@@ -1522,6 +1522,7 @@ const OP_CMDS = [
   { command: 'draw', description: 'Розыгрыш бесплатной печати сейчас' },
   { command: 'logout_all', description: 'Выйти из панели на всех устройствах' },
   { command: 'id', description: 'Telegram ID и ID чата' },
+  { command: 'widget', description: 'Проверить живую карточку заказа' },
 ];
 async function botCommands(env) {
   const r = await tg(env, 'setMyCommands', { commands: CLIENT_CMDS });
