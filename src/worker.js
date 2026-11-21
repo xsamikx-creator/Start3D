@@ -1,3 +1,4 @@
+import { ORDER_WIDGET } from './widget.js';
 // Start3D server: site assets + order API + Telegram bot webhook.
 // Runs on Cloudflare Workers with a D1 database bound as DB.
 //
@@ -124,6 +125,50 @@ const tx = (k, lang, v = {}) => {
 };
 // Azerbaijani numbers compared by their last 9 digits: +994 50 123 45 67 = 050 123 45 67 = 501234567.
 const normPhone = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('994')) d = d.slice(3); return d.replace(/^0+/, '').slice(-9); };
+/* ---------- live order card in the client's chat (Telegram HTML widget, Bot API 10.4) ---------- */
+const WIDGET_L = {
+  az: { order: 'Sifariş', pcs: 'əd.', paused: 'Fasilə', printed: 'Çap olundu', ready: 'Hazırdır', done: 'Verildi', layer: 'qat', going: 'çap gedir', left: 'qalıb', h: 'saat', min: 'dəq', check: 'Operator detalı çıxarıb yoxlayır', pick: 'Götürə bilərsiniz', restart: 'Çapı yenidən başladırıq', steps: ['Çap', 'Yoxlama', 'Hazır'], open: 'Sifarişi aç', upd: 'yeniləndi' },
+  ru: { order: 'Заказ', pcs: 'шт.', paused: 'Пауза', printed: 'Напечатано', ready: 'Готов', done: 'Выдан', layer: 'слой', going: 'идёт печать', left: 'осталось', h: 'ч', min: 'мин', check: 'Оператор снимает и проверяет деталь', pick: 'Можно забирать', restart: 'Перезапускаем печать', steps: ['Печать', 'Проверка', 'Готов'], open: 'Открыть заказ', upd: 'обновлено' },
+  uk: { order: 'Замовлення', pcs: 'шт.', paused: 'Пауза', printed: 'Надруковано', ready: 'Готово', done: 'Видано', layer: 'шар', going: 'іде друк', left: 'залишилось', h: 'год', min: 'хв', check: 'Оператор знімає і перевіряє деталь', pick: 'Можна забирати', restart: 'Перезапускаємо друк', steps: ['Друк', 'Перевірка', 'Готово'], open: 'Відкрити замовлення', upd: 'оновлено' },
+  en: { order: 'Order', pcs: 'pcs', paused: 'Paused', printed: 'Printed', ready: 'Ready', done: 'Handed over', layer: 'layer', going: 'printing', left: 'left', h: 'h', min: 'min', check: 'The operator is taking the part off and checking it', pick: 'Ready for pick-up', restart: 'Restarting the print', steps: ['Print', 'Check', 'Ready'], open: 'Open order', upd: 'updated' },
+};
+// What the card shows (chat_data, ≤1024 bytes): the order and, while printing, the printer's live state.
+async function widgetData(env, origin, o) {
+  const d = JSON.parse(o.data || '{}');
+  const x = { id: o.id, n: clip(d.name || '', 40), m: d.mat || '', q: d.qty || 1, pr: d.printer ? printerName(d.printer) : '', u: `${origin}/?t=${o.id}-${o.code}`, t: now() };
+  x.s = ['printing', 'post', 'ready', 'done'].includes(o.status) ? o.status : 'done';
+  if (o.status === 'printing' && d.printer) {
+    const r = await env.DB.prepare('SELECT status, order_id FROM printers WHERE id=?').bind(d.printer).first();
+    const st = r?.order_id === o.id ? JSON.parse(r.status || '{}') : {};
+    x.p = st.percent || 0; x.l = st.layer || 0; x.L = st.layers || 0; x.r = Math.round(st.remaining || 0);
+    if (['FAILED', 'PAUSE'].includes(st.state)) x.s = 'failed';
+  }
+  return JSON.stringify(x);
+}
+// Sent once when printing starts (next to the usual text message, which stays for older Telegram apps).
+async function widgetSend(env, origin, o) {
+  if (!o.tg_chat_id) return;
+  const L = WIDGET_L[langOf(o.lang)];
+  const r = await tg(env, 'sendWidget', { chat_id: o.tg_chat_id, html: ORDER_WIDGET.replace('__L__', JSON.stringify(L)), allow_queries: true,
+    caption: `🖨 ${o.id}: ${L.going} — ${env.PUBLIC_ORIGIN || origin}/?t=${o.id}-${o.code}`, chat_data: await widgetData(env, origin, o) });
+  if (!r.ok) { console.log('sendWidget', o.id, r.description); return; }
+  await kvSet(env, 'wdg:' + o.id, JSON.stringify({ c: o.tg_chat_id, m: r.result.message_id, at: now() }));
+  await kvSet(env, `wdgm:${o.tg_chat_id}:${r.result.message_id}`, o.id);
+}
+// Keeps the card current: on every status change, and while printing at most every 20 s.
+async function widgetUpdate(env, origin, o, force = false) {
+  const w = JSON.parse((await kvGet(env, 'wdg:' + o.id)) || 'null');
+  if (!w || (!force && now() - w.at < 20000)) return;
+  w.at = now(); await kvSet(env, 'wdg:' + o.id, JSON.stringify(w));
+  await tg(env, 'editMessageWidgetData', { chat_id: w.c, message_id: w.m, chat_data: await widgetData(env, origin, o) });
+}
+// The card's ↻ button and its quiet refresh when it appears on screen.
+async function onWidgetQuery(env, q, origin) {
+  const id = await kvGet(env, `wdgm:${q.chat?.id}:${q.message_id}`);
+  const o = id && (await getOrder(env, id));
+  const data = o && String(o.tg_chat_id) === String(q.from?.id) ? await widgetData(env, origin, o) : '';
+  await tg(env, 'answerWidgetQuery', { widget_query_id: q.id, data });
+}
 const langOf = (code) => (LANGS.includes((code || '').slice(0, 2)) ? code.slice(0, 2) : 'ru');
 
 /* ---------- Telegram API ---------- */
@@ -420,6 +465,8 @@ async function bridgeStatus(env, req, origin, pid) {
       }
     }
   }
+  // the client's live card in Telegram follows the print (throttled; at once when the state changes)
+  if (prev?.order_id && (await kvGet(env, 'wdg:' + prev.order_id))) { const o = await getOrder(env, prev.order_id); if (o) await widgetUpdate(env, origin, o, was !== st.state); }
   return json({ ok: true });
 }
 async function bridgeFrame(env, req, pid) {
@@ -786,6 +833,7 @@ async function clientPaid(env, id, code) {
 /* ---------- Telegram webhook ---------- */
 async function onUpdate(env, u, origin) {
   if (u.callback_query) return onCallback(env, u.callback_query, origin);
+  if (u.widget_query) return onWidgetQuery(env, u.widget_query, origin);
   const m = u.message;
   if (!m) return;
   const chat = m.chat, from = m.from || {}, lang = langOf(from.language_code);
@@ -950,7 +998,7 @@ async function onUpdate(env, u, origin) {
     await say(tx('linked', n.lang, { id: n.id, st: tx('st_' + n.status, n.lang) }),
       { reply_markup: { inline_keyboard: [[openBtn(origin, n)]] } });
     if (n.status === 'pay') await notifyClient(env, origin, n, 'confirmed');
-    if (n.status === 'printing') await notifyClient(env, origin, n, 'printing');
+    if (n.status === 'printing') { await notifyClient(env, origin, n, 'printing'); await widgetSend(env, origin, n); }
     if (!(await hasPhone(env, chat.id))) await say(tx('ask_phone', n.lang), phoneKeyboard(n.lang));
     return;
   }
@@ -1242,6 +1290,7 @@ async function operatorPhoto(env, origin, id, fileId, say) {
   const first = o.status !== 'ready' && o.status !== 'done';
   if (first) await freePrinter(env, id);
   const n = await setStatus(env, id, first ? { data: JSON.stringify(d), status: 'ready' } : { data: JSON.stringify(d) });
+  if (first) await widgetUpdate(env, origin, n, true);
   if (n.tg_chat_id) {
     const rest = n.price ? n.price - deposit(env, n.price) : 0;
     await tg(env, 'sendPhoto', {
@@ -1264,11 +1313,12 @@ async function onCallback(env, q, origin) {
   const opChat = await kvGet(env, 'operator_chat');
   const allowed = (opChat && String(q.message?.chat?.id) === String(opChat)) || String(q.from.id) === String(await adminId(env));
   const answer = (text) => tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text });
+  if (act === 'noop') return answer('');
   if (act === 'pc' || act === 'pn') { // the phone's owner answers "was this order yours?"
     const o = await getOrder(env, id); const d = JSON.parse(o?.data || '{}');
     if (!o || String(d.phoneAsk) !== String(q.from.id)) return answer('—');
     delete d.phoneAsk;
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [] } });
+    await doneMarkup(env, q, act === 'pc' ? tx('phone_yes', o.lang) + ' ✓' : tx('phone_no', o.lang) + ' ✓');
     if (act === 'pc') {
       await env.DB.prepare('UPDATE orders SET tg_chat_id=?, data=? WHERE id=?').bind(q.from.id, JSON.stringify(d), id).run();
       const n = await getOrder(env, id);
@@ -1285,7 +1335,7 @@ async function onCallback(env, q, origin) {
   if (act === 'bu') { // owner approved (or cancelled) a bridge update
     if (String(q.from.id) !== String(await adminId(env))) return answer('Только владелец');
     const pend = JSON.parse((await kvGet(env, 'bridge_upd_pending')) || 'null');
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [] } });
+    await doneMarkup(env, q, id === '-' ? 'Отменено' : '✓ Обновление одобрено');
     if (id === '-' || !pend || !pend.sha.startsWith(id) || now() - pend.at > 30 * 60e3) return answer(id === '-' ? 'Отменено' : 'Предложение устарело — /bridge update ещё раз');
     await kvSet(env, 'bridge_update', JSON.stringify({ sha: pend.sha, hb: pend.hb, hs: pend.hs }));
     await kvSet(env, 'bridge_restart', now());
@@ -1330,7 +1380,7 @@ async function onCallback(env, q, origin) {
       return [{ text: `🤖 ${p.name}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `ap:${p.id}|${o.id}` }];
     });
     rows.push([{ text: '↩︎ Назад', callback_data: `bk:${o.id}` }]);
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    await opChoice(env, q, o, rows);
     return answer('На каком принтере печатать?');
   }
   if (act === 'bk') { await refreshOperatorMsg(env, o); await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: opButtons(o) } }); return answer(''); }
@@ -1340,17 +1390,16 @@ async function onCallback(env, q, origin) {
       const b = busy.results.find((r) => r.id === p.id);
       return [{ text: `🖨 ${p.name}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `sp:${p.id}|${o.id}` }];
     });
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    await opChoice(env, q, o, rows);
     return answer('На каком принтере?');
   }
-  if (act === 'noop') return answer('');
   if (act === 'sv') { // the end-of-print camera frame goes to the client (page + Telegram)
     const d = JSON.parse(o.data || '{}');
     if (!d.shot || d.shotFail) return answer('Кадра нет');
     if (d.shotPub) return answer('Уже показан клиенту');
     d.shotPub = true; const n = await setStatus(env, o.id, { data: JSON.stringify(d) });
     if (n.tg_chat_id) await tg(env, 'sendPhoto', { chat_id: n.tg_chat_id, photo: d.shot, caption: tx('shot_client', n.lang, { id: n.id }), reply_markup: { inline_keyboard: [[openBtn(origin, n)]] } });
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [[{ text: '✓ Показано клиенту', callback_data: 'noop:' + o.id }]] } });
+    await doneMarkup(env, q, '✓ Показано клиенту');
     return answer(n.tg_chat_id ? 'Клиент увидит кадр на странице заказа и в Telegram' : 'Клиент увидит кадр на странице заказа');
   }
   if (act === 'rs' && ['printing', 'post'].includes(o.status)) { // restart a failed print: pick the printer, the order and its link stay the same
@@ -1361,11 +1410,28 @@ async function onCallback(env, q, origin) {
       return [{ text: `🔁 ${p.name}${p.id === cur ? ' (тот же)' : ''}${b ? ' · занят ' + b.order_id : ''}`, callback_data: `rr:${p.id}|${o.id}` }];
     });
     rows.push([{ text: '↩︎ Назад', callback_data: `bk:${o.id}` }]);
-    await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+    await opChoice(env, q, o, rows);
     return answer('На каком принтере перезапускаете?');
   }
   const r = await opAction(env, origin, o, act, { pid, chatId: q.message?.chat?.id });
+  // the choice was made in a private (ephemeral) list: replace that list with the result, for this operator only
+  if (isEphemeral(q.message) && (r.note || r.error)) await tg(env, 'sendMessage', { chat_id: q.message.chat.id, text: r.error ? '⚠️ ' + r.error : `✓ ${o.id}: ${r.note}`,
+    ephemeral_message_parameters: { receiver_user_id: q.from.id, callback_query_id: q.id, replace_callback_query_message: true } });
   return answer(r.error || r.note);
+}
+// Ephemeral messages (Bot API 10.2+): seen only by the operator who pressed. Printer lists and similar choices go
+// there instead of rewriting the shared order card; older setups fall back to editing the card's buttons.
+const isEphemeral = (m) => !!(m && (m.ephemeral_message_id || m.receiver_user));
+async function opChoice(env, q, o, rows) {
+  const r = await tg(env, 'sendMessage', { chat_id: q.message.chat.id, text: `${o.id} · ${o.client}: выберите (видно только вам)`,
+    reply_markup: { inline_keyboard: rows.filter((row) => !String(row[0].callback_data).startsWith('bk:')) },
+    ephemeral_message_parameters: { receiver_user_id: q.from.id, callback_query_id: q.id } });
+  if (!r.ok) await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: rows } });
+}
+// A grey button that can't be pressed (Bot API 10.3); older setups get a button that just answers.
+async function doneMarkup(env, q, text) {
+  const r = await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [[{ text, disabled: {} }]] } });
+  if (!r.ok) await tg(env, 'editMessageReplyMarkup', { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: { inline_keyboard: [[{ text, callback_data: 'noop:x' }]] } });
 }
 
 // One place for order actions: used by the bot buttons and by the web operator panel.
@@ -1380,7 +1446,7 @@ async function opAction(env, origin, o, act, x = {}) {
     const d = JSON.parse(o.data || '{}'); d.printer = x.pid;
     n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
     await env.DB.prepare('INSERT INTO printers(id, order_id, updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id').bind(x.pid, id, now()).run();
-    await notifyClient(env, origin, n, 'printing'); note = `Печать на ${printerName(x.pid)}`;
+    await notifyClient(env, origin, n, 'printing'); await widgetSend(env, origin, n); note = `Печать на ${printerName(x.pid)}`;
   }
   else if (act === 'rr' && ['printing', 'post'].includes(o.status) && PRINTERS.some((p) => p.id === x.pid)) {
     // Same order, same link: the client keeps watching; live progress starts from zero on the chosen printer.
@@ -1388,7 +1454,7 @@ async function opAction(env, origin, o, act, x = {}) {
     await freePrinter(env, id);
     n = await setStatus(env, id, { status: 'printing', data: JSON.stringify(d) });
     await env.DB.prepare("INSERT INTO printers(id, order_id, status, updated_at) VALUES(?,?,'{}',?) ON CONFLICT(id) DO UPDATE SET order_id=excluded.order_id, status='{}'").bind(x.pid, id, now()).run();
-    await notifyClient(env, origin, n, 'restarted'); note = `Перезапуск на ${printerName(x.pid)} · клиенту сообщили`;
+    await notifyClient(env, origin, n, 'restarted'); await widgetUpdate(env, origin, n, true); note = `Перезапуск на ${printerName(x.pid)} · клиенту сообщили`;
   }
   else if (act === 'ap' && o.status === 'queue') {
     if (env.AUTO_PRINT !== 'on') return { error: 'Автопечать выключена' }; // switched off: prints are started by hand on the printer
@@ -1405,13 +1471,13 @@ async function opAction(env, origin, o, act, x = {}) {
     if (r.ok) await kvSet(env, 'photo_wait:' + r.result.message_id, id);
     note = 'Жду фото в Telegram';
   }
-  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); await tlToClient(env, n); note = 'Готов'; }
+  else if (act === 'dn' && ['printing', 'post'].includes(o.status)) { await freePrinter(env, id); n = await setStatus(env, id, { status: 'ready' }); await notifyClient(env, origin, n, 'ready'); await widgetUpdate(env, origin, n, true); await tlToClient(env, n); note = 'Готов'; }
   else if (act === 'rp' && ['ready', 'done'].includes(o.status)) {
     const d = JSON.parse(o.data || '{}'); d.reprints = (d.reprints || 0) + 1; d.accept = 'reprint';
     n = await setStatus(env, id, { status: 'queue', data: JSON.stringify(d) });
     await notifyClient(env, origin, n, 'reprint'); note = 'Перепечатка в очереди';
   }
-  else if (act === 'g' && o.status === 'ready') { n = await setStatus(env, id, { status: 'done' }); await notifyClient(env, origin, n, 'done'); note = 'Выдан'; }
+  else if (act === 'g' && o.status === 'ready') { n = await setStatus(env, id, { status: 'done' }); await notifyClient(env, origin, n, 'done'); await widgetUpdate(env, origin, n, true); note = 'Выдан'; }
   else return { error: 'Статус уже изменился' };
   await refreshOperatorMsg(env, n);
   return { ok: true, note, order: n };
@@ -1421,10 +1487,10 @@ async function opAction(env, origin, o, act, x = {}) {
 async function ensureWebhook(env, origin) {
   if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET || origin.includes('localhost')) return;
   // Keyed by origin + bot id, so swapping BOT_TOKEN for a new bot re-registers the webhook.
-  const key = `${origin}|${String(env.BOT_TOKEN).split(':')[0]}`;
+  const key = `${origin}|${String(env.BOT_TOKEN).split(':')[0]}|w1`; // |w1: widget queries added to the updates
   if ((await kvGet(env, 'cmds_v')) !== CMDS_V) { await botCommands(env); await kvSet(env, 'cmds_v', CMDS_V); }
   if ((await kvGet(env, 'webhook')) === key) return;
-  const r = await tg(env, 'setWebhook', { url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
+  const r = await tg(env, 'setWebhook', { url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query', 'widget_query'] });
   if (!r.ok) return console.error('setWebhook failed', r.description);
   await botCommands(env);
   const me = await tg(env, 'getMe', {});
@@ -1458,7 +1524,7 @@ async function adminId(env) { return env.ADMIN_TG_ID || (await kvGet(env, 'admin
 
 async function setup(env, origin) {
   const hook = await tg(env, 'setWebhook', {
-    url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true,
+    url: `${origin}/tg/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query', 'widget_query'], drop_pending_updates: true,
   });
   const cmds = await botCommands(env);
   const me = await tg(env, 'getMe', {});
