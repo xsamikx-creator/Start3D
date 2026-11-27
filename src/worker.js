@@ -621,6 +621,8 @@ async function bridgeBusy(env, req) {
   for (const pr of PRINTERS) rotate[pr.id] = (await kvGet(env, 'rotate:' + pr.id)) || DEFAULT_ROTATE[pr.id] || '0';
   // the moved camera keeps the rotation set for the printer it now films
   for (const pr of PRINTERS) { const src = await camSrc(env, pr.id); if (src !== pr.id && src !== '-') { const r = await kvGet(env, 'rotate:' + pr.id); if (r) rotate[src] = r; } }
+  // Nov 27: the laptop got the current bridge by hand; forget older approvals so it isn't sent back to them
+  if (!(await kvGet(env, 'bridge_upd_reset1'))) { await env.DB.prepare("DELETE FROM kv WHERE k IN ('bridge_update','bridge_upd_pending')").run(); await kvSet(env, 'bridge_upd_reset1', now()); }
   const upd = JSON.parse((await kvGet(env, 'bridge_update')) || 'null');
   const update = upd && upd.hb !== (req?.headers.get('x-bridge-sha') || '') ? upd : undefined;
   return json({ busy: [...busy], rotate, orders, camfor, update, jobs: await jobsForBridge(env), restart: +((await kvGet(env, 'bridge_restart')) || 0) > +((await kvGet(env, 'bridge_start')) || 0) });
